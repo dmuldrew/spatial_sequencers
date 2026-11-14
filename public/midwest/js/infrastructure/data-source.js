@@ -15,14 +15,14 @@ function inputValues(record) {
 export function validateDataset(data) {
   if (data?.schemaVersion !== 1 || !data.inputs
     || (!Array.isArray(data.cells) && !Array.isArray(data.samples))) {
-    throw new Error('Expected a version 1 A1/A2 dataset with H3 cells or geographic samples.');
+    throw new Error('Expected a version 1 map dataset with H3 cells or geographic samples.');
   }
   for (const key of ['A1', 'A2']) {
     const input = data.inputs[key];
     if (!input || input.product !== INPUTS[key].product
       || input.band !== INPUTS[key].band || input.units !== INPUTS[key].units
       || !Number.isFinite(input.resolutionMeters) || input.resolutionMeters <= 0) {
-      throw new Error(`${key}: dataset metadata does not match the configured product, band and units.`);
+      throw new Error(`${INPUTS[key].product}: dataset metadata does not match the configured product, band and units.`);
     }
   }
   if (Array.isArray(data.cells)) {

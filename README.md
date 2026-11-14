@@ -193,14 +193,15 @@ spatial_sequencers/
 The map below the PyroSync spiral covers a 180 × 120 mile study area centered
 on 42°N, 93.5°W. The bundled July 11–26, 2024 Terra MODIS snapshot has
 7,443 H3 cells with both inputs. This map has its own zoom slider and is also
-available at `/midwest/index.html`.
+available at `/midwest/map.html`. Use `/#iowa-map` to jump to it from the dashboard.
 
-- **A1** is MOD11A2 daytime land surface temperature (°C), averaged from
+- **MOD11A2 daytime land surface temperature** (°C) is averaged from
   two quality-filtered 8-day composites. It controls hue from green to brown.
-- **A2** is MOD13Q1 NDVI from one quality-filtered 16-day composite. It
-  controls saturation from 75 to 150 on a 0–255 scale.
-- Both inputs are normalized over the visible cells. Gray cells are missing
-  one or both inputs. Click a hexagon for raw and normalized values. The
+- **MOD13Q1 NDVI** comes from one quality-filtered 16-day composite. It
+  controls saturation from 5% to 95%.
+- Both inputs use the visible 5th–95th percentiles for color, with values
+  outside those limits clipped to the endpoints. Views with fewer than 20
+  observations per input use the full range. Gray cells are missing one or both inputs. Click a hexagon for raw and normalized values. The
   closest zoom depends on the coarser active input's source resolution.
 
 The map's input definitions, appearance, zoom policy, and sonification extension

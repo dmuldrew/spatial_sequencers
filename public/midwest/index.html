@@ -3,120 +3,15 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Earth Atlas · Midwest A1 × A2</title>
-    <link rel="stylesheet" href="vendor/leaflet.css">
-    <link rel="stylesheet" href="style.css">
+    <title>Earth Atlas · Iowa Temperature and Vegetation</title>
+    <script>
+      location.replace('./map.html' + location.search + location.hash);
+    </script>
+    <noscript>
+      <meta http-equiv="refresh" content="0; url=./map.html">
+    </noscript>
   </head>
   <body>
-    <header>
-      <div class="brand">
-        <strong>◈ EARTH ATLAS</strong>
-        <span>TWO INPUTS / ONE LANDSCAPE</span>
-      </div>
-      <a href="https://www.earthdata.nasa.gov/data/instruments/modis" target="_blank" rel="noopener">
-        NASA MODIS data ↗
-      </a>
-    </header>
-
-    <div class="layout">
-      <aside>
-        <div class="eyebrow">MODIS × H3</div>
-        <h1>Heat meets<br>vegetation.</h1>
-        <p class="intro">Explore the relationship between surface temperature and vegetation.</p>
-
-        <section>
-          <div class="eyebrow">STUDY REGION</div>
-          <h2 id="region-name">Central Iowa · American Midwest</h2>
-          <p>180 × 120 miles, centered on 42°N, 93.5°W. This is the widest view.</p>
-        </section>
-
-        <section>
-          <div class="eyebrow">A1 / HUE</div>
-          <h2 id="a1-name">Daytime surface temperature</h2>
-          <p id="a1-details">MOD11A2 · daytime land surface temperature · °C · nominal 1 km / 8 days.</p>
-          <div class="eyebrow">A2 / SATURATION</div>
-          <h2 id="a2-name">Vegetation index (NDVI)</h2>
-          <p id="a2-details">MOD13Q1 · NDVI · nominal 250 m / 16 days.</p>
-        </section>
-
-        <section>
-          <div class="eyebrow">DATA SOURCE</div>
-          <h2 id="data-state">Loading…</h2>
-          <p id="provenance">Checking prepared observations…</p>
-          <label class="upload" for="file">Import prepared A1/A2 JSON ↑</label>
-          <input id="file" type="file" accept=".json" hidden>
-          <button id="reload" type="button">Reload bundled data</button>
-        </section>
-
-        <p class="footnote">
-          Color ranges follow the visible hexagons. The same value may change color when you pan
-          or zoom. Gray means missing data. A constant input range maps to 0.5.
-        </p>
-      </aside>
-
-      <main>
-        <div class="toolbar">
-          <div>
-            <span class="eyebrow">OBSERVATION WINDOW</span>
-            <strong id="window">Loading…</strong>
-          </div>
-          <button id="fit" type="button">↗ Reset view</button>
-        </div>
-
-        <div class="stats">
-          <div>
-            <strong id="cell-count">—</strong>
-            <span>cells with both inputs</span>
-          </div>
-          <div>
-            <strong id="grid-count">—</strong>
-            <span>visible hexagons</span>
-          </div>
-          <div>
-            <strong id="grid-resolution">—</strong>
-            <span>H3 resolution</span>
-          </div>
-        </div>
-
-        <div class="map-zoom">
-          <label for="zoom">
-            Map zoom
-            <output id="zoomLabel">180 miles across</output>
-          </label>
-          <input id="zoom" type="range" min="0" max="100" value="0" step="0.1">
-          <div class="range-label">
-            <span>Full study area</span>
-            <span>Source-resolution limit</span>
-          </div>
-          <p id="zoom-policy" class="hint"></p>
-        </div>
-
-        <div class="map-wrap">
-          <div id="map" aria-label="Central Iowa hexagon map of temperature and vegetation"></div>
-        </div>
-
-        <div class="color-key">
-          <div>
-            <strong>A1: green → brown</strong>
-            <div class="hue-ramp"></div>
-            <span id="a1-range">No observations</span>
-          </div>
-          <div>
-            <strong>A2: saturation 75 → 150 / 255</strong>
-            <div class="saturation-ramp"></div>
-            <span id="a2-range">No observations</span>
-          </div>
-        </div>
-        <div id="status" role="status">Loading NASA observations…</div>
-        <footer>
-          <span>NASA MODIS · H3 cells</span>
-          <span>Gray = missing input</span>
-        </footer>
-      </main>
-    </div>
-
-    <script src="vendor/leaflet.js"></script>
-    <script src="vendor/h3.js"></script>
-    <script type="module" src="js/app.js"></script>
+    <p><a href="./map.html">Open the Iowa MODIS map</a></p>
   </body>
 </html>

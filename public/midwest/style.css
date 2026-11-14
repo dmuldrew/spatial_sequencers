@@ -70,12 +70,33 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
 .range-label { display: flex; justify-content: space-between; font-size: 10px; color: #66746b; }
 .map-wrap { position: relative; aspect-ratio: 1.5; outline: 1px solid #cbd5c9; border-radius: 8px; overflow: hidden; }
 #map { position: absolute; inset: 0; height: 100%; background: #e1e7dd; }
-.color-key { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; padding: 14px 0; font-size: 11px; }
-.color-key strong, .color-key span { display: block; }
-.hue-ramp { height: 10px; margin: 8px 0; background: linear-gradient(90deg, hsl(120, 44%, 35%), hsl(75, 44%, 35%), hsl(30, 44%, 35%)); }
-.saturation-ramp { height: 10px; margin: 8px 0; background: linear-gradient(90deg, hsl(75, 29.4118%, 35%), hsl(75, 58.8235%, 35%)); }
-#status { padding: 12px 0; font-size: 12px; line-height: 1.5; color: #526349; }
-footer { border-top: 1px solid #d7ddd3; padding-top: 12px; font-size: 10px; color: #66746b; display: flex; justify-content: space-between; gap: 16px; }
+.color-key {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding-top: 12px;
+  font-size: 11px;
+}
+
+.color-matrix {
+  display: grid;
+  grid-template-columns: auto 72px;
+  align-items: center;
+  gap: 3px 6px;
+}
+
+.color-swatches {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-auto-rows: 10px;
+  gap: 1px;
+}
+
+.temperature-axis { grid-column: 2; white-space: nowrap; }
+.color-limits { display: grid; gap: 2px; }
+.color-limits span { font-variant-numeric: tabular-nums; }
+#status { padding-top: 5px; font-size: 11px; color: #526349; }
 
 @media (max-width: 800px) {
   .layout { grid-template-columns: 1fr; }

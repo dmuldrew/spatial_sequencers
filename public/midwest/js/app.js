@@ -1,6 +1,6 @@
 import { INPUTS, coarsestResolution } from './domain/inputs.js';
 import { STUDY_AREA, areaBounds } from './domain/study-area.js';
-import { appearanceFor, viewportRanges } from './domain/appearance.js';
+import { appearanceFor, colorFor, viewportRanges } from './domain/appearance.js';
 import { preferredH3Resolution, ZOOM_POLICY } from './domain/zoom-policy.js';
 import { loadBundledDataset, loadDatasetFile } from './infrastructure/data-source.js';
 import { aggregateSamples, visibleGrid } from './infrastructure/hex-grid.js';
@@ -38,12 +38,13 @@ function cellPopup(cell, appearance) {
   const container = document.createElement('div');
   const lines = [
     `H3 ${cell.id} · resolution ${h3Resolution}`,
-    `A1 · ${INPUTS.A1.label}: ${formatValue(cell.A1, INPUTS.A1.units)}`,
-    `A2 · ${INPUTS.A2.label}: ${formatValue(cell.A2, INPUTS.A2.units)}`,
-    `Normalized A1: ${formatValue(appearance.A1)}`,
-    `Normalized A2: ${formatValue(appearance.A2)}`,
+    ...Object.entries(INPUTS).map(([key, input]) => {
+      const value = formatValue(cell[key], input.units);
+      const normalized = formatValue(appearance[key]);
+      return `${input.product} ${input.label}: ${value} (normalized: ${normalized})`;
+    }),
     appearance.missing ? 'Both inputs are required for color.'
-      : `Hue: ${appearance.hue.toFixed(1)}° · saturation: ${appearance.saturation.toFixed(1)}/255`,
+      : `Hue: ${appearance.hue.toFixed(1)}° · saturation: ${Math.round(appearance.saturation * 100)}%`,
   ];
   for (const text of lines) {
     const line = document.createElement('div');
@@ -69,8 +70,8 @@ function render() {
     element('status').textContent = loadError;
   } else if (hasObservations) {
     element('status').textContent = complete.length
-      ? `${complete.length.toLocaleString()} visible cells have both inputs. Ranges update after zooming or panning.`
-      : 'No paired observations in this view. Gray cells indicate missing A1 or A2.';
+      ? `${complete.length.toLocaleString()} cells with both measurements.`
+      : 'No paired observations in this view. Gray cells indicate missing temperature or vegetation data.';
   }
 }
 
@@ -83,7 +84,7 @@ function installDataset(next) {
   hasObservations = (next.cells ?? next.samples).length > 0;
   loadError = null;
   element('window').textContent = next.periodLabel || 'Observation dates unavailable';
-  element('provenance').textContent = next.description || 'Prepared A1/A2 dataset';
+  element('provenance').textContent = next.description || 'Prepared map dataset';
   element('data-state').textContent = hasObservations ? 'Observed data' : 'Data unavailable';
   element('zoom-policy').textContent = `Closest view: at least ${ZOOM_POLICY.minimumPixelsAcross} pixels across at the coarser input resolution (${activeResolution.toLocaleString()} m).`;
   element('status').textContent = hasObservations ? 'Preparing paired cells…'
@@ -129,12 +130,28 @@ if (frame) {
   }).observe(document.body);
 }
 
+function renderColorLegend() {
+  const swatches = [];
+  for (const vegetation of [1, 0.5, 0]) {
+    for (const temperature of [0, 0.5, 1]) {
+      const swatch = document.createElement('span');
+      swatch.style.backgroundColor = colorFor(temperature, vegetation).color;
+      swatches.push(swatch);
+    }
+  }
+  element('color-swatches').replaceChildren(...swatches);
+}
+
+renderColorLegend();
 element('region-name').textContent = STUDY_AREA.name;
 for (const [key, input] of Object.entries(INPUTS)) {
   const id = key.toLowerCase();
+  const encoding = { A1: 'Hue', A2: 'Saturation' };
+  element(`${id}-encoding`).textContent = `${input.product} · ${encoding[key]}`;
   element(`${id}-name`).textContent = input.label;
+  element(`${id}-key`).textContent = `${input.product} · ${input.label}`;
   element(`${id}-details`).textContent =
-    `${input.product} · ${input.units} · nominal ${input.resolutionMeters.toLocaleString()} m / ${input.compositeDays} days.`;
+    `${input.units} · nominal ${input.resolutionMeters.toLocaleString()} m / ${input.compositeDays} days.`;
 }
 view.updateLimits(activeResolution, true);
 bindControls();

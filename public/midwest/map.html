@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Earth Atlas · Iowa Temperature and Vegetation</title>
+    <link rel="stylesheet" href="vendor/leaflet.css">
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <header>
+      <div class="brand">
+        <strong>◈ EARTH ATLAS</strong>
+        <span>TWO INPUTS / ONE LANDSCAPE</span>
+      </div>
+      <a href="https://www.earthdata.nasa.gov/data/instruments/modis" target="_blank" rel="noopener">
+        NASA MODIS data ↗
+      </a>
+    </header>
+
+    <div class="layout">
+      <aside>
+        <div class="eyebrow">MODIS × H3</div>
+        <h1>Heat meets<br>vegetation.</h1>
+        <p class="intro">Explore the relationship between surface temperature and vegetation.</p>
+
+        <section>
+          <div class="eyebrow">STUDY REGION</div>
+          <h2 id="region-name">Central Iowa · American Midwest</h2>
+          <p>180 × 120 miles, centered on 42°N, 93.5°W. This is the widest view.</p>
+        </section>
+
+        <section>
+          <div id="a1-encoding" class="eyebrow">MOD11A2 · HUE</div>
+          <h2 id="a1-name">Daytime surface temperature</h2>
+          <p id="a1-details">MOD11A2 · daytime land surface temperature · °C · nominal 1 km / 8 days.</p>
+          <div id="a2-encoding" class="eyebrow">MOD13Q1 · SATURATION</div>
+          <h2 id="a2-name">Vegetation index (NDVI)</h2>
+          <p id="a2-details">MOD13Q1 · NDVI · nominal 250 m / 16 days.</p>
+        </section>
+
+        <section>
+          <div class="eyebrow">DATA SOURCE</div>
+          <h2 id="data-state">Loading…</h2>
+          <p id="provenance">Checking prepared observations…</p>
+          <label class="upload" for="file">Import prepared map data (JSON) ↑</label>
+          <input id="file" type="file" accept=".json" hidden>
+          <button id="reload" type="button">Reload bundled data</button>
+        </section>
+
+        <p class="footnote">
+          Surface temperature runs from green to brown. Higher NDVI makes the color more
+          saturated (5–95%). Color limits use the visible 5th–95th percentiles. Small views
+          use their full range. Values outside the color limits use the nearest endpoint.
+        </p>
+      </aside>
+
+      <main>
+        <div class="toolbar">
+          <div>
+            <span class="eyebrow">OBSERVATION WINDOW</span>
+            <strong id="window">Loading…</strong>
+          </div>
+          <button id="fit" type="button">↗ Reset view</button>
+        </div>
+
+        <div class="stats">
+          <div>
+            <strong id="cell-count">—</strong>
+            <span>cells with both inputs</span>
+          </div>
+          <div>
+            <strong id="grid-count">—</strong>
+            <span>visible hexagons</span>
+          </div>
+          <div>
+            <strong id="grid-resolution">—</strong>
+            <span>H3 resolution</span>
+          </div>
+        </div>
+
+        <div class="map-zoom">
+          <label for="zoom">
+            Map zoom
+            <output id="zoomLabel">180 miles across</output>
+          </label>
+          <input id="zoom" type="range" min="0" max="100" value="0" step="0.1">
+          <div class="range-label">
+            <span>Full study area</span>
+            <span>Source-resolution limit</span>
+          </div>
+          <p id="zoom-policy" class="hint"></p>
+        </div>
+
+        <div class="map-wrap">
+          <div id="map" aria-label="Central Iowa hexagon map of temperature and vegetation"></div>
+        </div>
+
+        <div class="color-key" aria-label="Map color legend">
+          <div class="color-matrix" aria-hidden="true">
+            <span class="vegetation-axis">↑ NDVI</span>
+            <div id="color-swatches" class="color-swatches"></div>
+            <span class="temperature-axis">Temperature →</span>
+          </div>
+          <div class="color-limits">
+            <div><strong id="a1-key">MOD11A2 surface temperature</strong> <span id="a1-range">—</span></div>
+            <div><strong id="a2-key">MOD13Q1 vegetation index (NDVI)</strong> <span id="a2-range">—</span></div>
+            <div>Gray = missing data</div>
+          </div>
+        </div>
+        <div id="status" role="status">Loading NASA observations…</div>
+      </main>
+    </div>
+
+    <script src="vendor/leaflet.js"></script>
+    <script src="vendor/h3.js"></script>
+    <script type="module" src="js/app.js"></script>
+  </body>
+</html>
