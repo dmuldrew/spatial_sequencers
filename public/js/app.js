@@ -1402,12 +1402,11 @@ async function init() {
     state.biomes = dataset.biomes || [];
     state.worldGeo = topojson.feature(world, world.objects.countries);
 
-    // Start centered on California's highest anomaly month so the spiral & tension immediately tell a story
+    // Start at the earliest recorded month (2001-01) so the spiral draws forward chronologically
     const firstBiome = state.biomes[0];
     if (firstBiome) {
       state.globeRotation = [-firstBiome.lon, -firstBiome.lat];
-      const peakIdx = firstBiome.records.findIndex((r) => r.ym === firstBiome.peakAnomaly.ym);
-      state.monthIndex = peakIdx >= 0 ? peakIdx : firstBiome.records.length - 1;
+      state.monthIndex = 0;
     }
 
     renderBiomeControls();
