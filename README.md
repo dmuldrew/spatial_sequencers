@@ -92,7 +92,10 @@ This repository includes [.github/workflows/deploy-pages.yml](.github/workflows/
 
 1. On GitHub, open **Repository Settings → Pages**.
 2. Under **Build and deployment**, set **Source** to **GitHub Actions**.
-3. Push any commit to `main` (or click **Run workflow** in the **Actions** tab) to publish **`https://dmuldrew.github.io/spatial_sequencers/`**.
+3. Push any commit to `main` to deploy automatically, **or deploy a specific branch manually**:
+   - Open **Actions → Deploy PyroSync to GitHub Pages → Run workflow**.
+   - Keep **Use workflow from** set to **`main`**, enter your target branch/tag/SHA in **`Branch, tag, or commit SHA to build and deploy`**, and click **Run workflow**.
+4. Visit **`https://dmuldrew.github.io/spatial_sequencers/`**.
 
 #### Manual Branch Deploy via Script
 
