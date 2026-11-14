@@ -190,3 +190,25 @@ spatial_sequencers/
 | **The Earth Information Jukebox** | NASA Earth Information Center (EIC) visuals | Real-time visual-to-audio sonification tool | Beginner (Youth) / Intermediate |
 | **Dancing with the SARs** | NISAR Synthetic Aperture Radar (SAR) | Interactive surface-change tracker & visual narrative | Intermediate / Advanced |
 | **Harmonization of MODIS and VIIRS Hot Spots** | NASA FIRMS active fire hotspots (MODIS & VIIRS) | Harmonized Burning Activity Calendar & web dashboard | Intermediate / Advanced |
+
+## Central Iowa MODIS hexagon map
+
+Available on the second home page tab (**Central Iowa MODIS Hex Map** / `/#iowa-map`) or directly at `/midwest/map.html`, this map covers a 180 × 120 mile study area centered
+on 42°N, 93.5°W. The bundled July 11–26, 2024 Terra MODIS snapshot has
+7,443 H3 cells with both inputs and includes its own zoom slider.
+
+- **MOD11A2 daytime land surface temperature** (°C) is averaged from
+  two quality-filtered 8-day composites. It controls hue from green to brown.
+- **MOD13Q1 NDVI** comes from one quality-filtered 16-day composite. It
+  controls saturation from 5% to 95%.
+- Both inputs use the visible 5th–95th percentiles for color, with values
+  outside those limits clipped to the endpoints. Views with fewer than 20
+  observations per input use the full range. Gray cells are missing one or both inputs. Click a hexagon for raw and normalized values. The
+  closest zoom depends on the coarser active input's source resolution.
+
+The map's input definitions, appearance, zoom policy, and sonification extension
+point live in `public/midwest/js/domain/`. The July snapshot and its source
+provenance are in `public/midwest/data/midwest.json`. The existing PyroSync
+spiral handles its own audio. To regenerate the map snapshot from the source
+GeoTIFF bands, run `python3 scripts/prepare_midwest.py /path/to/geotiffs` with
+Rasterio, NumPy, and H3 v4 installed.
