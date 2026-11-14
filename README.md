@@ -190,10 +190,9 @@ spatial_sequencers/
 
 ## Central Iowa MODIS hexagon map
 
-The map below the PyroSync spiral covers a 180 × 120 mile study area centered
+Available on the second home page tab (**Central Iowa MODIS Hex Map** / `/#iowa-map`) or directly at `/midwest/map.html`, this map covers a 180 × 120 mile study area centered
 on 42°N, 93.5°W. The bundled July 11–26, 2024 Terra MODIS snapshot has
-7,443 H3 cells with both inputs. This map has its own zoom slider and is also
-available at `/midwest/map.html`. Use `/#iowa-map` to jump to it from the dashboard.
+7,443 H3 cells with both inputs and includes its own zoom slider.
 
 - **MOD11A2 daytime land surface temperature** (°C) is averaged from
   two quality-filtered 8-day composites. It controls hue from green to brown.

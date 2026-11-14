@@ -1315,6 +1315,75 @@ function wireEvents() {
   });
 }
 
+function activatePageTab(tabId, { focusTab = false, updateHash = true } = {}) {
+  const tabs = Array.from(document.querySelectorAll('.page-tab[role="tab"]'));
+  const targetTab = tabs.find((t) => t.id === tabId) || tabs[0];
+  if (!targetTab) return;
+
+  tabs.forEach((tab) => {
+    const selected = tab === targetTab;
+    tab.setAttribute('aria-selected', String(selected));
+    tab.setAttribute('tabindex', selected ? '0' : '-1');
+    const panelId = tab.getAttribute('aria-controls');
+    const panel = panelId ? document.getElementById(panelId) : null;
+    if (panel) panel.hidden = !selected;
+  });
+
+  if (targetTab.id === 'tab-iowa') {
+    if (state.isPlaying) togglePlay();
+    const frame = document.getElementById('midwest-map-frame');
+    if (frame) {
+      if (!frame.getAttribute('src') && frame.dataset.src) {
+        frame.src = frame.dataset.src;
+      } else if (frame.contentWindow) {
+        frame.contentWindow.dispatchEvent(new Event('resize'));
+      }
+    }
+  }
+
+  if (focusTab) targetTab.focus();
+  if (updateHash && window.history && window.history.replaceState) {
+    const hash = targetTab.id === 'tab-iowa' ? '#iowa-map' : '#spiral';
+    window.history.replaceState(null, '', hash);
+  }
+}
+
+function wirePageTabs() {
+  const tabs = Array.from(document.querySelectorAll('.page-tab[role="tab"]'));
+  if (!tabs.length) return;
+
+  tabs.forEach((tab, idx) => {
+    tab.addEventListener('click', () => activatePageTab(tab.id));
+    tab.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        activatePageTab(tabs[(idx + 1) % tabs.length].id, { focusTab: true });
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        activatePageTab(tabs[(idx - 1 + tabs.length) % tabs.length].id, { focusTab: true });
+      } else if (e.key === 'Home') {
+        e.preventDefault();
+        activatePageTab(tabs[0].id, { focusTab: true });
+      } else if (e.key === 'End') {
+        e.preventDefault();
+        activatePageTab(tabs[tabs.length - 1].id, { focusTab: true });
+      }
+    });
+  });
+
+  const syncFromHash = () => {
+    const h = window.location.hash;
+    if (h === '#iowa-map' || h === '#tab-iowa') {
+      activatePageTab('tab-iowa', { updateHash: false });
+    } else if (h === '#spiral' || h === '#tab-spiral') {
+      activatePageTab('tab-spiral', { updateHash: false });
+    }
+  };
+
+  window.addEventListener('hashchange', syncFromHash);
+  syncFromHash();
+}
+
 // =========================================================================
 // Bootstrap
 // =========================================================================
@@ -1349,6 +1418,7 @@ async function init() {
     renderAudioLegend();
     updateHudAndSidebar();
     wireEvents();
+    wirePageTabs();
 
     const meta = document.getElementById('dataset-meta');
     if (meta) {
