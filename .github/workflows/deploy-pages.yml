@@ -1,3 +1,4 @@
+# Build and deploy PyroSync static bundle (public/ + vendor/ + .nojekyll) to GitHub Pages
 name: Deploy PyroSync to GitHub Pages
 
 on:
@@ -15,13 +16,13 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build-and-deploy:
+  deploy:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Setup Node.js
@@ -32,11 +33,14 @@ jobs:
       - name: Build static bundle (public + vendor + .nojekyll)
         run: ./scripts/deploy-gh-pages.sh --build-only
 
-      - name: Upload GitHub Pages artifact
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./dist
+          path: './dist'
 
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
