@@ -1315,6 +1315,25 @@ function wireEvents() {
   });
 }
 
+let flybyController = null;
+let flybyControllerPromise = null;
+
+async function getFlybyController() {
+  if (flybyController) return flybyController;
+  if (!flybyControllerPromise) {
+    flybyControllerPromise = import('./flyby.js').then(({ createFlybyController }) => {
+      flybyController = createFlybyController({
+        getState: () => state,
+        ensureAudioStarted,
+        tensionScale,
+        pitchScale
+      });
+      return flybyController;
+    });
+  }
+  return flybyControllerPromise;
+}
+
 function activatePageTab(tabId, { focusTab = false, updateHash = true } = {}) {
   const tabs = Array.from(document.querySelectorAll('.page-tab[role="tab"]'));
   const targetTab = tabs.find((t) => t.id === tabId) || tabs[0];
@@ -1331,6 +1350,7 @@ function activatePageTab(tabId, { focusTab = false, updateHash = true } = {}) {
 
   if (targetTab.id === 'tab-iowa') {
     if (state.isPlaying) togglePlay();
+    flybyController?.setActive(false);
     const frame = document.getElementById('midwest-map-frame');
     if (frame) {
       if (!frame.getAttribute('src') && frame.dataset.src) {
@@ -1339,11 +1359,23 @@ function activatePageTab(tabId, { focusTab = false, updateHash = true } = {}) {
         frame.contentWindow.dispatchEvent(new Event('resize'));
       }
     }
+  } else if (targetTab.id === 'tab-flyby') {
+    if (state.isPlaying) togglePlay();
+    getFlybyController()
+      .then((ctrl) => {
+        ctrl.syncMonth(state.monthIndex);
+        return ctrl.setActive(true);
+      })
+      .catch((err) => console.error('Failed to activate flyby view:', err));
+  } else {
+    flybyController?.setActive(false);
   }
 
   if (focusTab) targetTab.focus();
   if (updateHash && window.history && window.history.replaceState) {
-    const hash = targetTab.id === 'tab-iowa' ? '#iowa-map' : '#spiral';
+    let hash = '#spiral';
+    if (targetTab.id === 'tab-iowa') hash = '#iowa-map';
+    else if (targetTab.id === 'tab-flyby') hash = '#flyby';
     window.history.replaceState(null, '', hash);
   }
 }
@@ -1375,6 +1407,8 @@ function wirePageTabs() {
     const h = window.location.hash;
     if (h === '#iowa-map' || h === '#tab-iowa') {
       activatePageTab('tab-iowa', { updateHash: false });
+    } else if (h === '#flyby' || h === '#tab-flyby') {
+      activatePageTab('tab-flyby', { updateHash: false });
     } else if (h === '#spiral' || h === '#tab-spiral') {
       activatePageTab('tab-spiral', { updateHash: false });
     }

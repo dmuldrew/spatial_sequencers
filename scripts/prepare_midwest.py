@@ -1,24 +1,39 @@
-"""Crop Terra MODIS GeoTIFF bands to the study box and prepare H3 cell means.
+"""Aggregate Terra MODIS GeoTIFF bands into H3 cells using raster_h3.
+
+Uses https://github.com/dmuldrew/raster_h3 (Python package or `raster-h3-cli`)
+for streaming GeoTIFF decoding, CRS reprojection to WGS84, bbox pruning, and H3 binning.
 
 Usage: python3 scripts/prepare_midwest.py path/to/geotiffs
-Requires rasterio, numpy and h3 (v4). See README for source asset names.
 """
 import argparse
 import json
 import math
+import shutil
+import subprocess
 from pathlib import Path
-
-import h3
-import numpy as np
-import rasterio
-from rasterio.warp import transform, transform_bounds
-from rasterio.windows import Window, from_bounds
 
 
 PROJECT = Path(__file__).resolve().parents[1]
 TEMPERATURE_DATES = ('A2024193', 'A2024201')
 VEGETATION_DATE = 'A2024193'
 TILES = ('h10v04', 'h11v04')
+MODIS_SINUSOIDAL_PROJ = '+proj=sinu +lon_0=0 +x_0=0 +y_0=0 +R=6371007.181 +units=m +no_defs'
+
+# Average hexagon area (m^2) by H3 resolution 0..10 (avoids external h3 dependency).
+H3_AVG_AREA_M2 = (
+    4_357_449_416_078.383,
+    609_788_441_794.134,
+    86_801_780_398.997,
+    12_393_434_655.088,
+    1_770_347_654.491,
+    252_903_858.182,
+    36_129_062.164,
+    5_161_293.360,
+    737_327.598,
+    105_332.513,
+    15_047.502,
+)
+
 INPUTS = {
     'A1': {
         'product': 'MOD11A2', 'band': 'LST_Day_1km', 'units': '°C',
@@ -42,92 +57,251 @@ def study_bounds():
     return longitude - half_width, latitude - half_height, longitude + half_width, latitude + half_height
 
 
-def read_window(path, bounds):
-    with rasterio.open(path) as raster:
-        projected = transform_bounds('EPSG:4326', raster.crs, *bounds, densify_pts=41)
-        extent = from_bounds(*projected, raster.transform)
-        left = math.floor(extent.col_off)
-        top = math.floor(extent.row_off)
-        right = math.ceil(extent.col_off + extent.width)
-        bottom = math.ceil(extent.row_off + extent.height)
-        window = Window(left, top, right - left, bottom - top)
-        window = window.intersection(Window(0, 0, raster.width, raster.height))
-        return raster.read(1, window=window), raster.window_transform(window), raster.crs
-
-
-def read_band(folder, product, date, tile, band, bounds, source_items):
+def find_band_file(folder, product, date, tile, band, source_items):
     files = list(folder.glob(f'{product}.{date}.{tile}.061.*_{band}.tif'))
     if len(files) != 1:
-        raise ValueError(f'Expected one {product} {date} {tile} {band} GeoTIFF')
+        raise ValueError(f'Expected one {product} {date} {tile} {band} GeoTIFF in {folder}')
     source_items.add(files[0].stem.removesuffix(f'_{band}'))
-    return read_window(files[0], bounds)
+    return files[0]
 
 
-def paired_bands(folder, product, date, tile, band, quality_band, bounds, source_items):
-    raw, grid, crs = read_band(folder, product, date, tile, band, bounds, source_items)
-    quality, qa_grid, qa_crs = read_band(folder, product, date, tile, quality_band, bounds, source_items)
-    if (raw.shape, grid, crs) != (quality.shape, qa_grid, qa_crs):
-        raise ValueError(f'Mismatched data and QA grids in {product} {date} {tile}')
-    return raw, quality, grid, crs
+def _scan_with_python_api(paths, resolution, bounds, crs, categorical=False, raw_values=False):
+    import raster_h3
 
+    if raw_values:
+        # Python API applies GDAL scale/offset by default; fall back to CLI when raw DNs are needed.
+        return None
 
-def temperature(folder, tile, bounds, source_items):
-    parts = [
-        paired_bands(folder, 'MOD11A2', date, tile, 'LST_Day_1km', 'QC_Day', bounds, source_items)
-        for date in TEMPERATURE_DATES
-    ]
-    raw, _, grid, crs = parts[0]
-    sums = np.zeros(raw.shape, dtype=np.float64)
-    counts = np.zeros(raw.shape, dtype=np.uint8)
-    for raw, quality, part_grid, part_crs in parts:
-        if (grid, crs, raw.shape) != (part_grid, part_crs, sums.shape):
-            raise ValueError(f'Mismatched temperature grids in {tile}')
-        # QC value zero is good data. Read the QA band as raw integers because
-        # some GeoTIFF copies also declare zero as nodata.
-        valid = (raw >= 7500) & (raw <= 20000) & ((quality & 3) == 0) & ((quality >> 6) <= 1)
-        sums[valid] += raw[valid] * 0.02 - 273.15
-        counts[valid] += 1
-    means = np.divide(sums, counts, out=np.full_like(sums, np.nan), where=counts > 0)
-    return means, grid, crs
-
-
-def vegetation(folder, tile, bounds, source_items):
-    raw, quality, grid, crs = paired_bands(
-        folder, 'MOD13Q1', VEGETATION_DATE, tile, '250m_16_days_NDVI',
-        '250m_16_days_pixel_reliability', bounds, source_items,
+    columns = (
+        ['h3_hex', 'class_id', 'count', 'total_count']
+        if categorical
+        else ['h3_hex', 'sum', 'count']
     )
-    # Reliability class 0 identifies good observations.
-    valid = (raw >= -2000) & (raw <= 10000) & (quality == 0)
-    return np.where(valid, raw * 0.0001, np.nan), grid, crs
+    kwargs = {
+        'resolutions': resolution,
+        'bbox': bounds,
+        'columns': columns,
+        'categorical': categorical,
+    }
+    if categorical:
+        kwargs['format'] = 'long'
+    if crs:
+        kwargs['crs'] = crs
+
+    source = ','.join(str(p) for p in paths)
+    data = raster_h3.RasterH3ArrowStream(source, **kwargs).to_dict()
+    if not data:
+        return []
+    keys = list(data.keys())
+    n_rows = len(data[keys[0]])
+    return [{k: data[k][i] for k in keys} for i in range(n_rows)]
 
 
-def accumulate(totals, raster, grid, crs, bounds, resolution):
-    west, south, east, north = bounds
-    for first_row in range(0, raster.shape[0], 64):
-        rows, columns = np.nonzero(np.isfinite(raster[first_row:first_row + 64]))
-        rows += first_row
-        if not len(rows):
+def _scan_with_cli(paths, resolution, bounds, crs, categorical=False, raw_values=False, cli_bin=None):
+    exe = cli_bin or shutil.which('raster-h3-cli') or shutil.which('raster-h3')
+    if not exe:
+        raise RuntimeError(
+            'Could not find `raster_h3` Python package or `raster-h3-cli` executable. '
+            'Install from https://github.com/dmuldrew/raster_h3.'
+        )
+
+    columns = 'h3_hex,class_id,count,total_count' if categorical else 'h3_hex,sum,count'
+    bbox_arg = ','.join(f'{v:.8f}' for v in bounds)
+    source = ','.join(str(p) for p in paths)
+    cmd = [
+        exe,
+        'jsonl',
+        source,
+        '-r',
+        str(resolution),
+        '--bbox',
+        bbox_arg,
+        '--columns',
+        columns,
+    ]
+    if categorical:
+        cmd.extend(['-c', '--format', 'long'])
+    if raw_values:
+        cmd.append('--raw-values')
+    if crs:
+        cmd.extend(['--crs', crs])
+
+    proc = subprocess.run(cmd, check=True, capture_output=True, text=True)
+    rows = []
+    for line in proc.stdout.splitlines():
+        line = line.strip()
+        if line:
+            rows.append(json.loads(line))
+    return rows
+
+
+def scan_raster_h3(paths, resolution, bounds, crs=None, categorical=False, raw_values=False, cli_bin=None):
+    """Run H3 aggregation via raster_h3 Python bindings or CLI."""
+    try:
+        rows = _scan_with_python_api(
+            paths, resolution, bounds, crs, categorical=categorical, raw_values=raw_values
+        )
+        if rows is not None:
+            return rows
+    except ImportError:
+        pass
+    except RuntimeError as err:
+        # Retry with MODIS sinusoidal PROJ string if the GeoTIFF omits embedded CRS tags.
+        if crs is None and 'CrsNotDetected' in str(err):
+            return scan_raster_h3(
+                paths,
+                resolution,
+                bounds,
+                crs=MODIS_SINUSOIDAL_PROJ,
+                categorical=categorical,
+                raw_values=raw_values,
+                cli_bin=cli_bin,
+            )
+        raise
+
+    try:
+        return _scan_with_cli(
+            paths,
+            resolution,
+            bounds,
+            crs,
+            categorical=categorical,
+            raw_values=raw_values,
+            cli_bin=cli_bin,
+        )
+    except subprocess.CalledProcessError as err:
+        if crs is None and 'CrsNotDetected' in (err.stderr or ''):
+            return _scan_with_cli(
+                paths,
+                resolution,
+                bounds,
+                MODIS_SINUSOIDAL_PROJ,
+                categorical=categorical,
+                raw_values=raw_values,
+                cli_bin=cli_bin,
+            )
+        raise
+
+
+def good_qc_cells(qa_paths, resolution, bounds, crs, predicate, cli_bin=None):
+    """Identify H3 cells whose majority QA pixel class satisfies `predicate(class_id)`."""
+    rows = scan_raster_h3(
+        qa_paths,
+        resolution,
+        bounds,
+        crs=crs,
+        categorical=True,
+        raw_values=True,
+        cli_bin=cli_bin,
+    )
+    by_cell = {}
+    for row in rows:
+        cell = row.get('h3_hex')
+        cls_id = row.get('class_id')
+        cnt = row.get('count') or 0
+        if not cell or cls_id is None:
             continue
-        xs, ys = grid * (columns + 0.5, rows + 0.5)
-        longitudes, latitudes = transform(crs, 'EPSG:4326', xs, ys)
-        for lat, lon, value in zip(latitudes, longitudes, raster[rows, columns]):
-            if south <= lat <= north and west <= lon <= east:
-                cell = h3.latlng_to_cell(lat, lon, resolution)
-                total, count = totals.get(cell, (0.0, 0))
-                totals[cell] = total + float(value), count + 1
+        prev = by_cell.get(cell)
+        if prev is None or cnt > prev[1]:
+            by_cell[cell] = (int(cls_id), cnt)
+    return {cell for cell, (cls_id, _) in by_cell.items() if predicate(cls_id)}
 
 
-def prepare(folder):
+def to_celsius(value):
+    """Normalize LST mean to °C whether input GeoTIFF used raw DN, Kelvin, or °C."""
+    if value > 2000:
+        return value * 0.02 - 273.15
+    if value > 150:
+        return value - 273.15
+    return value
+
+
+def to_ndvi(value):
+    """Normalize NDVI mean to [-0.2, 1.0] whether scaled or raw DN."""
+    if abs(value) > 2.0:
+        return value * 0.0001
+    return value
+
+
+def accumulate_metric(totals, rows, converter, valid_range, allowed_cells=None):
+    lo, hi = valid_range
+    for row in rows:
+        cell = row.get('h3_hex')
+        count = int(row.get('count') or 0)
+        total = row.get('sum')
+        if not cell or count <= 0 or total is None:
+            continue
+        if allowed_cells is not None and cell not in allowed_cells:
+            continue
+        mean_val = converter(float(total) / count)
+        if not (lo <= mean_val <= hi):
+            continue
+        prev_sum, prev_count = totals.get(cell, (0.0, 0))
+        totals[cell] = (prev_sum + mean_val * count, prev_count + count)
+
+
+def prepare(folder, crs=None, cli_bin=None, skip_qc=False):
     bounds = study_bounds()
     coarsest_pixel = max(item['resolutionMeters'] for item in INPUTS.values())
-    resolution = max(index for index in range(11)
-                     if h3.average_hexagon_area(index, 'm^2') >= coarsest_pixel ** 2)
+    resolution = max(
+        index for index, area in enumerate(H3_AVG_AREA_M2)
+        if area >= coarsest_pixel ** 2
+    )
     source_items = set()
     observations = {'A1': {}, 'A2': {}}
-    for key, read in (('A1', temperature), ('A2', vegetation)):
-        for tile in TILES:
-            raster, grid, crs = read(folder, tile, bounds, source_items)
-            accumulate(observations[key], raster, grid, crs, bounds, resolution)
+
+    # A1: MOD11A2 8-day daytime land surface temperature
+    for date in TEMPERATURE_DATES:
+        lst_paths = [
+            find_band_file(folder, 'MOD11A2', date, tile, 'LST_Day_1km', source_items)
+            for tile in TILES
+        ]
+        allowed = None
+        if not skip_qc:
+            qc_paths = [
+                find_band_file(folder, 'MOD11A2', date, tile, 'QC_Day', source_items)
+                for tile in TILES
+            ]
+            allowed = good_qc_cells(
+                qc_paths,
+                resolution,
+                bounds,
+                crs,
+                lambda qc: ((qc & 3) == 0) and ((qc >> 6) <= 1),
+                cli_bin=cli_bin,
+            )
+        rows = scan_raster_h3(lst_paths, resolution, bounds, crs=crs, cli_bin=cli_bin)
+        accumulate_metric(observations['A1'], rows, to_celsius, (-73.15, 126.85), allowed)
+
+    # A2: MOD13Q1 16-day NDVI
+    ndvi_paths = [
+        find_band_file(folder, 'MOD13Q1', VEGETATION_DATE, tile, '250m_16_days_NDVI', source_items)
+        for tile in TILES
+    ]
+    allowed_ndvi = None
+    if not skip_qc:
+        rel_paths = [
+            find_band_file(
+                folder,
+                'MOD13Q1',
+                VEGETATION_DATE,
+                tile,
+                '250m_16_days_pixel_reliability',
+                source_items,
+            )
+            for tile in TILES
+        ]
+        allowed_ndvi = good_qc_cells(
+            rel_paths,
+            resolution,
+            bounds,
+            crs,
+            lambda rel: rel == 0,
+            cli_bin=cli_bin,
+        )
+    ndvi_rows = scan_raster_h3(ndvi_paths, resolution, bounds, crs=crs, cli_bin=cli_bin)
+    accumulate_metric(observations['A2'], ndvi_rows, to_ndvi, (-0.2, 1.0), allowed_ndvi)
+
     cell_ids = sorted(observations['A1'].keys() | observations['A2'].keys())
     cells = []
     for cell in cell_ids:
@@ -136,18 +310,20 @@ def prepare(folder):
             total, count = totals.get(cell, (0.0, 0))
             values[key] = round(total / count, 5) if count else None
         cells.append(values)
+
     paired_count = sum(cell['A1'] is not None and cell['A2'] is not None for cell in cells)
     if not paired_count:
         raise ValueError('No H3 cells have both observations')
-    print(f'{paired_count:,} paired cells; {len(cells):,} with at least one observation')
+    print(f'{paired_count:,} paired cells; {len(cells):,} with at least one observation (via raster_h3)')
     return {
         'schemaVersion': 1,
         'inputs': INPUTS,
         'periodLabel': 'July 11–26, 2024',
-        'description': 'Terra MODIS Collection 6.1. Two 8-day temperature composites and one '
-                       '16-day vegetation composite. Only good-quality observations are included.',
+        'description': 'Terra MODIS Collection 6.1 processed with raster_h3. Two 8-day temperature '
+                       'composites and one 16-day vegetation composite. Only good-quality observations are included.',
         'source': {
             'provider': 'Microsoft Planetary Computer',
+            'processor': 'https://github.com/dmuldrew/raster_h3',
             'items': sorted(source_items),
             'quality': {
                 'A1': 'QC_Day mandatory QA = 0 and LST error flag ≤ 1 (≤ 2 K).',
@@ -163,8 +339,16 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('geotiff_directory', type=Path)
     parser.add_argument('--output', type=Path, default=PROJECT / 'public/midwest/data/midwest.json')
+    parser.add_argument('--crs', default=None, help='Optional source CRS override (e.g. PROJ.4 string)')
+    parser.add_argument('--cli-bin', default=None, help='Optional path to raster-h3-cli binary')
+    parser.add_argument('--skip-qc', action='store_true', help='Skip separate QA band filtering')
     arguments = parser.parse_args()
-    dataset = prepare(arguments.geotiff_directory)
+    dataset = prepare(
+        arguments.geotiff_directory,
+        crs=arguments.crs,
+        cli_bin=arguments.cli_bin,
+        skip_qc=arguments.skip_qc,
+    )
     temporary = arguments.output.with_suffix('.tmp')
     temporary.write_text(json.dumps(dataset, ensure_ascii=False, separators=(',', ':')) + '\n')
     temporary.replace(arguments.output)

@@ -10,6 +10,7 @@
   "dependencies": {
     "d3": "^7.9.0",
     "d3-audio": "github:dmuldrew/d3-audio",
+    "three": "0.170.0",
     "tone": "^14.8.49",
     "topojson-client": "^3.1.0",
     "world-atlas": "^2.0.2"

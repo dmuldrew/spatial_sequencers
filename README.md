@@ -207,5 +207,5 @@ The map's input definitions, appearance, zoom policy, and sonification extension
 point live in `public/midwest/js/domain/`. The July snapshot and its source
 provenance are in `public/midwest/data/midwest.json`. The existing PyroSync
 spiral handles its own audio. To regenerate the map snapshot from the source
-GeoTIFF bands, run `python3 scripts/prepare_midwest.py /path/to/geotiffs` with
-Rasterio, NumPy, and H3 v4 installed.
+GeoTIFF bands without Rasterio, install [`raster_h3`](https://github.com/dmuldrew/raster_h3)
+(Python package or `raster-h3-cli`) and run `python3 scripts/prepare_midwest.py /path/to/geotiffs`.

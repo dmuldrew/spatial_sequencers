@@ -816,6 +816,8 @@ table.data-table tbody tr.is-current-row td {
   .page-tab,
   .stage-canvas,
   .hud-corner,
+  .flyby-viewport,
+  .flyby-hud,
   .stat-card {
     border: 1px solid CanvasText;
   }
@@ -884,4 +886,241 @@ table.data-table tbody tr.is-current-row td {
   height: 560px;
   border: 0;
   border-radius: .75rem;
+}
+
+/* =========================================================================
+   Three.js Orbital Flyby Experience
+   ========================================================================= */
+.flyby-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.flyby-topbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.flyby-title {
+  margin: 0;
+  font-size: 1.08rem;
+  font-weight: 800;
+}
+
+.flyby-subtitle {
+  margin: 0.25rem 0 0;
+  font-size: 0.84rem;
+  color: var(--muted);
+  max-width: 72ch;
+}
+
+.flyby-mode-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.flyby-mode-bar .btn-mini[aria-pressed="true"],
+.flyby-layer-pills .btn-mini[aria-pressed="true"],
+.flyby-waypoints .btn-mini.is-target {
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border-color: var(--accent);
+}
+
+.flyby-viewport {
+  position: relative;
+  width: 100%;
+  height: min(64vh, 620px);
+  min-height: 460px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: radial-gradient(circle at 50% 48%, #0a1730 0%, #050811 72%, #020408 100%);
+  cursor: crosshair;
+  user-select: none;
+  touch-action: none;
+}
+
+.flyby-viewport:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+#flyby-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.flyby-hud {
+  position: absolute;
+  top: 0.75rem;
+  min-width: 215px;
+  max-width: 270px;
+  padding: 0.55rem 0.75rem;
+  background: rgba(7, 11, 20, 0.84);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  pointer-events: none;
+  font-size: 0.78rem;
+}
+
+.flyby-hud-tl {
+  left: 0.75rem;
+}
+
+.flyby-hud-tr {
+  right: 0.75rem;
+}
+
+.flyby-stat-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.14rem 0;
+  color: var(--muted);
+}
+
+.flyby-stat-row strong {
+  color: var(--text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-weight: 700;
+  text-align: right;
+  max-width: 155px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.flyby-reticle {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+.flyby-reticle-ring {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 1px solid rgba(56, 189, 248, 0.42);
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.15);
+}
+
+.flyby-reticle-dot {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(250, 204, 21, 0.85);
+}
+
+.flyby-status-banner {
+  position: absolute;
+  left: 50%;
+  bottom: 0.75rem;
+  transform: translateX(-50%);
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  background: rgba(7, 11, 20, 0.88);
+  border: 1px solid var(--border);
+  color: var(--accent);
+  font-size: 0.76rem;
+  font-weight: 700;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.flyby-status-banner.is-hidden {
+  display: none;
+}
+
+.flyby-deck {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.flyby-waypoints {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.flyby-deck-mid {
+  display: grid;
+  grid-template-columns: minmax(260px, 1.1fr) minmax(260px, 1fr);
+  gap: 0.85rem;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .flyby-deck-mid {
+    grid-template-columns: 1fr;
+  }
+  .flyby-hud {
+    min-width: 165px;
+    font-size: 0.7rem;
+  }
+}
+
+.flyby-timeline-box,
+.flyby-layers-box {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.6rem 0.75rem;
+}
+
+.flyby-time-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.flyby-time-row input[type="range"] {
+  flex: 1 1 auto;
+}
+
+.flyby-layer-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.flyby-metric-select {
+  width: auto;
+  min-width: 170px;
+  padding: 0.36rem 0.6rem;
+  font-size: 0.78rem;
+}
+
+.flyby-thruster-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(110px, 1fr));
+  gap: 0.4rem;
+}
+
+@media (max-width: 720px) {
+  .flyby-thruster-grid {
+    grid-template-columns: repeat(2, minmax(110px, 1fr));
+  }
+}
+
+.flyby-ctrl-btn.is-active {
+  background: var(--amber);
+  color: #111827;
+  border-color: var(--amber);
+}
+
+.flyby-boost-btn {
+  border-color: rgba(249, 115, 22, 0.5);
+  color: #fdba74;
 }
