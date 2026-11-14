@@ -187,3 +187,11 @@ spatial_sequencers/
 | **The Earth Information Jukebox** | NASA Earth Information Center (EIC) visuals | Real-time visual-to-audio sonification tool | Beginner (Youth) / Intermediate |
 | **Dancing with the SARs** | NISAR Synthetic Aperture Radar (SAR) | Interactive surface-change tracker & visual narrative | Intermediate / Advanced |
 | **Harmonization of MODIS and VIIRS Hot Spots** | NASA FIRMS active fire hotspots (MODIS & VIIRS) | Harmonized Burning Activity Calendar & web dashboard | Intermediate / Advanced |
+
+## Forest × Fire hex map
+
+Below the spiral, a new Equal Earth hex map combines **2023 national forest area (% of land)** from [World Bank WDI / FAO](https://data.worldbank.org/indicator/AG.LND.FRST.ZS) with the bundled FIRMS hotspot sample. Green fills repeat the country-level value at each hex center; they are not local canopy measurements. Orange circle area encodes sampled detection count, with per-cell counts and summed FRP available by clicking or using the keyboard-accessible fire-cell selector. Fine, medium, and coarse grids re-bin the same observations; the checkbox toggles fire markers.
+
+The archive includes up to 55 highest-FRP detections per study biome, not all global fires. Missing fire markers do not mean no fires; missing forest values appear gray. Coastal hex centers can lie offshore or across a border. Neither forest loss, burned forest area, nor causality can be inferred. This projected hex grid is for display, not equal-area spatial analysis. The map is independent of the spiral timeline and live refresh.
+
+Refresh the forest snapshot with `python3 scripts/fetch_forest_cover.py`. The bundled JSON keeps the map usable on static GitHub Pages without runtime API requests. Implementation: `public/js/forest-map.js`; data: `public/data/forest_cover.json`.
