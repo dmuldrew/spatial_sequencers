@@ -1,5 +1,7 @@
 # Spatial Sequencers — PyroSync Fire-Weather Observatory
 
+**Live Demo:** **[https://dmuldrew.github.io/spatial_sequencers/](https://dmuldrew.github.io/spatial_sequencers/)**
+
 An interactive **audio-visual NASA wildfire & meteorology observatory** built with **[d3-audio](https://github.com/dmuldrew/d3-audio)**, **D3.js v7**, and **Tone.js**, alongside research summaries for the **2026 NASA International Space Apps Challenge** tracks.
 
 ---
