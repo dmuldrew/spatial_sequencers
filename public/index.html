@@ -189,23 +189,17 @@
         </aside>
       </div>
 
+      <section class="panel midwest-map-panel" aria-labelledby="midwest-heading">
+        <h2 id="midwest-heading">Central Iowa MODIS hexagon map</h2>
+        <iframe
+          class="midwest-map-frame"
+          src="./midwest/index.html"
+          title="Interactive H3 map of surface temperature and vegetation"
+          loading="lazy"
+        ></iframe>
+      </section>
+
       <!-- Semantic Data Breakdown & Scientific Interpretation -->
-    <section class="panel forest-panel" aria-labelledby="forest-heading">
-      <p class="eyebrow">Forest × Fire · Spatial explorer</p>
-      <h2 id="forest-heading">Where forest cover meets fire</h2>
-      <p>Explore a hexagonal world map. Green shows national forest coverage; orange circles show the number of bundled fire detections in each hex.</p>
-      <div class="forest-controls">
-        <label>Hex size <select id="forest-resolution"><option value="7">Fine</option><option value="11" selected>Medium</option><option value="17">Coarse</option></select></label>
-        <label><input id="forest-fire-toggle" type="checkbox" checked> Show sampled fires</label>
-        <label>Inspect fire hex <select id="forest-cell-select"><option>Loading…</option></select></label>
-      </div>
-      <div class="forest-legend"><span class="forest-gradient"></span> Forest area: 0 → 100% <span class="forest-missing"></span> No data <span class="forest-fire-key">●</span> Circle area = sampled detections</div>
-      <svg id="forest-map" viewBox="0 0 1000 510" role="img" aria-labelledby="forest-heading forest-map-description"><desc id="forest-map-description">Hex map of country-level forest area with sampled fire detections. Use the Inspect fire hex selector for keyboard access to fire cells.</desc></svg>
-      <p id="forest-detail" role="status" aria-live="polite">Loading forest and fire data…</p>
-      <p class="forest-method">Forest coverage: <a href="https://data.worldbank.org/indicator/AG.LND.FRST.ZS" target="_blank" rel="noopener noreferrer">World Bank / FAO, 2023</a>, national forest area as a share of land, repeated across each country’s hexes—not local tree canopy. Hexes use the country at their center; coastal cells can cross borders. Fire: the bundled NASA FIRMS 7-day sample (up to 55 highest-FRP detections per study biome), not a complete global inventory. Empty cells do not establish absence of fire. These layers do not measure burned forest or establish causation. Hexes are a projected display grid, not equal-area analytical units. The historical scrubber and Live 24h control do not change this archive map.</p>
-    </section>
-
-
       <section class="reference-section" aria-labelledby="science-heading">
         <h2 id="science-heading">Communicating Climate Departure with Harmonic Tension</h2>
         <p style="color: var(--muted); max-width: 78ch;">
@@ -323,6 +317,5 @@
 
   <script src="./js/enable-audio.js"></script>
   <script type="module" src="./js/app.js"></script>
-  <script type="module" src="./js/forest-map.js"></script>
 </body>
 </html>

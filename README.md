@@ -188,10 +188,24 @@ spatial_sequencers/
 | **Dancing with the SARs** | NISAR Synthetic Aperture Radar (SAR) | Interactive surface-change tracker & visual narrative | Intermediate / Advanced |
 | **Harmonization of MODIS and VIIRS Hot Spots** | NASA FIRMS active fire hotspots (MODIS & VIIRS) | Harmonized Burning Activity Calendar & web dashboard | Intermediate / Advanced |
 
-## Forest × Fire hex map
+## Central Iowa MODIS hexagon map
 
-Below the spiral, a new Equal Earth hex map combines **2023 national forest area (% of land)** from [World Bank WDI / FAO](https://data.worldbank.org/indicator/AG.LND.FRST.ZS) with the bundled FIRMS hotspot sample. Green fills repeat the country-level value at each hex center; they are not local canopy measurements. Orange circle area encodes sampled detection count, with per-cell counts and summed FRP available by clicking or using the keyboard-accessible fire-cell selector. Fine, medium, and coarse grids re-bin the same observations; the checkbox toggles fire markers.
+The map below the PyroSync spiral covers a 180 × 120 mile study area centered
+on 42°N, 93.5°W. The bundled July 11–26, 2024 Terra MODIS snapshot has
+7,443 H3 cells with both inputs. This map has its own zoom slider and is also
+available at `/midwest/index.html`.
 
-The archive includes up to 55 highest-FRP detections per study biome, not all global fires. Missing fire markers do not mean no fires; missing forest values appear gray. Coastal hex centers can lie offshore or across a border. Neither forest loss, burned forest area, nor causality can be inferred. This projected hex grid is for display, not equal-area spatial analysis. The map is independent of the spiral timeline and live refresh.
+- **A1** is MOD11A2 daytime land surface temperature (°C), averaged from
+  two quality-filtered 8-day composites. It controls hue from green to brown.
+- **A2** is MOD13Q1 NDVI from one quality-filtered 16-day composite. It
+  controls saturation from 75 to 150 on a 0–255 scale.
+- Both inputs are normalized over the visible cells. Gray cells are missing
+  one or both inputs. Click a hexagon for raw and normalized values. The
+  closest zoom depends on the coarser active input's source resolution.
 
-Refresh the forest snapshot with `python3 scripts/fetch_forest_cover.py`. The bundled JSON keeps the map usable on static GitHub Pages without runtime API requests. Implementation: `public/js/forest-map.js`; data: `public/data/forest_cover.json`.
+The map's input definitions, appearance, zoom policy, and sonification extension
+point live in `public/midwest/js/domain/`. The July snapshot and its source
+provenance are in `public/midwest/data/midwest.json`. The existing PyroSync
+spiral handles its own audio. To regenerate the map snapshot from the source
+GeoTIFF bands, run `python3 scripts/prepare_midwest.py /path/to/geotiffs` with
+Rasterio, NumPy, and H3 v4 installed.
