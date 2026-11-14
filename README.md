@@ -82,9 +82,19 @@ Then visit **[http://localhost:3000](http://localhost:3000)**.
 
 ### Option 4: Deploy to GitHub Pages
 
-PyroSync uses relative asset paths (`./styles.css`, `./vendor/...`, `./data/...`) so it runs identically on GitHub Pages under `/spatial_sequencers/`. To deploy the static bundle (including `.nojekyll` and bundled `vendor/` libraries) to the `gh-pages` branch:
+PyroSync uses relative asset paths (`./styles.css`, `./vendor/...`, `./data/...`) so it runs identically on GitHub Pages under `/spatial_sequencers/`.
 
-1. Run the deploy script from the repository root:
+#### Automated via GitHub Actions (Recommended)
+
+This repository includes [.github/workflows/deploy-pages.yml](.github/workflows/deploy-pages.yml), which builds `./dist` on every push to `main` (reusing `./scripts/deploy-gh-pages.sh --build-only`) and deploys it via GitHub Pages.
+
+1. On GitHub, open **Repository Settings → Pages**.
+2. Under **Build and deployment**, set **Source** to **GitHub Actions**.
+3. Push any commit to `main` (or click **Run workflow** in the **Actions** tab) to publish **`https://dmuldrew.github.io/spatial_sequencers/`**.
+
+#### Manual Branch Deploy via Script
+
+1. Run the deploy script from the repository root to build and push to `gh-pages`:
    ```bash
    # Preview/validate the static bundle locally without pushing (optional)
    ./scripts/deploy-gh-pages.sh --dry-run
@@ -92,10 +102,7 @@ PyroSync uses relative asset paths (`./styles.css`, `./vendor/...`, `./data/...`
    # Build and force-push the static bundle to origin/gh-pages
    ./scripts/deploy-gh-pages.sh
    ```
-2. On GitHub, open **Repository Settings → Pages**.
-3. Under **Build and deployment**, set **Source** to **Deploy from a branch**.
-4. Select branch **`gh-pages`** and folder **`/ (root)`**, then click **Save**.
-5. Once the GitHub Pages build completes (~1–2 minutes), open **`https://dmuldrew.github.io/spatial_sequencers/`**.
+2. Under **Repository Settings → Pages**, set **Source** to **Deploy from a branch** → **`gh-pages`** → **`/ (root)`**, then click **Save**.
 
 > Note: The **Live 24h** `/api/live-modis` proxy button requires the Node/Docker backend; on static GitHub Pages, the app gracefully stays on the bundled 7-day NASA FIRMS MODIS archive.
 
@@ -115,6 +122,8 @@ Inside the running web app, clicking **Live 24h** queries `/api/live-modis` on t
 
 ```text
 spatial_sequencers/
+├── .github/workflows/
+│   └── deploy-pages.yml        # GitHub Actions workflow deploying ./dist to GitHub Pages
 ├── Dockerfile                  # Node 22 Alpine container image
 ├── docker-compose.yml          # Compose service exposing port 3000
 ├── package.json                # Dependencies: d3, d3-audio, tone, topojson-client, world-atlas
