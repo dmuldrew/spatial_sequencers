@@ -2,6 +2,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import https from 'node:https';
+import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -101,8 +102,45 @@ function parseModisCsvSample(csvText, limit = 300) {
   };
 }
 
+async function serveMidwest(requestPath, requestUrl, res) {
+  const endpoint = process.env.MIDWEST_SERVICE;
+  if (!endpoint) return sendJson(res, 404, { error: 'Dynamic map data is unavailable.' });
+  const route = requestPath.slice('/api/midwest'.length);
+  if (route !== '/config' && !/^\/blocks\/-?\d{1,2}--?\d{1,2}(\/plan)?$/.test(route)) {
+    return sendJson(res, 404, { error: 'Unknown map endpoint.' });
+  }
+  const worker = new URL(route, endpoint);
+  const job = randomUUID();
+  worker.searchParams.set('job', job);
+  const params = new URL(requestUrl, 'http://localhost').searchParams;
+  const budget = params.get('budget');
+  if (budget && /^\d{1,8}$/.test(budget)) worker.searchParams.set('budget', budget);
+  const controller = new AbortController();
+  const cancel = () => {
+    controller.abort();
+    fetch(new URL(`/cancel/${job}`, endpoint), {
+      method: 'POST', signal: AbortSignal.timeout(3000),
+    }).catch(() => {});
+  };
+  res.once('close', cancel);
+  try {
+    const response = await fetch(worker, {
+      signal: AbortSignal.any([controller.signal, AbortSignal.timeout(120_000)]),
+    });
+    const payload = await response.json();
+    res.off('close', cancel);
+    return sendJson(res, response.status, payload);
+  } catch {
+    if (!res.destroyed) return sendJson(res, 502, { error: 'The map data service is unavailable.' });
+  }
+}
+
 const server = http.createServer(async (req, res) => {
   const reqPath = decodeURI((req.url || '/').split('?')[0]);
+
+  if (req.method === 'GET' && reqPath.startsWith('/api/midwest/')) {
+    return serveMidwest(reqPath, req.url, res);
+  }
 
   if (reqPath === '/api/health') {
     return sendJson(res, 200, { status: 'ok', service: 'pyrosync-spatial-sequencers' });

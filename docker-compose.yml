@@ -7,4 +7,19 @@ services:
       - "3000:3000"
     environment:
       - PORT=3000
+      - MIDWEST_SERVICE=http://midwest-data:3001
+    depends_on:
+      - midwest-data
     restart: unless-stopped
+
+  midwest-data:
+    build:
+      context: .
+      dockerfile: Dockerfile.midwest
+    image: spatial-sequencers-midwest-data:latest
+    volumes:
+      - midwest-cache:/cache
+    restart: unless-stopped
+
+volumes:
+  midwest-cache:

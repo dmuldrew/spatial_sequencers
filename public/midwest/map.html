@@ -3,15 +3,15 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Earth Atlas · Iowa Temperature and Vegetation</title>
+    <title>Earth Atlas · Iowa MODIS Map</title>
     <link rel="stylesheet" href="vendor/leaflet.css">
     <link rel="stylesheet" href="style.css">
   </head>
   <body>
     <header>
       <div class="brand">
-        <strong>◈ EARTH ATLAS</strong>
-        <span>TWO INPUTS / ONE LANDSCAPE</span>
+        <strong>◈ EARTH DATA</strong>
+        <span>MODIS EXPLORER</span>
       </div>
       <a href="https://www.earthdata.nasa.gov/data/instruments/modis" target="_blank" rel="noopener">
         NASA MODIS data ↗
@@ -21,19 +21,21 @@
     <div class="layout">
       <aside>
         <div class="eyebrow">MODIS × H3</div>
-        <h1>Heat meets<br>vegetation.</h1>
-        <p class="intro">Explore the relationship between surface temperature and vegetation.</p>
+        <h1>Fire and<br>vegetation.</h1>
+        <p class="intro">Follow MODIS fire detections across the vegetation map.</p>
 
         <section>
           <div class="eyebrow">STUDY REGION</div>
           <h2 id="region-name">Central Iowa · American Midwest</h2>
-          <p>180 × 120 miles, centered on 42°N, 93.5°W. This is the widest view.</p>
+          <p>The map opens near Sioux City. Turn roaming off for the central Iowa overview.</p>
         </section>
 
         <section>
-          <div id="a1-encoding" class="eyebrow">MOD11A2 · HUE</div>
-          <h2 id="a1-name">Daytime surface temperature</h2>
-          <p id="a1-details">MOD11A2 · daytime land surface temperature · °C · nominal 1 km / 8 days.</p>
+          <div id="temperature-details" hidden>
+            <div id="a1-encoding" class="eyebrow">MOD11A2 · HUE</div>
+            <h2 id="a1-name">Daytime surface temperature</h2>
+            <p id="a1-details">MOD11A2 · daytime land surface temperature · °C · nominal 1 km / 8 days.</p>
+          </div>
           <div id="a2-encoding" class="eyebrow">MOD13Q1 · SATURATION</div>
           <h2 id="a2-name">Vegetation index (NDVI)</h2>
           <p id="a2-details">MOD13Q1 · NDVI · nominal 250 m / 16 days.</p>
@@ -48,11 +50,6 @@
           <button id="reload" type="button">Reload bundled data</button>
         </section>
 
-        <p class="footnote">
-          Surface temperature runs from green to brown. Higher NDVI makes the color more
-          saturated (5–95%). Color limits use the visible 5th–95th percentiles. Small views
-          use their full range. Values outside the color limits use the nearest endpoint.
-        </p>
       </aside>
 
       <main>
@@ -67,7 +64,7 @@
         <div class="stats">
           <div>
             <strong id="cell-count">—</strong>
-            <span>cells with both inputs</span>
+            <span id="cell-count-label">cells with NDVI</span>
           </div>
           <div>
             <strong id="grid-count">—</strong>
@@ -86,17 +83,57 @@
           </label>
           <input id="zoom" type="range" min="0" max="100" value="0" step="0.1">
           <div class="range-label">
-            <span>Full study area</span>
+            <span id="zoom-out-label">Full study area</span>
             <span>Source-resolution limit</span>
           </div>
           <p id="zoom-policy" class="hint"></p>
         </div>
 
-        <div class="map-wrap">
-          <div id="map" aria-label="Central Iowa hexagon map of temperature and vegetation"></div>
+        <div class="palette-controls">
+          <label for="palette">Map view</label>
+          <select id="palette">
+            <option value="fire-timeline" selected>Fire timeline · NDVI</option>
+            <option value="continuous">Green–brown · continuous</option>
+            <option value="classified">Blue–orange · 3 × 3 classes</option>
+          </select>
         </div>
 
-        <div class="color-key" aria-label="Map color legend">
+        <div class="roaming-controls">
+          <label><input id="roam" type="checkbox" disabled> Move study area</label>
+          <output id="map-update-state" role="status"></output>
+          <span id="map-navigation">Focus the map and use the arrow keys to move one screen.</span>
+        </div>
+
+        <aside id="download-prompt" class="download-prompt" aria-labelledby="download-title" hidden>
+          <strong id="download-title">Allow this map download?</strong>
+          <p id="download-message" role="status"></p>
+          <div class="download-actions">
+            <button id="download-allow" type="button">Continue</button>
+            <button id="download-cancel" type="button">Cancel download</button>
+          </div>
+        </aside>
+
+        <div id="timeline-controls" class="timeline-controls">
+          <div class="timeline-actions">
+            <button id="fire-replay" type="button" disabled>Replay</button>
+            <time id="fire-clock">Loading observation times…</time>
+          </div>
+          <label for="fire-progress">Fire timeline (UTC)</label>
+          <input id="fire-progress" type="range" min="0" max="0" step="1" value="0" disabled>
+          <p id="timeline-caption" class="hint"></p>
+        </div>
+
+        <div class="map-wrap">
+          <div id="map" tabindex="0" aria-describedby="map-navigation" aria-label="MODIS vegetation and fire hotspot map"></div>
+        </div>
+
+        <div id="ndvi-key" class="ndvi-key" aria-label="NDVI color legend">
+          <strong>MOD13Q1 NDVI · 16-day composite</strong>
+          <div id="ndvi-ramp" aria-hidden="true"></div>
+          <span id="ndvi-low"></span> to <span id="ndvi-high"></span> · Gray = missing data
+        </div>
+
+        <div id="bivariate-key" class="color-key" aria-label="Map color legend" hidden>
           <div class="color-matrix" aria-hidden="true">
             <span class="vegetation-axis">↑ NDVI</span>
             <div id="color-swatches" class="color-swatches"></div>
@@ -105,10 +142,18 @@
           <div class="color-limits">
             <div><strong id="a1-key">MOD11A2 surface temperature</strong> <span id="a1-range">—</span></div>
             <div><strong id="a2-key">MOD13Q1 vegetation index (NDVI)</strong> <span id="a2-range">—</span></div>
+            <div id="color-method"></div>
             <div>Gray = missing data</div>
           </div>
         </div>
-        <div id="status" role="status">Loading NASA observations…</div>
+        <div class="roaming-controls">
+          <label><input id="fire-toggle" type="checkbox" checked disabled> MODIS fire hotspots</label>
+          <span id="fire-count" role="status"></span>
+        </div>
+        <div class="map-status">
+          <div id="status" role="status">Loading NASA observations…</div>
+          <button id="block-retry" type="button" hidden>Retry map blocks</button>
+        </div>
       </main>
     </div>
 

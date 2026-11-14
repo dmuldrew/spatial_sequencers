@@ -1,5 +1,8 @@
 import { closestZoom } from '../domain/zoom-policy.js';
 
+// At 60 miles across, multiple full-screen moves fit in the prepared coverage.
+const ROAMING_ZOOM_OFFSET = Math.log2(3);
+
 export class MapView {
   constructor(element, bounds, onViewChange) {
     this.bounds = L.latLngBounds(
@@ -32,38 +35,58 @@ export class MapView {
       maxZoom: 22,
       attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
     }).addTo(this.map);
+    this.map.createPane('hexagons').style.zIndex = '410';
+    this.map.createPane('hotspots').style.zIndex = '425';
     this.cells = L.layerGroup().addTo(this.map);
+    this.fires = L.layerGroup().addTo(this.map);
+    this.fireMarkers = new Map();
     this.map.on('moveend', onViewChange);
   }
 
-  updateLimits(resolutionMeters, reset = false) {
-    const position = reset ? 0 : this.getZoomPercent();
+  setPanBounds(bounds, roaming) {
+    const changed = this.roaming !== roaming;
+    this.roaming = roaming;
+    const limit = L.latLngBounds([bounds.south, bounds.west], [bounds.north, bounds.east]);
+    this.map.setMaxBounds(limit);
+    if (changed) this.updateLimits(this.resolutionMeters, false, true);
+  }
+
+  moveByView(x, y) {
+    const size = this.map.getSize();
+    const center = this.map.project(this.map.getCenter());
+    const next = center.add([x * size.x, y * size.y]);
+    this.map.setView(this.map.unproject(next), this.map.getZoom(), { animate: false });
+    return center.distanceTo(this.map.project(this.map.getCenter())) >= 1;
+  }
+
+  updateLimits(resolutionMeters, reset = false, preserveScale = false) {
+    this.resolutionMeters = resolutionMeters;
+    const position = this.getZoomPercent();
+    const previousZoom = this.map.getZoom();
     this.map.invalidateSize({ pan: false });
     const size = this.map.getSize();
     // Compute directly in scale space. Leaflet's getBoundsZoom clamps to the
     // previous limits, which can trap the zoom range after a resize.
     const fitScale = Math.max(size.x / this.projectedSize.x, size.y / this.projectedSize.y);
-    this.minimumZoom = Math.log2(fitScale);
+    this.minimumZoom = Math.log2(fitScale) + (this.roaming ? ROAMING_ZOOM_OFFSET : 0);
     this.maximumZoom = Math.max(this.minimumZoom, Math.min(22, closestZoom(
       this.bounds.getNorth(), size.x, resolutionMeters,
     )));
     this.map.setMinZoom(this.minimumZoom);
     this.map.setMaxZoom(this.maximumZoom);
-    this.setZoomPercent(position);
+    if (reset) this.reset();
+    else if (preserveScale) this.map.setZoom(previousZoom, { animate: false });
+    else this.setZoomPercent(position);
   }
 
-  reset() {
-    this.map.setView(this.bounds.getCenter(), this.minimumZoom, { animate: false });
+  reset(center = this.bounds.getCenter()) {
+    this.map.setView(center, this.minimumZoom, { animate: false });
   }
 
   setZoomPercent(percent) {
-    if (percent <= 0) {
-      this.reset();
-      return;
-    }
     const zoom = this.minimumZoom + (this.maximumZoom - this.minimumZoom) * percent / 100;
     this.map.setZoom(zoom, { animate: false });
-    this.map.panInsideBounds(this.bounds, { animate: false });
+    this.map.panInsideBounds(this.map.options.maxBounds, { animate: false });
   }
 
   getZoomPercent() {
@@ -86,13 +109,39 @@ export class MapView {
     return this.map.distance([latitude, bounds.west], [latitude, bounds.east]) / 1609.344;
   }
 
+  renderFires(points) {
+    const next = new Set(points);
+    for (const [point, marker] of this.fireMarkers) {
+      if (!next.has(point)) {
+        this.fires.removeLayer(marker);
+        this.fireMarkers.delete(point);
+      }
+    }
+    for (const point of points) {
+      if (this.fireMarkers.has(point)) continue;
+      const description = document.createElement('div');
+      const time = `${point.time.slice(0, 2)}:${point.time.slice(2)} UTC`;
+      description.textContent = `MODIS ${point.satellite} · ${point.date} ${time} · ${point.power} MW · confidence ${point.confidence}%`;
+      const marker = L.circleMarker([point.latitude, point.longitude], {
+        pane: 'hotspots',
+        radius: 5,
+        color: '#ffffff',
+        weight: 2,
+        fillColor: '#e00023',
+        fillOpacity: 1,
+      }).bindPopup(description, { autoPan: false }).addTo(this.fires);
+      this.fireMarkers.set(point, marker);
+    }
+  }
+
   render(cells, styleFor, popupFor) {
     this.cells.clearLayers();
     for (const cell of cells) {
       const appearance = styleFor(cell);
       L.polygon(cell.geometry, {
+        pane: 'hexagons',
         color: appearance.missing ? '#737e7c' : '#374737',
-        weight: 0.65,
+        weight: 0.4,
         fillColor: appearance.color,
         fillOpacity: appearance.missing ? 0.25 : 1,
       }).bindPopup(() => popupFor(cell, appearance), { autoPan: false }).addTo(this.cells);
