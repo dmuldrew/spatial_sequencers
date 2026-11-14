@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="dark light">
+  <title>PyroSync: 26-Year Wildfire Spiral &amp; Harmonic Anomaly Observatory</title>
+  <link rel="stylesheet" href="./styles.css">
+  <script src="./vendor/d3.min.js"></script>
+  <script src="./vendor/topojson-client.min.js"></script>
+  <script src="./vendor/Tone.js"></script>
+  <script src="./vendor/d3-audio.js"></script>
+</head>
+<body>
+  <a href="#main-heading" class="skip-link visually-hidden">Skip to main content</a>
+
+  <div class="container">
+    <header class="site-header">
+      <div>
+        <p class="eyebrow">2026 NASA Space Apps · Fire-Weather Sonification Observatory</p>
+        <h1 id="main-heading" tabindex="-1">PyroSync: 26-Year Wildfire Spiral &amp; Climate Deviation</h1>
+        <p class="subtitle-lead">
+          Traverse 2001–2026 monthly fire weather benchmarked against the 1991–2020 NASA POWER seasonal normal.
+          As dryness and fire danger depart from historical norms, <code>d3-audio</code> shifts harmony from warm
+          consonance into detuned dissonance around a live 3D geographic locator.
+        </p>
+      </div>
+      <div class="header-actions">
+        <button type="button" id="btn-audio-activate" class="btn btn-audio" aria-pressed="false">
+          🔊 Enable Audio
+        </button>
+        <button type="button" id="btn-mute-audio" class="btn" aria-pressed="false">
+          🔇 Mute
+        </button>
+        <span id="danger-badge" class="status-badge safe" role="status">
+          ● Normal Range (≤ +0.9σ)
+        </span>
+      </div>
+    </header>
+
+    <main>
+      <div id="sr-live-announcer" class="visually-hidden" aria-live="polite" aria-atomic="true"></div>
+
+      <div class="workspace-grid">
+        <!-- Left Stage: 26-Year Wildfire Spiral + Centered 3D Geo Globe + Audio Legend -->
+        <section aria-label="26-year wildfire spiral and central 3D geographic locator">
+          <div class="panel">
+            <div class="biome-pills" id="biome-pills" role="group" aria-label="Quick biome selector"></div>
+
+            <div id="panel-spiral" class="stage-canvas">
+              <div class="hud-corner hud-tl">
+                <div class="hud-kicker"><span class="live-dot" aria-hidden="true"></span>Active Biome</div>
+                <div id="spiral-biome-name" class="hud-big">California &amp; W. US</div>
+                <div class="hud-row"><span>Month</span><strong id="spiral-date-val">2001-01 · Jan</strong></div>
+                <div class="hud-row"><span>Norm Dev</span><strong id="spiral-sigma-val">+0.00 σ</strong></div>
+              </div>
+
+              <div class="hud-corner hud-tr">
+                <div class="hud-kicker">Fire Weather vs 1991–2020</div>
+                <div id="spiral-ffwi-val" class="hud-big">FFWI 10.2</div>
+                <div class="hud-row"><span>VPD (Δ)</span><strong id="spiral-vpd-val">0.85 (+0.00)</strong></div>
+                <div class="hud-row"><span>RH / Wind</span><strong id="spiral-rhwind-val">54% · 3.1 m/s</strong></div>
+              </div>
+
+              <div class="hud-corner hud-bl">
+                <div class="hud-kicker">NASA Satellite Fire</div>
+                <div class="hud-row"><span>EONET (2015+)</span><strong id="spiral-fires-val">Pre-EONET</strong></div>
+                <div class="hud-row"><span>MODIS 7d</span><strong id="spiral-modis-val">154</strong></div>
+                <div class="hud-row"><span>7d FRP</span><strong id="spiral-frp-val">0 MW</strong></div>
+              </div>
+
+              <div class="hud-corner hud-br">
+                <div class="hud-kicker">Harmonic Tension</div>
+                <div id="spiral-tension-tier" class="hud-big">Consonant</div>
+                <div class="hud-row"><span>Chord</span><strong id="spiral-chord-val">C3 G3 C4 E4</strong></div>
+                <div class="hud-row"><span>Detune / Cutoff</span><strong id="spiral-filter-val">+0¢ · 1,240 Hz</strong></div>
+              </div>
+
+              <!-- 3D Orthographic Globe centered inside the spiral's inner radius -->
+              <div class="center-globe-box" aria-hidden="true">
+                <svg id="globe-svg" viewBox="0 0 256 256"></svg>
+              </div>
+
+              <svg id="spiral-svg" role="img" aria-label="26-year wildfire climate spiral from 2001 to 2026 plotting deviation from 1991 to 2020 norms around a central 3D geographic globe"></svg>
+            </div>
+
+            <div id="legend-mount" class="legend-mount"></div>
+          </div>
+        </section>
+
+        <!-- Right Sidebar: Playback, Historical Scrubber, Sandbox, Deviation Plot -->
+        <aside class="panel" aria-label="Sequencer controls and norm deviation analytics">
+          <h2 style="margin: 0 0 0.9rem; font-size: 1.05rem;">Historical Sequencer &amp; Sandbox</h2>
+
+          <div class="control-section">
+            <div class="transport-row">
+              <button type="button" id="btn-play-pause" class="btn btn-primary">
+                ▶ Play 2001–2026
+              </button>
+              <button type="button" id="btn-refresh-live" class="btn" title="Fetch latest 24h NASA FIRMS MODIS detections for the center globe">
+                🛰️ Live 24h
+              </button>
+            </div>
+
+            <div class="control-label">Playback Speed</div>
+            <div class="speed-group" role="group" aria-label="Playback speed">
+              <button type="button" class="btn-speed" data-speed="0.5" aria-pressed="false">0.5x</button>
+              <button type="button" class="btn-speed" data-speed="1" aria-pressed="true">1x</button>
+              <button type="button" class="btn-speed" data-speed="2" aria-pressed="false">2x</button>
+              <button type="button" class="btn-speed" data-speed="4" aria-pressed="false">4x</button>
+            </div>
+          </div>
+
+          <div class="control-section">
+            <div class="control-label">Spiral Radial Axis (Fire Risk Variable)</div>
+            <div class="metric-group" role="group" aria-label="Spiral radial variable">
+              <button type="button" class="btn-metric" data-metric="sigma" aria-pressed="true">Norm Deviation (σ)</button>
+              <button type="button" class="btn-metric" data-metric="ffwi" aria-pressed="false">Fosberg FWI</button>
+              <button type="button" class="btn-metric" data-metric="vpd" aria-pressed="false">VPD Dryness (kPa)</button>
+              <button type="button" class="btn-metric" data-metric="eonet" aria-pressed="false">EONET Fire Counts</button>
+            </div>
+          </div>
+
+          <div class="control-section">
+            <label class="control-label" for="biome-select">Global Fire Biome (Centers Globe)</label>
+            <select id="biome-select" class="select-input"></select>
+            <p id="biome-driver-text" style="margin: 0.45rem 0 0; font-size: 0.8rem; color: var(--muted);"></p>
+          </div>
+
+          <div class="control-section">
+            <label class="control-label" for="month-slider">
+              Timeline Month (<span id="month-slider-label">2001-01 · Jan 2001</span>)
+            </label>
+            <input id="month-slider" class="range-input" type="range" min="0" max="308" value="0">
+
+            <div class="jump-row" role="group" aria-label="Quick timeline jumps">
+              <button type="button" id="btn-jump-start" class="btn btn-mini">2001 Start</button>
+              <button type="button" id="btn-jump-eonet" class="btn btn-mini">2015 EONET Era</button>
+              <button type="button" id="btn-jump-peak" class="btn btn-mini">Peak +σ Anomaly</button>
+            </div>
+
+            <div class="stat-grid" style="margin-top: 0.65rem;">
+              <div class="stat-card">
+                <div class="stat-card-label">Max Temp (vs Norm)</div>
+                <div id="stat-temp" class="stat-card-value">-- °C</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-card-label">Humidity (vs Norm)</div>
+                <div id="stat-rh" class="stat-card-value">-- %</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-card-label">Wind / Precip</div>
+                <div id="stat-wind" class="stat-card-value">-- m/s</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-card-label">Deviation (σ)</div>
+                <div id="stat-sigma" class="stat-card-value">+0.00 σ</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="control-section">
+            <div class="control-label">Climate Norm "What-If" Sandbox</div>
+            <p style="margin: 0 0 0.5rem; font-size: 0.78rem; color: var(--muted);">
+              Modify meteorological conditions to hear how returning toward—or exceeding—the 1991–2020 norm shifts harmonic tension:
+            </p>
+            <div class="sandbox-list">
+              <button type="button" class="btn btn-sandbox" data-mod="marine" aria-pressed="false">
+                🌫️ +18% Coastal Humidity (Resolve Tension)
+              </button>
+              <button type="button" class="btn btn-sandbox" data-mod="calmWind" aria-pressed="false">
+                🍃 -45% Peak Wind Gusts (Lower FFWI)
+              </button>
+              <button type="button" class="btn btn-sandbox" data-mod="rain" aria-pressed="false">
+                🌧️ Rain / Moisture Pulse (Quench VPD)
+              </button>
+              <button type="button" class="btn btn-sandbox" data-mod="heatwave" aria-pressed="false">
+                🔥 +3.5 °C Heatwave (Amplify +σ Dissonance)
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <div class="control-label">1991–2020 Norm Deviation (σ) vs. FFWI</div>
+            <div class="scatter-box">
+              <svg id="scatter-svg" role="img" aria-label="Scatter plot of 2001 to 2026 monthly z-score deviation from the 1991 to 2020 norm versus Fosberg Fire Weather Index"></svg>
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      <!-- Semantic Data Breakdown & Scientific Interpretation -->
+      <section class="reference-section" aria-labelledby="science-heading">
+        <h2 id="science-heading">Communicating Climate Departure with Harmonic Tension</h2>
+        <p style="color: var(--muted); max-width: 78ch;">
+          Rather than mapping raw seasonal temperature alone—where normal summers always sound intense—PyroSync measures
+          each month from <strong>2001 to 2026</strong> against its biome's <strong>30-year 1991–2020 calendar-month baseline</strong>
+          using standardized <strong>z-scores (σ)</strong> of Vapor Pressure Deficit (VPD) and Fosberg Fire Weather Index (FFWI).
+          Normal variability remains consonant; statistically significant positive departures drive <code>d3-audio</code>'s
+          <code>scaleTension()</code> into suspended, minor, and tritone dissonance with microtonal detuning and FM grit.
+        </p>
+
+        <div class="table-wrapper" tabindex="0" role="region" aria-labelledby="mapping-caption">
+          <table class="data-table mapping-table">
+            <caption id="mapping-caption">Data-to-Audio Mapping Specification (d3-audio Scalers)</caption>
+            <thead>
+              <tr>
+                <th scope="col">Physical Variable</th>
+                <th scope="col">Data Domain</th>
+                <th scope="col">Auditory Encoding</th>
+                <th scope="col">Meaningful Interpretation</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">Norm Deviation (z-score σ)</th>
+                <td>0.0 to +3.0 σ above 1991–2020 mean</td>
+                <td><code>scaleTension()</code> (Chords, Detune 0–60¢, FM Index, Cutoff)</td>
+                <td>&lt;+0.9σ plays warm Consonant C major chords; +1–2σ enters Moderate/Tense intervals; ≥+2.5σ triggers Dissonant tritones &amp; FM harshness.</td>
+              </tr>
+              <tr>
+                <th scope="row">Anomaly Magnitude / EONET</th>
+                <td>0σ to +3.5σ &amp; EONET fires/mo</td>
+                <td><code>scalePitch()</code> (C3 to E6) &amp; <code>scaleGain()</code></td>
+                <td>Baseline months whisper in deep octaves; compounding heat/dryness spikes &amp; active satellite fire months ring higher and louder.</td>
+              </tr>
+              <tr>
+                <th scope="row">Vapor Pressure Deficit (VPD)</th>
+                <td>0.2 to 4.5 kPa</td>
+                <td><code>scaleFilter()</code> (320 Hz to 8,800 Hz)</td>
+                <td>Humid air keeps the lowpass filter closed and warm; parched, fuel-curing air opens into sharp high frequencies.</td>
+              </tr>
+              <tr>
+                <th scope="row">10m Surface Wind Speed</th>
+                <td>0.5 to 11.0 m/s</td>
+                <td><code>scaleRhythm()</code> (Euclidean Pulses)</td>
+                <td>Stronger monthly winds densify Bjorklund Euclidean ember pulses, signaling accelerated flame-front spread risk.</td>
+              </tr>
+              <tr>
+                <th scope="row">Biome Longitude (Globe)</th>
+                <td>-150° W to +150° E</td>
+                <td><code>scalePan()</code> (-0.85 Left to +0.85 Right)</td>
+                <td>Synchronizes stereo soundstage with the central 3D globe: Americas left, Mediterranean/Africa center, Boreal Asia/Australia right.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="cards-grid">
+          <article class="panel">
+            <h3 style="margin-top: 0; color: var(--accent);">NASA Multi-Decade Datasets (1991–2026)</h3>
+            <ul style="padding-left: 1.15rem; margin: 0; font-size: 0.88rem; color: var(--muted);">
+              <li><strong>NASA POWER v2 (1991–2026):</strong> 36 years of monthly 2m max temperature, relative humidity, 10m wind, and precipitation. Years 1991–2020 form the climatological normal; 2001–2026 unroll around the spiral.</li>
+              <li><strong>NASA EONET v3 (2015–2026):</strong> Multi-year wildfire event detections joined by calendar month to spotlight confirmed outbreaks along extreme +σ spiral arms.</li>
+              <li><strong>NASA FIRMS MODIS C6.1:</strong> Recent 7-day active hotspots &amp; Fire Radiative Power (MW) plus on-demand 24h refresh rendered directly on the central 3D globe.</li>
+            </ul>
+          </article>
+
+          <article class="panel">
+            <h3 style="margin-top: 0; color: var(--green);">Reading the Spiral &amp; Central Globe</h3>
+            <p style="margin: 0; font-size: 0.88rem; color: var(--muted);">
+              Each full revolution represents one <strong>Jan → Dec seasonal year</strong> advancing outward from <strong>2001</strong> (inner ring)
+              to <strong>2026</strong> (outer ring). Angular position marks the month, ribbon width/glow encode VPD/FFWI departure (σ) from
+              the 1991–2020 normal, amber/crimson flares mark EONET outbreaks (2015+), and the central globe rotates to frame the active
+              biome alongside live MODIS satellite fire detections.
+            </p>
+          </article>
+        </div>
+
+        <div class="table-controls">
+          <span class="control-label" style="margin: 0;">Monthly Telemetry Filter:</span>
+          <div class="filter-pills" role="group" aria-label="Filter monthly records table">
+            <button type="button" id="btn-filter-anomalies" class="btn btn-mini" aria-pressed="true">
+              Significant Deviations (|σ| ≥ 1.0 or Active Fires)
+            </button>
+            <button type="button" id="btn-filter-all" class="btn btn-mini" aria-pressed="false">
+              All 309 Months (2001–2026)
+            </button>
+          </div>
+        </div>
+
+        <div class="table-wrapper" tabindex="0" role="region" aria-labelledby="monthly-caption" style="margin-top: 0.65rem;">
+          <table class="data-table monthly-table">
+            <caption id="monthly-caption">Active Biome Monthly Fire-Weather Anomalies (Click any row to jump &amp; audition)</caption>
+            <thead>
+              <tr>
+                <th scope="col">Month (YYYY-MM)</th>
+                <th scope="col">Norm Dev (σ)</th>
+                <th scope="col">VPD (Δ kPa)</th>
+                <th scope="col">FFWI (Δ)</th>
+                <th scope="col">Tmax / RH</th>
+                <th scope="col">Tension Tier</th>
+                <th scope="col">EONET Fires</th>
+              </tr>
+            </thead>
+            <tbody id="monthly-table-body"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <span>PyroSync · Built with <a href="https://github.com/dmuldrew/d3-audio" target="_blank" rel="noopener noreferrer">d3-audio</a>, D3.js &amp; Tone.js</span>
+      <span id="dataset-meta">Loading NASA multi-decade dataset metadata…</span>
+    </footer>
+  </div>
+
+  <script src="./js/enable-audio.js"></script>
+  <script type="module" src="./js/app.js"></script>
+</body>
+</html>

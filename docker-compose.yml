@@ -1,0 +1,10 @@
+services:
+  pyrosync:
+    build: .
+    image: spatial-sequencers-pyrosync:latest
+    container_name: pyrosync-observatory
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+    restart: unless-stopped
