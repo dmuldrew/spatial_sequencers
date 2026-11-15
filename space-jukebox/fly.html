@@ -678,12 +678,14 @@ $("btnPilot").addEventListener("click", () => {
   setPilotMode(pilotMode === "tour" ? "manual" : "tour");
 });
 window.addEventListener("keydown", e => {
-  /* Stand down while a control has focus: keeping the shortcut made Space
-     pause the flight instead of activating the button the user had focused.
-     Held-key steering stands down too, for the same reason. */
-  const onControl = e.target instanceof Element && e.target.closest("button, a, input, select, textarea");
-  if (!onControl) keysDown.add(e.code);
-  if (onControl) return;
+  /* Stand down narrowly: while a form field has focus, and for Space on a
+     focused button (Space should activate that button natively, not also
+     fire the global shortcut). An earlier all-keys version swallowed every
+     shortcut after Start, because Start leaves focus on the Fly button. */
+  const tgt = e.target instanceof Element ? e.target : null;
+  if (tgt && tgt.closest("input, select, textarea")) return;
+  keysDown.add(e.code);
+  if (e.code === "Space" && tgt && tgt.closest("button, a")) return;
   if (e.code === "Space"){ e.preventDefault(); if (!e.repeat) $("btnFly").click(); }
   else if (e.key === "s" || e.key === "S") announceHere();
   else if (e.key === "n" || e.key === "N") $("btnNarrate").click();
