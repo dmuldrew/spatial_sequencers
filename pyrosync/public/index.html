@@ -14,7 +14,39 @@
 <body>
   <a href="#main-heading" class="skip-link visually-hidden">Skip to main content</a>
 
+  <header class="hub-header is-wide">
+    <div class="hub-header-inner">
+      <a class="hub-brand" href="../">
+        <span aria-hidden="true">🪐</span>
+        <span>Spatial Sequencers Hub</span>
+      </a>
+
+      <nav class="site-nav" aria-label="Experiences">
+        <button
+          class="menu-button"
+          type="button"
+          popovertarget="site-menu"
+          popovertargetaction="toggle"
+          aria-controls="site-menu"
+        >
+          <span aria-hidden="true">☰</span>
+          <span>Experiences</span>
+        </button>
+
+        <ul id="site-menu" class="site-menu" role="list">
+          <li><a href="../" data-exp="hub">🪐 All Experiences</a></li>
+          <li><a href="#spiral" data-exp="spiral" aria-current="page">🌀 Wildfire Spiral</a></li>
+          <li><a href="#iowa-map" data-exp="iowa-map">⬡ Iowa Hex Map</a></li>
+          <li><a href="../spaceship-flyby/" data-exp="combined-flyby">🚀 Combined Flyby</a></li>
+          <li><a href="#flyby" data-exp="pyrosat-flyby">🛰️ PyroSat-1 3D</a></li>
+          <li><a href="../space-jukebox/fly.html" data-exp="fire-flight">🔥 3D Fire Flight</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
   <div class="container">
+
     <header class="site-header">
       <div>
         <p class="eyebrow">2026 NASA Space Apps · Fire-Weather Sonification Observatory</p>
@@ -26,7 +58,6 @@
         </p>
       </div>
       <div class="header-actions">
-        <a class="btn" href="#iowa-map">Jump to fire map</a>
         <button type="button" id="btn-audio-activate" class="btn btn-audio" aria-pressed="false">
           🔊 Enable Audio
         </button>
@@ -42,7 +73,20 @@
     <main>
       <div id="sr-live-announcer" class="visually-hidden" aria-live="polite" aria-atomic="true"></div>
 
-      <div class="workspace-grid">
+      <div class="page-tabs" role="tablist" aria-label="Observatory visualizations">
+        <button type="button" id="tab-spiral" class="page-tab" role="tab" aria-selected="true" aria-controls="panel-spiral-view" tabindex="0">
+          🌀 26-Year Wildfire Spiral
+        </button>
+        <button type="button" id="tab-iowa" class="page-tab" role="tab" aria-selected="false" aria-controls="panel-iowa-view" tabindex="-1">
+          ⬡ MODIS Fire Map Prototype
+        </button>
+        <button type="button" id="tab-flyby" class="page-tab" role="tab" aria-selected="false" aria-controls="panel-flyby-view" tabindex="-1">
+          🚀 Orbital Flyby (3D)
+        </button>
+      </div>
+
+      <section id="panel-spiral-view" role="tabpanel" aria-labelledby="tab-spiral" tabindex="0">
+        <div class="workspace-grid">
         <!-- Left Stage: 26-Year Wildfire Spiral + Centered 3D Geo Globe + Audio Legend -->
         <section aria-label="26-year wildfire spiral and central 3D geographic locator">
           <div class="panel">
@@ -190,16 +234,6 @@
         </aside>
       </div>
 
-      <section id="iowa-map" class="panel midwest-map-panel" aria-labelledby="midwest-heading">
-        <h2 id="midwest-heading">MODIS Fire Map Prototype</h2>
-        <iframe
-          class="midwest-map-frame"
-          src="./midwest/map.html"
-          title="MODIS Fire Map Prototype"
-          loading="lazy"
-        ></iframe>
-      </section>
-
       <!-- Semantic Data Breakdown & Scientific Interpretation -->
       <details class="reference-section">
         <summary>PyroSync methods and monthly records</summary>
@@ -309,6 +343,123 @@
           </table>
         </div>
       </details>
+      </section>
+
+      <section id="panel-iowa-view" role="tabpanel" aria-labelledby="tab-iowa" tabindex="0" hidden>
+        <div id="iowa-map" class="panel midwest-map-panel">
+          <div class="midwest-map-header">
+            <h2 id="midwest-heading">MODIS Fire Map Prototype</h2>
+            <a class="btn btn-mini" href="./midwest/map.html" target="_blank" rel="noopener noreferrer">Open standalone map ↗</a>
+          </div>
+          <iframe
+            id="midwest-map-frame"
+            class="midwest-map-frame"
+            data-src="./midwest/map.html"
+            title="MODIS Fire Map Prototype"
+          ></iframe>
+        </div>
+      </section>
+
+      <section id="panel-flyby-view" role="tabpanel" aria-labelledby="tab-flyby" tabindex="0" hidden>
+        <div class="panel flyby-shell">
+          <div class="flyby-topbar">
+            <div>
+              <h2 class="flyby-title">PyroSat-1: Planetary Hex &amp; Pyro Spiral Flyby</h2>
+              <p class="flyby-subtitle">
+                Pilot over global H3 MODIS fire columns, Central Iowa's 1 km/250 m H3 thermal-NDVI patch, and 3D 2001–2026 biome Pyro Spirals rising into orbit.
+              </p>
+            </div>
+            <div class="flyby-mode-bar" role="group" aria-label="Flight camera and attitude modes">
+              <button type="button" id="flyby-btn-autopilot" class="btn btn-mini" aria-pressed="true">🛰️ Autopilot Cruise</button>
+              <button type="button" id="flyby-btn-cam" class="btn btn-mini">🎥 Cam: Chase</button>
+              <button type="button" id="flyby-btn-horizon" class="btn btn-mini" aria-pressed="true">🧭 Horizon Lock</button>
+              <button type="button" id="flyby-btn-reset" class="btn btn-mini">↺ Reset Orbit</button>
+            </div>
+          </div>
+
+          <div id="flyby-viewport" class="flyby-viewport" tabindex="0" aria-label="Interactive Three.js spacecraft flyby viewport. Click inside and use W A S D or Arrow keys to steer, Q E to roll, Shift to boost, Space to brake.">
+            <canvas id="flyby-canvas"></canvas>
+
+            <!-- Top Left HUD: Craft Attitude & Position -->
+            <div class="flyby-hud flyby-hud-tl">
+              <div class="hud-title">PYROSAT-1 TELEMETRY</div>
+              <div class="flyby-stat-row"><span>Mode</span><strong id="flyby-hud-mode">AUTOPILOT</strong></div>
+              <div class="flyby-stat-row"><span>Altitude</span><strong id="flyby-hud-alt">— km</strong></div>
+              <div class="flyby-stat-row"><span>Airspeed</span><strong id="flyby-hud-spd">— km/s</strong></div>
+              <div class="flyby-stat-row"><span>Sub-craft</span><strong id="flyby-hud-latlon">—</strong></div>
+            </div>
+
+            <!-- Top Right HUD: Fire, Hex & Audio Scanner -->
+            <div class="flyby-hud flyby-hud-tr">
+              <div class="hud-title">HEX &amp; PYRO SCANNER</div>
+              <div class="flyby-stat-row"><span>Target</span><strong id="flyby-hud-target">Global Survey</strong></div>
+              <div class="flyby-stat-row"><span>Spiral Date</span><strong id="flyby-hud-ym">2001-01</strong></div>
+              <div class="flyby-stat-row"><span>Biome Risk</span><strong id="flyby-hud-sigma">—</strong></div>
+              <div class="flyby-stat-row"><span>Footprint</span><strong id="flyby-hud-hex">Scanning…</strong></div>
+              <div class="flyby-stat-row"><span>Audio Bus</span><strong id="flyby-hud-audio">Idle (Enable Audio)</strong></div>
+            </div>
+
+            <!-- Center Cockpit Reticle -->
+            <div class="flyby-reticle" aria-hidden="true">
+              <span class="flyby-reticle-ring"></span>
+              <span class="flyby-reticle-dot"></span>
+            </div>
+
+            <!-- Loading / WebGL status banner -->
+            <div id="flyby-status-banner" class="flyby-status-banner">Initializing Three.js planetary core…</div>
+          </div>
+
+          <!-- Flight Deck Controls below/docked with viewport -->
+          <div class="flyby-deck">
+            <div class="flyby-deck-group">
+              <span class="control-label">AUTOPILOT FLYBY TARGETS (CLICK TO SLINGSHOT)</span>
+              <div id="flyby-waypoints" class="flyby-waypoints" role="group" aria-label="Planetary flyby waypoints"></div>
+            </div>
+
+            <div class="flyby-deck-mid">
+              <div class="flyby-timeline-box">
+                <div class="slider-header">
+                  <span class="control-label" style="margin: 0;">PYRO SPIRAL TIME SYNC</span>
+                  <span id="flyby-time-readout" class="mono">2001-01</span>
+                </div>
+                <div class="flyby-time-row">
+                  <button type="button" id="flyby-btn-play" class="btn btn-primary btn-mini" aria-pressed="false">▶ Play 2001–2026</button>
+                  <input type="range" id="flyby-time-slider" min="0" max="308" value="0" step="1" aria-label="Scrub 3D pyro spiral month">
+                </div>
+              </div>
+
+              <div class="flyby-layers-box" role="group" aria-label="3D planetary layers">
+                <span class="control-label">LAYERS &amp; SPIRAL AXIS</span>
+                <div class="flyby-layer-pills">
+                  <button type="button" id="flyby-layer-hex" class="btn btn-mini" aria-pressed="true">⬡ H3 Hexes</button>
+                  <button type="button" id="flyby-layer-spirals" class="btn btn-mini" aria-pressed="true">🌀 3D Spirals</button>
+                  <button type="button" id="flyby-layer-fires" class="btn btn-mini" aria-pressed="true">🔥 MODIS Towers</button>
+                  <select id="flyby-metric-select" class="select-input flyby-metric-select" aria-label="3D spiral radial variable">
+                    <option value="sigma">Radial: Norm Dev (σ)</option>
+                    <option value="ffwi">Radial: Fosberg FWI</option>
+                    <option value="vpd">Radial: VPD Dryness</option>
+                    <option value="eonet">Radial: EONET Fires</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div class="flyby-deck-thrusters">
+              <span class="control-label">MANUAL THRUSTERS (KEYS: W/A/S/D OR ARROWS · Q/E ROLL · SHIFT BOOST · SPACE BRAKE · DRAG TO STEER)</span>
+              <div class="flyby-thruster-grid" role="group" aria-label="On-screen spacecraft thrusters">
+                <button type="button" class="btn btn-mini flyby-ctrl-btn" data-ctrl="rollLeft">↺ Q Roll</button>
+                <button type="button" class="btn btn-mini flyby-ctrl-btn" data-ctrl="pitchUp">▲ W Pitch Up</button>
+                <button type="button" class="btn btn-mini flyby-ctrl-btn" data-ctrl="rollRight">↻ E Roll</button>
+                <button type="button" class="btn btn-mini flyby-ctrl-btn flyby-boost-btn" data-ctrl="boost">🔥 Shift Boost</button>
+                <button type="button" class="btn btn-mini flyby-ctrl-btn" data-ctrl="yawLeft">◀ A Turn L</button>
+                <button type="button" class="btn btn-mini flyby-ctrl-btn" data-ctrl="pitchDown">▼ S Dive</button>
+                <button type="button" class="btn btn-mini flyby-ctrl-btn" data-ctrl="yawRight">▶ D Turn R</button>
+                <button type="button" class="btn btn-mini flyby-ctrl-btn" data-ctrl="brake">⏹ Space Brake</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
     </main>
 
     <footer class="site-footer">
@@ -318,6 +469,9 @@
   </div>
 
   <script src="./js/enable-audio.js"></script>
+  <script type="module" src="./js/hub-nav.js"></script>
   <script type="module" src="./js/app.js"></script>
 </body>
 </html>
+
+<!-- deployment trigger: enable fork Pages build -->
