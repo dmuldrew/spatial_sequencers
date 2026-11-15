@@ -1,0 +1,306 @@
+{
+  "schemaVersion": 1,
+  "inputs": {
+    "A1": {
+      "product": "MOD11A2",
+      "band": "LST_Day_1km",
+      "units": "°C",
+      "resolutionMeters": 1000
+    },
+    "A2": {
+      "product": "MOD13Q1",
+      "band": "250m_16_days_NDVI",
+      "units": "NDVI",
+      "resolutionMeters": 250
+    }
+  },
+  "periodLabel": "July 11–26, 2024",
+  "description": "Terra MODIS Collection 6.1. Two 8-day temperature composites and one 16-day vegetation composite. Only good-quality observations are included.",
+  "source": {
+    "provider": "Microsoft Planetary Computer",
+    "items": [
+      "MOD11A2.A2024193.h10v04.061.2024202041629",
+      "MOD11A2.A2024193.h11v04.061.2024202041819",
+      "MOD11A2.A2024201.h10v04.061.2024211133329",
+      "MOD11A2.A2024201.h11v04.061.2024211133536",
+      "MOD13Q1.A2024193.h10v04.061.2024212093244",
+      "MOD13Q1.A2024193.h11v04.061.2024212093303"
+    ],
+    "aggregation": "raster_h3 v0.7.0; pixel-center means after nearest-neighbor reprojection to EPSG:5070 at native pixel spacing.",
+    "quality": {
+      "A1": "QC_Day mandatory QA = 0 and LST error flag ≤ 1 (≤ 2 K).",
+      "A2": "Pixel reliability = 0 (good data)."
+    }
+  },
+  "h3Resolution": 7,
+  "blockSchema": 1,
+  "cacheKey": "modis-2024-193-a531da9fc118",
+  "colorBreaks": {
+    "A1": [
+      25.744289999999996,
+      27.485
+    ],
+    "A2": [
+      0.78619,
+      0.83778
+    ]
+  },
+  "blocks": {
+    "0-0": {
+      "url": "blocks/modis-2024-193-a531da9fc118/0-0.json",
+      "bytes": 111940,
+      "bounds": {
+        "west": -97.87053418635713,
+        "south": 40.010000000000005,
+        "east": -96.12232051181428,
+        "north": 40.68857623808434
+      }
+    },
+    "0-1": {
+      "url": "blocks/modis-2024-193-a531da9fc118/0-1.json",
+      "bytes": 145021,
+      "bounds": {
+        "west": -97.87053418635713,
+        "south": 40.68857623808434,
+        "east": -96.12232051181428,
+        "north": 41.56978096605202
+      }
+    },
+    "0-2": {
+      "url": "blocks/modis-2024-193-a531da9fc118/0-2.json",
+      "bytes": 142377,
+      "bounds": {
+        "west": -97.87053418635713,
+        "south": 41.56978096605202,
+        "east": -96.12232051181428,
+        "north": 42.43912765644262
+      }
+    },
+    "0-3": {
+      "url": "blocks/modis-2024-193-a531da9fc118/0-3.json",
+      "bytes": 140017,
+      "bounds": {
+        "west": -97.87053418635713,
+        "south": 42.43912765644262,
+        "east": -96.12232051181428,
+        "north": 43.29657844423267
+      }
+    },
+    "0-4": {
+      "url": "blocks/modis-2024-193-a531da9fc118/0-4.json",
+      "bytes": 136490,
+      "bounds": {
+        "west": -97.87053418635713,
+        "south": 43.29657844423267,
+        "east": -96.12232051181428,
+        "north": 44.1421067121033
+      }
+    },
+    "1-0": {
+      "url": "blocks/modis-2024-193-a531da9fc118/1-0.json",
+      "bytes": 112577,
+      "bounds": {
+        "west": -96.12232051181428,
+        "south": 40.010000000000005,
+        "east": -94.37410683727143,
+        "north": 40.68857623808434
+      }
+    },
+    "1-1": {
+      "url": "blocks/modis-2024-193-a531da9fc118/1-1.json",
+      "bytes": 145953,
+      "bounds": {
+        "west": -96.12232051181428,
+        "south": 40.68857623808434,
+        "east": -94.37410683727143,
+        "north": 41.56978096605202
+      }
+    },
+    "1-2": {
+      "url": "blocks/modis-2024-193-a531da9fc118/1-2.json",
+      "bytes": 142613,
+      "bounds": {
+        "west": -96.12232051181428,
+        "south": 41.56978096605202,
+        "east": -94.37410683727143,
+        "north": 42.43912765644262
+      }
+    },
+    "1-3": {
+      "url": "blocks/modis-2024-193-a531da9fc118/1-3.json",
+      "bytes": 141139,
+      "bounds": {
+        "west": -96.12232051181428,
+        "south": 42.43912765644262,
+        "east": -94.37410683727143,
+        "north": 43.29657844423267
+      }
+    },
+    "1-4": {
+      "url": "blocks/modis-2024-193-a531da9fc118/1-4.json",
+      "bytes": 134604,
+      "bounds": {
+        "west": -96.12232051181428,
+        "south": 43.29657844423267,
+        "east": -94.37410683727143,
+        "north": 44.1421067121033
+      }
+    },
+    "2-0": {
+      "url": "blocks/modis-2024-193-a531da9fc118/2-0.json",
+      "bytes": 106514,
+      "bounds": {
+        "west": -94.37410683727143,
+        "south": 40.010000000000005,
+        "east": -92.62589316272857,
+        "north": 40.68857623808434
+      }
+    },
+    "2-1": {
+      "url": "blocks/modis-2024-193-a531da9fc118/2-1.json",
+      "bytes": 142663,
+      "bounds": {
+        "west": -94.37410683727143,
+        "south": 40.68857623808434,
+        "east": -92.62589316272857,
+        "north": 41.56978096605202
+      }
+    },
+    "2-2": {
+      "url": "blocks/modis-2024-193-a531da9fc118/2-2.json",
+      "bytes": 142639,
+      "bounds": {
+        "west": -94.37410683727143,
+        "south": 41.56978096605202,
+        "east": -92.62589316272857,
+        "north": 42.43912765644262
+      }
+    },
+    "2-3": {
+      "url": "blocks/modis-2024-193-a531da9fc118/2-3.json",
+      "bytes": 138047,
+      "bounds": {
+        "west": -94.37410683727143,
+        "south": 42.43912765644262,
+        "east": -92.62589316272857,
+        "north": 43.29657844423267
+      }
+    },
+    "2-4": {
+      "url": "blocks/modis-2024-193-a531da9fc118/2-4.json",
+      "bytes": 132739,
+      "bounds": {
+        "west": -94.37410683727143,
+        "south": 43.29657844423267,
+        "east": -92.62589316272857,
+        "north": 44.1421067121033
+      }
+    },
+    "3-0": {
+      "url": "blocks/modis-2024-193-a531da9fc118/3-0.json",
+      "bytes": 112675,
+      "bounds": {
+        "west": -92.62589316272857,
+        "south": 40.010000000000005,
+        "east": -90.87767948818572,
+        "north": 40.68857623808434
+      }
+    },
+    "3-1": {
+      "url": "blocks/modis-2024-193-a531da9fc118/3-1.json",
+      "bytes": 145698,
+      "bounds": {
+        "west": -92.62589316272857,
+        "south": 40.68857623808434,
+        "east": -90.87767948818572,
+        "north": 41.56978096605202
+      }
+    },
+    "3-2": {
+      "url": "blocks/modis-2024-193-a531da9fc118/3-2.json",
+      "bytes": 141395,
+      "bounds": {
+        "west": -92.62589316272857,
+        "south": 41.56978096605202,
+        "east": -90.87767948818572,
+        "north": 42.43912765644262
+      }
+    },
+    "3-3": {
+      "url": "blocks/modis-2024-193-a531da9fc118/3-3.json",
+      "bytes": 133527,
+      "bounds": {
+        "west": -92.62589316272857,
+        "south": 42.43912765644262,
+        "east": -90.87767948818572,
+        "north": 43.29657844423267
+      }
+    },
+    "3-4": {
+      "url": "blocks/modis-2024-193-a531da9fc118/3-4.json",
+      "bytes": 132189,
+      "bounds": {
+        "west": -92.62589316272857,
+        "south": 43.29657844423267,
+        "east": -90.87767948818572,
+        "north": 44.1421067121033
+      }
+    },
+    "4-0": {
+      "url": "blocks/modis-2024-193-a531da9fc118/4-0.json",
+      "bytes": 118763,
+      "bounds": {
+        "west": -90.87767948818572,
+        "south": 40.010000000000005,
+        "east": -89.12946581364287,
+        "north": 40.68857623808434
+      }
+    },
+    "4-1": {
+      "url": "blocks/modis-2024-193-a531da9fc118/4-1.json",
+      "bytes": 149698,
+      "bounds": {
+        "west": -90.87767948818572,
+        "south": 40.68857623808434,
+        "east": -89.12946581364287,
+        "north": 41.56978096605202
+      }
+    },
+    "4-2": {
+      "url": "blocks/modis-2024-193-a531da9fc118/4-2.json",
+      "bytes": 143011,
+      "bounds": {
+        "west": -90.87767948818572,
+        "south": 41.56978096605202,
+        "east": -89.12946581364287,
+        "north": 42.43912765644262
+      }
+    },
+    "4-3": {
+      "url": "blocks/modis-2024-193-a531da9fc118/4-3.json",
+      "bytes": 136489,
+      "bounds": {
+        "west": -90.87767948818572,
+        "south": 42.43912765644262,
+        "east": -89.12946581364287,
+        "north": 43.29657844423267
+      }
+    },
+    "4-4": {
+      "url": "blocks/modis-2024-193-a531da9fc118/4-4.json",
+      "bytes": 130913,
+      "bounds": {
+        "west": -90.87767948818572,
+        "south": 43.29657844423267,
+        "east": -89.12946581364287,
+        "north": 44.1421067121033
+      }
+    }
+  },
+  "coverage": {
+    "west": -97.87053418635713,
+    "south": 40.010000000000005,
+    "east": -89.12946581364287,
+    "north": 44.1421067121033
+  }
+}

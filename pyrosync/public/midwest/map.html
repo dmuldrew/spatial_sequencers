@@ -3,119 +3,118 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Earth Atlas · Iowa Temperature and Vegetation</title>
+    <title>Earth Atlas · MODIS Fire Map Prototype</title>
     <link rel="stylesheet" href="vendor/leaflet.css">
     <link rel="stylesheet" href="style.css">
   </head>
   <body>
-    <header>
-      <div class="brand">
-        <strong>◈ EARTH ATLAS</strong>
-        <span>TWO INPUTS / ONE LANDSCAPE</span>
-      </div>
-      <nav aria-label="Experiences" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
-        <a href="../../">🪐 All Experiences Hub</a>
-        <a href="../#spiral">🌀 Wildfire Spiral</a>
-        <a href="../../spaceship-flyby/">🚀 Combined Flyby</a>
-        <a href="https://www.earthdata.nasa.gov/data/instruments/modis" target="_blank" rel="noopener">
-          NASA MODIS data ↗
-        </a>
-      </nav>
-    </header>
+    <main>
+      <header class="row">
+        <h1>MODIS Fire Map Prototype</h1>
+        <nav aria-label="Experiences" class="hub-nav">
+          <a href="../../">🪐 All Experiences Hub</a>
+          <a href="../#spiral">🌀 Wildfire Spiral</a>
+          <a href="../../spaceship-flyby/">🚀 Combined Flyby</a>
+          <a href="https://www.earthdata.nasa.gov/data/instruments/modis" target="_blank" rel="noopener">NASA MODIS data ↗</a>
+        </nav>
+      </header>
 
-    <div class="layout">
-      <aside>
-        <div class="eyebrow">MODIS × H3</div>
-        <h1>Heat meets<br>vegetation.</h1>
-        <p class="intro">Explore the relationship between surface temperature and vegetation.</p>
+      <form id="study-selection" class="row">
+        <label>
+          Latitude
+          <input id="study-latitude" type="number" min="-80" max="80" step="any" value="42.57" required>
+        </label>
+        <label>
+          Longitude
+          <input id="study-longitude" type="number" min="-180" max="180" step="any" value="-96.52" required>
+        </label>
+        <label>
+          Start date (UTC)
+          <input id="study-date" type="date" min="2000-02-18" value="2024-07-11" required>
+        </label>
+        <button type="submit">Update map</button>
+        <span id="selection-state" role="status"></span>
+      </form>
 
-        <section>
-          <div class="eyebrow">STUDY REGION</div>
-          <h2 id="region-name">Central Iowa · American Midwest</h2>
-          <p>180 × 120 miles, centered on 42°N, 93.5°W. This is the widest view.</p>
-        </section>
-
-        <section>
-          <div id="a1-encoding" class="eyebrow">MOD11A2 · HUE</div>
-          <h2 id="a1-name">Daytime surface temperature</h2>
-          <p id="a1-details">MOD11A2 · daytime land surface temperature · °C · nominal 1 km / 8 days.</p>
-          <div id="a2-encoding" class="eyebrow">MOD13Q1 · SATURATION</div>
-          <h2 id="a2-name">Vegetation index (NDVI)</h2>
-          <p id="a2-details">MOD13Q1 · NDVI · nominal 250 m / 16 days.</p>
-        </section>
-
-        <section>
-          <div class="eyebrow">DATA SOURCE</div>
-          <h2 id="data-state">Loading…</h2>
-          <p id="provenance">Checking prepared observations…</p>
-          <label class="upload" for="file">Import prepared map data (JSON) ↑</label>
-          <input id="file" type="file" accept=".json" hidden>
-          <button id="reload" type="button">Reload bundled data</button>
-        </section>
-
-        <p class="footnote">
-          Surface temperature runs from green to brown. Higher NDVI makes the color more
-          saturated (5–95%). Color limits use the visible 5th–95th percentiles. Small views
-          use their full range. Values outside the color limits use the nearest endpoint.
-        </p>
-      </aside>
-
-      <main>
-        <div class="toolbar">
-          <div>
-            <span class="eyebrow">OBSERVATION WINDOW</span>
-            <strong id="window">Loading…</strong>
-          </div>
-          <button id="fit" type="button">↗ Reset view</button>
-        </div>
-
-        <div class="stats">
-          <div>
-            <strong id="cell-count">—</strong>
-            <span>cells with both inputs</span>
-          </div>
-          <div>
-            <strong id="grid-count">—</strong>
-            <span>visible hexagons</span>
-          </div>
-          <div>
-            <strong id="grid-resolution">—</strong>
-            <span>H3 resolution</span>
-          </div>
-        </div>
-
-        <div class="map-zoom">
-          <label for="zoom">
-            Map zoom
-            <output id="zoomLabel">180 miles across</output>
-          </label>
+      <div class="row map-tools">
+        <label>
+          Color palette
+          <select id="palette">
+            <option value="green-brown">Green–brown</option>
+            <option value="orange-cyan">Orange–cyan</option>
+          </select>
+        </label>
+        <label class="zoom">
+          Zoom <output id="zoomLabel" for="zoom"></output>
           <input id="zoom" type="range" min="0" max="100" value="0" step="0.1">
-          <div class="range-label">
-            <span>Full study area</span>
-            <span>Source-resolution limit</span>
-          </div>
-          <p id="zoom-policy" class="hint"></p>
-        </div>
+        </label>
+      </div>
 
-        <div class="map-wrap">
-          <div id="map" aria-label="Central Iowa hexagon map of temperature and vegetation"></div>
+      <section id="download-prompt" role="dialog" aria-modal="false"
+        aria-labelledby="download-title" aria-describedby="download-message" hidden>
+        <strong id="download-title">Map download in progress</strong>
+        <p id="download-message" role="status"></p>
+        <div class="row">
+          <button id="download-allow" type="button">Continue</button>
+          <button id="download-cancel" type="button">Cancel download</button>
         </div>
+      </section>
 
-        <div class="color-key" aria-label="Map color legend">
-          <div class="color-matrix" aria-hidden="true">
-            <span class="vegetation-axis">↑ NDVI</span>
-            <div id="color-swatches" class="color-swatches"></div>
-            <span class="temperature-axis">Temperature →</span>
-          </div>
-          <div class="color-limits">
-            <div><strong id="a1-key">MOD11A2 surface temperature</strong> <span id="a1-range">—</span></div>
-            <div><strong id="a2-key">MOD13Q1 vegetation index (NDVI)</strong> <span id="a2-range">—</span></div>
-            <div>Gray = missing data</div>
-          </div>
+      <section class="timeline" aria-labelledby="timeline-label">
+        <div class="row">
+          <label id="timeline-label" for="fire-progress">Fire timeline (UTC)</label>
+          <button id="fire-replay" type="button" disabled>Replay</button>
+          <time id="fire-clock"></time>
+          <button id="map-audio-toggle" type="button" aria-pressed="false" hidden>Sound</button>
         </div>
-        <div id="status" role="status">Loading NASA observations…</div>
-      </main>
-    </div>
+        <input id="fire-progress" type="range" min="0" max="0" step="1" value="0" disabled>
+      </section>
+
+      <div id="map" tabindex="0" aria-describedby="map-navigation" aria-label="Hexagonal data map with MODIS fire hotspots"></div>
+      <span id="map-navigation" class="visually-hidden" role="status">Focus the map and use the arrow keys to move one screen.</span>
+
+      <div class="row map-layers" role="group" aria-label="Map layers">
+        <label class="check"><input id="fire-toggle" type="checkbox" checked disabled> Hotspots</label>
+        <label class="check"><input id="wind-layer" type="checkbox" checked> Wind</label>
+        <label class="check"><input id="perimeter-layer" type="checkbox" checked> Incident perimeters</label>
+        <label class="check"><input id="terrain-layer" type="checkbox"> Terrain</label>
+      </div>
+      <div class="row map-key" aria-label="Map color legend">
+        <div class="color-matrix" aria-hidden="true">
+          <span id="a2-axis"></span>
+          <div id="color-swatches"></div>
+          <span id="a1-axis"></span>
+        </div>
+        <div>
+          <div><strong id="a1-label"></strong> <span id="a1-range"></span></div>
+          <div><strong id="a2-label"></strong> <span id="a2-range"></span></div>
+          <div>Gray = no data</div>
+        </div>
+      </div>
+      <div class="row map-status">
+        <span id="fire-count"></span>
+        <span id="status" role="status">Loading map…</span>
+        <span id="map-audio-status" role="status"></span>
+        <button id="block-retry" type="button" hidden>Retry map data</button>
+      </div>
+
+      <details>
+        <summary>Map details</summary>
+        <p><strong id="region-name"></strong> · <span id="window"></span></p>
+        <p id="provenance"></p>
+        <p id="weather-state"></p>
+        <p id="perimeter-state"></p>
+        <p>Focus the map and use the arrow keys to move one screen.</p>
+        <p id="map-audio-hint" hidden>Hover with Sound on to hear the harmony grow more tense as temperature rises. Replay sounds a pop for each new hotspot. <a href="./audio/CREDITS.txt">Audio credits</a></p>
+        <div class="row">
+          <label>
+            Import prepared map data
+            <input id="file" type="file" accept=".json,application/json">
+          </label>
+          <button id="reload" type="button">Reload map data</button>
+        </div>
+      </details>
+    </main>
 
     <script src="vendor/leaflet.js"></script>
     <script src="vendor/h3.js"></script>

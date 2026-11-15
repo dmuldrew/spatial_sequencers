@@ -51,12 +51,6 @@ export function validateDataset(data) {
   return { ...data, samples };
 }
 
-export async function loadBundledDataset() {
-  const response = await fetch('data/midwest.json', { cache: 'no-store' });
-  if (!response.ok) throw new Error('The bundled Midwest dataset could not be loaded.');
-  return validateDataset(await response.json());
-}
-
 export async function loadDatasetFile(file) {
   if (file.size > 50 * 1024 * 1024) throw new Error('Use a prepared JSON file smaller than 50 MB.');
   return validateDataset(JSON.parse(await file.text()));

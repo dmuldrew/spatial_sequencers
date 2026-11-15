@@ -61,10 +61,9 @@ export function visibleGrid(viewBounds, studyBounds, resolution, aggregates, h3)
     [bounds.south, bounds.west], [bounds.south, bounds.east],
     [bounds.north, bounds.east], [bounds.north, bounds.west],
   ];
-  const centers = h3.polygonToCells(polygon, resolution);
-  // Include edge intersections even when a zoomed viewport contains no cell center.
-  for (const point of polygon) centers.push(h3.latLngToCell(...point, resolution));
-  const ids = new Set(centers.flatMap(id => h3.gridDisk(id, 1)));
+  const ids = h3.polygonToCellsExperimental(
+    polygon, resolution, h3.POLYGON_TO_CELLS_FLAGS.containmentOverlapping,
+  );
   const cells = [];
   for (const id of ids) {
     const boundary = h3.cellToBoundary(id);

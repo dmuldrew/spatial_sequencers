@@ -191,27 +191,41 @@ spatial_sequencers/
 | **Dancing with the SARs** | NISAR Synthetic Aperture Radar (SAR) | Interactive surface-change tracker & visual narrative | Intermediate / Advanced |
 | **Harmonization of MODIS and VIIRS Hot Spots** | NASA FIRMS active fire hotspots (MODIS & VIIRS) | Harmonized Burning Activity Calendar & web dashboard | Intermediate / Advanced |
 
-## Central Iowa MODIS hexagon map
+## MODIS Fire Map Prototype
 
-Available on the second home page tab (**Central Iowa MODIS Hex Map** / `/#iowa-map`) or directly at `/midwest/map.html`, this map covers a 180 × 120 mile study area centered
-on 42°N, 93.5°W. The bundled July 11–26, 2024 Terra MODIS snapshot has
-7,443 H3 cells with both inputs and includes its own zoom slider.
+Available on the second home page tab (**MODIS Fire Map Prototype** / `/#iowa-map`) or directly at `/midwest/map.html`,
+the prototype shows **MOD11A2 daytime land surface temperature**
+and **MOD13Q1 vegetation index (NDVI)** on a hexagonal grid, with
+**NASA FIRMS MODIS fire hotspots** overlaid.
+Cells with only NDVI use the vegetation color scale in either palette.
+Green–brown adapts the YlGn and YlOrBr ramps from [ColorBrewer](https://colorbrewer2.org/).
+The Orange–Cyan palette is from [Jonatan Hildén’s *Bivariate hue blending* (2022)](https://aaltodoc.aalto.fi/bitstream/123456789/119235/1/master_Hilden_Jonatan_2022.pdf).
 
-- **MOD11A2 daytime land surface temperature** (°C) is averaged from
-  two quality-filtered 8-day composites. It controls hue from green to brown.
-- **MOD13Q1 NDVI** comes from one quality-filtered 16-day composite. It
-  controls saturation from 5% to 95%.
-- Both inputs use the visible 5th–95th percentiles for color, with values
-  outside those limits clipped to the endpoints. Views with fewer than 20
-  observations per input use the full range. Gray cells are missing one or both inputs. Click a hexagon for raw and normalized values. The
-  closest zoom depends on the coarser active input's source resolution.
+The challenge goal is a burning activity calendar built from harmonized MODIS
+and VIIRS detections. Adding VIIRS and reconciling detections across the two
+sensors are future work.
 
-The map's input definitions, appearance, zoom policy, and sonification extension
-point live in `public/midwest/js/domain/`. The July snapshot and its source
-provenance are in `public/midwest/data/midwest.json`. The existing PyroSync
-spiral handles its own audio. To regenerate the map snapshot from the source
-GeoTIFF bands, install [`raster_h3`](https://github.com/dmuldrew/raster_h3)
-(Python package or `raster-h3-cli`) and run `python3 scripts/prepare_midwest.py /path/to/geotiffs`.
+For the [Earth Information Jukebox challenge](#1-the-earth-information-jukebox),
+the goal is to turn map data into music in real time. Select **Sound** to listen.
+
+- Focus the map and use the arrow keys to pan.
+- Select **Replay** or scrub the **Fire timeline (UTC)** to see when hotspots
+  were detected.
+- Enter latitude, longitude, and a start date, then select **Update map** to
+  jump to a new location. The static map contains only the bundled observations.
+
+Developers can change the two inputs in [the dataset configuration](public/midwest/js/domain/inputs.js)
+and supply matching prepared observations.
+
+Two preparation scripts read the source GeoTIFF bands:
+
+- `python3 scripts/prepare_midwest_blocks.py /path/to/geotiffs` writes the map
+  blocks and `public/midwest/data/manifest.json` used by the prototype map and
+  by the `midwest-data` Docker service (`Dockerfile.midwest`). Requires
+  Rasterio, NumPy, H3 v4 and [`raster_h3`](https://github.com/dmuldrew/raster_h3) v0.7.0.
+- `python3 scripts/prepare_midwest.py /path/to/geotiffs` writes the
+  `public/midwest/data/midwest.json` snapshot used by the Orbital Flyby's Iowa
+  patch. Requires only `raster_h3` (Python package or `raster-h3-cli`).
 
 ## Orbital Flyby (3D)
 

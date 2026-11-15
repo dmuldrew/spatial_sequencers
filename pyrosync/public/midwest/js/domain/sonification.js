@@ -1,4 +1,6 @@
-/** Reserved extension point: sonification rules will be defined later. */
-export function sonifyCell(_cell, _normalizedInputs) {
-  // Intentionally silent.
+import { normalize } from './appearance.js';
+
+/** Temperature controls harmonic tension. Cells with no temperature stay quiet. */
+export function sonifyCell(cell, ranges) {
+  return normalize(cell?.A1, ranges?.A1);
 }
