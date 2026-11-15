@@ -12,7 +12,8 @@ const DENSITY_STOPS = ['#4c0519', '#b91c1c', '#f97316', '#facc15', '#fef9c3'];
 const TREND_STOPS = [[-1.5, '#2166ac'], [-0.5, '#67a9cf'], [0, '#ece7df'], [0.5, '#ef8a62'], [1.5, '#b2182b']];
 const monthColor = (m) => `hsl(${(m - 1) * 30}, 78%, 58%)`;
 // Hexagons with few detections have noisy trends and seasons: fade them.
-const CONFIDENCE_OPACITY = ['interpolate', ['linear'], ['log10', ['max', ['get', 'detections'], 1]], 0, 0.18, 2, 0.88];
+const CONFIDENCE_OPACITY = ['interpolate', ['linear'], ['log10', ['max', ['get', 'detections'], 1]], 0, 0.12, 2, 0.58];
+const HEX_OPACITY = 0.55; // semi-transparent, so coastlines and land stay visible
 const INITIAL_VIEW = { center: [20, 8], zoom: 2.2 };
 // PMTiles zoom bands for resolutions 0-4 (raster_h3 zoom bands), for the status line.
 const RES_FOR_ZOOM = [0, 0, 1, 1, 2, 3, 4, 4];
@@ -45,7 +46,43 @@ function paintFor(selected) {
       opacity: CONFIDENCE_OPACITY
     };
   }
-  return { color: densityExpression(lo, hi), opacity: 0.88 };
+  return { color: densityExpression(lo, hi), opacity: HEX_OPACITY };
+}
+
+// world-atlas cuts shapes at the 180th meridian, so a line can step from +180 to -180
+// longitude. That step has no length on the sphere, but MapLibre draws it as a line
+// all the way round the globe (Fiji's coast became a ring at 17 degrees south).
+// Split lines wherever consecutive points jump more than 180 degrees in longitude.
+function splitAtAntimeridian(geometry) {
+  const lines = geometry.type === 'LineString' ? [geometry.coordinates] : geometry.coordinates;
+  const out = [];
+  for (const line of lines) {
+    let current = [line[0]];
+    for (let i = 1; i < line.length; i += 1) {
+      if (Math.abs(line[i][0] - line[i - 1][0]) > 180) {
+        if (current.length > 1) out.push(current);
+        current = [];
+      }
+      current.push(line[i]);
+    }
+    if (current.length > 1) out.push(current);
+  }
+  return { type: 'MultiLineString', coordinates: out };
+}
+
+// Polygon rings with the same +180/-180 step would fill a sliver round the globe; shift
+// their negative longitudes by 360 so each ring is continuous (MapLibre wraps them).
+function unwrapAntimeridianRings(collection) {
+  const fixRing = (ring) => {
+    const jumps = ring.some((p, i) => i > 0 && Math.abs(p[0] - ring[i - 1][0]) > 180);
+    return jumps ? ring.map(([lon, lat]) => [lon < 0 ? lon + 360 : lon, lat]) : ring;
+  };
+  for (const feature of collection.features) {
+    const g = feature.geometry;
+    if (g.type === 'Polygon') g.coordinates = g.coordinates.map(fixRing);
+    else if (g.type === 'MultiPolygon') g.coordinates = g.coordinates.map((poly) => poly.map(fixRing));
+  }
+  return collection;
 }
 
 const per1000 = (density) => (density * 1000).toPrecision(2);
@@ -118,8 +155,10 @@ async function main() {
   maplibregl.addProtocol('pmtiles', protocol.tile);
 
   const world = await fetch('../vendor/countries-110m.json').then((r) => r.json());
-  const land = window.topojson.feature(world, world.objects.countries);
-  const borders = window.topojson.mesh(world, world.objects.countries, (a, b) => a !== b);
+  const countries = world.objects.countries;
+  const land = unwrapAntimeridianRings(window.topojson.feature(world, countries));
+  const borders = splitAtAntimeridian(window.topojson.mesh(world, countries, (a, b) => a !== b));
+  const coast = splitAtAntimeridian(window.topojson.mesh(world, countries, (a, b) => a === b));
   const paint = paintFor(mode);
 
   map = new maplibregl.Map({
@@ -133,11 +172,12 @@ async function main() {
       sources: {
         land: { type: 'geojson', data: land },
         borders: { type: 'geojson', data: borders },
+        coast: { type: 'geojson', data: coast },
         fire: { type: 'vector', url: `pmtiles://${pmtilesUrl}` }
       },
       layers: [
         { id: 'ocean', type: 'background', paint: { 'background-color': '#0b1a2e' } },
-        { id: 'land', type: 'fill', source: 'land', paint: { 'fill-color': '#1e293b' } },
+        { id: 'land', type: 'fill', source: 'land', paint: { 'fill-color': '#2f435a' } },
         {
           id: 'fire-fill',
           type: 'fill',
@@ -153,7 +193,10 @@ async function main() {
           minzoom: 5,
           paint: { 'line-color': '#0b1120', 'line-width': 0.4, 'line-opacity': 0.5 }
         },
-        { id: 'borders', type: 'line', source: 'borders', paint: { 'line-color': '#64748b', 'line-width': 0.6 } }
+        // Drawn above the hexagons so continents stay readable at every zoom.
+        { id: 'borders', type: 'line', source: 'borders', paint: { 'line-color': '#cbd5e1', 'line-width': 0.7, 'line-opacity': 0.55 } },
+        { id: 'coast-glow', type: 'line', source: 'coast', paint: { 'line-color': '#7dd3fc', 'line-width': 4, 'line-opacity': 0.25, 'line-blur': 2 } },
+        { id: 'coast', type: 'line', source: 'coast', paint: { 'line-color': '#e0f2fe', 'line-width': 1.3, 'line-opacity': 0.95 } }
       ]
     }
   });

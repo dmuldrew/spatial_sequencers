@@ -13,6 +13,8 @@ const SANDBOX_DELTAS = {
 const state = {
   dataset: null,
   worldGeo: null,
+  worldCoast: null,
+  worldBorders: null,
   biomes: [],
   activeBiomeIndex: 0,
   monthIndex: 0,
@@ -1440,6 +1442,9 @@ async function init() {
     state.dataset = dataset;
     state.biomes = dataset.biomes || [];
     state.worldGeo = topojson.feature(world, world.objects.countries);
+    // Coastlines are arcs used by a single country; internal borders are shared arcs.
+    state.worldCoast = topojson.mesh(world, world.objects.countries, (a, b) => a === b);
+    state.worldBorders = topojson.mesh(world, world.objects.countries, (a, b) => a !== b);
 
     // Start at the earliest recorded month (2001-01) so the spiral draws forward chronologically
     const firstBiome = state.biomes[0];

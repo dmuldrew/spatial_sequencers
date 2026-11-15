@@ -284,7 +284,7 @@ export function createFlybyController(bridge) {
     dom.statusBanner.classList.toggle('is-hidden', hide);
   }
 
-  function createEarthTexture(worldGeo, biomes) {
+  function createEarthTexture(worldGeo, biomes, worldCoast, worldBorders) {
     const canvas = document.createElement('canvas');
     canvas.width = 2048;
     canvas.height = 1024;
@@ -310,14 +310,27 @@ export function createFlybyController(bridge) {
     ctx.lineWidth = 1;
     ctx.stroke();
 
-    // Land masses
+    // Land masses: a lighter fill than the ocean, thin country borders, and a bright
+    // coastline with a soft glow, so continents stay legible under the hex layers.
     if (worldGeo) {
       ctx.beginPath();
       path(worldGeo);
-      ctx.fillStyle = '#0f2238';
+      ctx.fillStyle = '#2a3e55';
       ctx.fill();
-      ctx.strokeStyle = 'rgba(56, 189, 248, 0.58)';
-      ctx.lineWidth = 1.4;
+      if (worldBorders) {
+        ctx.beginPath();
+        path(worldBorders);
+        ctx.strokeStyle = 'rgba(203, 213, 225, 0.42)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+      ctx.beginPath();
+      path(worldCoast || worldGeo);
+      ctx.strokeStyle = 'rgba(125, 211, 252, 0.35)';
+      ctx.lineWidth = 6;
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(224, 242, 254, 0.95)';
+      ctx.lineWidth = 2;
       ctx.stroke();
     }
 
@@ -756,7 +769,14 @@ export function createFlybyController(bridge) {
     const hi = Number.isFinite(colorRange?.max) ? colorRange.max : -1;
 
     const geo = new THREE.CylinderGeometry(1, 1, 1, 6);
-    const mat = new THREE.MeshLambertMaterial({ color: '#ffffff' });
+    // Semi-transparent so coastlines and land show through the carpet. Cells do not
+    // overlap, so skipping depth writes avoids sorting artefacts between them.
+    const mat = new THREE.MeshLambertMaterial({
+      color: '#ffffff',
+      transparent: true,
+      opacity: 0.55,
+      depthWrite: false
+    });
     const mesh = new THREE.InstancedMesh(geo, mat, n);
     mesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
     mesh.visible = false;
@@ -2163,7 +2183,7 @@ export function createFlybyController(bridge) {
       scene.add(rimLight);
 
       // Planet Earth sphere + atmosphere + starfield
-      const earthTex = createEarthTexture(state.worldGeo, state.biomes);
+      const earthTex = createEarthTexture(state.worldGeo, state.biomes, state.worldCoast, state.worldBorders);
       const earth = new THREE.Mesh(
         new THREE.SphereGeometry(EARTH_R, 72, 48),
         new THREE.MeshStandardMaterial({ map: earthTex, roughness: 0.78, metalness: 0.08 })
