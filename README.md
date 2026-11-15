@@ -14,6 +14,15 @@ An interactive **audio-visual NASA wildfire, meteorology, and Earth-data sonific
 - **Live demo:** https://dmuldrew.github.io/spatial_sequencers/
 - **Run it locally:** `npm run preview` from the repo root → http://localhost:8123 (see *Local preview* under How to Run).
 
+## Team
+
+**Spatial Sequencers.** Project home is the team's original repo — [github.com/dmuldrew/spatial_sequencers](https://github.com/dmuldrew/spatial_sequencers) — with the live demo at [dmuldrew.github.io/spatial_sequencers](https://dmuldrew.github.io/spatial_sequencers/).
+
+- **@dmuldrew** — repo owner; PyroSync and the `d3-audio` sonification library
+- **Lan Ly** ([@lanly-dev](https://github.com/lanly-dev)) — Space Jukebox (3D Fire Flight); his work lands in the original repo by pull request from his fork
+- **Brian Pickrell** — MODIS map and fire timeline (Midwest)
+- **Monica** ([@mcaraway1](https://github.com/mcaraway1)) — contributor
+
 ---
 
 ## Sub-projects at a Glance
