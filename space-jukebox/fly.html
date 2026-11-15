@@ -96,6 +96,30 @@ const HOTSPOTS = [[42.29,-120.38,424],[42.28,-120.38,311],[35.05,-120.31,301],[3
 const BIOMES = [{"id":"california","name":"California & W. US","lat":37.5,"lon":-120.2,"count":55,"maxFrp":424},{"id":"boreal","name":"Boreal N. America","lat":55.5,"lon":-115.0,"count":55,"maxFrp":218},{"id":"amazon","name":"Amazon & Cerrado","lat":-10.5,"lon":-55.0,"count":55,"maxFrp":1640},{"id":"africa","name":"Sahel & N. Savanna","lat":9.5,"lon":23.0,"count":55,"maxFrp":2022},{"id":"mediterranean","name":"Mediterranean Basin","lat":39.0,"lon":21.5,"count":55,"maxFrp":287},{"id":"australia","name":"Australian Outback","lat":-17.5,"lon":129.0,"count":55,"maxFrp":5083}];
 const TOTAL_7D = 80347;
 
+/* Per-region spoken detail: total fire power (the 330 hotspots are
+   stored grouped by biome, 55 each, in BIOMES order), a rank line by
+   strongest single fire, and a one-line character note per region.  */
+const REGION_NOTES = {
+  california: "Wildfires across the western states.",
+  boreal: "Forest fires burning across the Canadian north.",
+  amazon: "Fires across the rainforest and the Cerrado savanna.",
+  africa: "Savanna fires burning across the Sahel.",
+  mediterranean: "Summer wildfires around the Mediterranean Sea.",
+  australia: "Bushfires burning in the Outback.",
+};
+const ORDINALS = ["strongest", "second strongest", "third strongest", "fourth strongest", "fifth strongest", "sixth strongest"];
+{
+  const byRank = [...BIOMES].sort((a, b) => b.maxFrp - a.maxFrp);
+  BIOMES.forEach((b, i) => {
+    b.totalFrp = HOTSPOTS.slice(i * b.count, (i + 1) * b.count).reduce((s, h) => s + h[2], 0);
+    const r = byRank.indexOf(b);
+    b.rankLine = r === 0
+      ? "It is the strongest fire region on Earth this week."
+      : `Ranked ${ORDINALS[r]} of the six regions.`;
+    b.note = REGION_NOTES[b.id] || "";
+  });
+}
+
 /* ============================== helpers ============================== */
 const $ = id => document.getElementById(id);
 function latLonToVec3(lat, lon, r){
@@ -450,7 +474,7 @@ function announce(text, force){
 
 /* ============================== flight state ============================== */
 let flying = false, u = 0, speedMul = 1, camMode = "chase", camAngle = 0;
-let lastBiomeId = null, intensitySmooth = 0;
+let lastBiomeId = null, intensitySmooth = 0, peakBiomeId = null;
 const pingCooldown = new Map();
 const LOOP_SECONDS = 80;
 const TOTAL_LABEL = TOTAL_7D.toLocaleString();
@@ -762,8 +786,15 @@ function animate(){
   }
   if (flying && inBiome && biome.id !== lastBiomeId){
     lastBiomeId = biome.id;
-    announce(`Now flying over ${biome.name}. ${biome.count} major hotspots below. Strongest fire power, ${biome.maxFrp}.`);
+    announce(`Now flying over ${biome.name}. ${biome.note} ${biome.count} major hotspots below, totalling about ${Math.round(biome.totalFrp)} megawatts of fire power. Strongest single fire, ${biome.maxFrp}. ${biome.rankLine}`);
   }
+  /* bonus detail at a region's core — only when the voice is free, so
+     it never talks over the entry announcement                        */
+  if (flying && inBiome && intensitySmooth > 2200 && peakBiomeId !== biome.id){
+    peakBiomeId = biome.id;
+    if (!speaking) announce(`Passing the densest fires of ${biome.name} now. Hear the tone climb — this is the region at its strongest.`);
+  }
+  if (!inBiome) peakBiomeId = null;
   renderer.render(scene, camera);
 }
 animate();
@@ -788,8 +819,8 @@ function announceHere(){
   const { biome, dist } = nearestBiome(ll.lat, ll.lon);
   const pct = Math.round(Math.min(1, intensitySmooth / 2600) * 100);
   const where = dist < 17
-    ? `Over ${biome.name}: ${biome.count} major hotspots below, strongest fire power ${biome.maxFrp} megawatts.`
-    : `In transit between fire regions, at ${Math.abs(ll.lat).toFixed(0)} degrees ${ll.lat >= 0 ? "north" : "south"}, ${Math.abs(ll.lon).toFixed(0)} degrees ${ll.lon >= 0 ? "east" : "west"}.`;
+    ? `Over ${biome.name}: ${biome.count} major hotspots below, totalling about ${Math.round(biome.totalFrp)} megawatts. Strongest fire power ${biome.maxFrp} megawatts. ${biome.rankLine}`
+    : `In transit between fire regions, at ${Math.abs(ll.lat).toFixed(0)} degrees ${ll.lat >= 0 ? "north" : "south"}, ${Math.abs(ll.lon).toFixed(0)} degrees ${ll.lon >= 0 ? "east" : "west"}. The nearest fire region is ${biome.name}.`;
   announce(`${where} Fire intensity ${pct} percent.${flying ? "" : " Flight paused."}`, true);
 }
 $("startBtn").addEventListener("click", () => {
@@ -799,7 +830,7 @@ $("startBtn").addEventListener("click", () => {
   /* u begins on the first region, so mark it announced: otherwise the region
      check fired on the very next frame and cancelled the intro mid-sentence. */
   lastBiomeId = tour[0].id;
-  announce(`Space Jukebox fire flight. Touring six fire regions of Earth, west to east. First stop, ${tour[0].name}. Press S at any time to hear where you are. The tone rises as the fires below grow hotter and denser.`);
+  announce(`Space Jukebox fire flight. Touring six fire regions of Earth, west to east. The ship follows 330 of the largest hotspots NASA satellites recorded this week, out of ${TOTAL_7D} detections in total. First stop, ${tour[0].name}. Press S at any time to hear where you are. The tone rises as the fires below grow hotter and denser.`);
   $("btnFly").focus();
 });
 $("btnFly").addEventListener("click", () => {
