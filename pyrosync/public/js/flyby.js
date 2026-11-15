@@ -161,6 +161,10 @@ export function createFlybyController(bridge) {
     // Audio timing
     lastDroneMs: 0,
     lastPingMs: 0,
+    // Fire history sonification
+    lastHistoryCellKey: null,
+    nextCrackleMs: 0,
+    lastScan: null,
     lastHudMs: 0
   };
 
@@ -190,6 +194,7 @@ export function createFlybyController(bridge) {
   let historyLevels = [];
   let historyMeta = null;
   let activeHistoryLevel = null;
+  let historyColorRange = null;
   let craftGroup = null;
   let plumeLeft = null;
   let plumeRight = null;
@@ -728,6 +733,7 @@ export function createFlybyController(bridge) {
       .catch(() => null);
     if (!manifest || !Array.isArray(manifest.levels) || !manifest.levels.length) return;
     historyMeta = manifest;
+    historyColorRange = manifest.colorRange || null;
     historyGroup = new THREE.Group();
     historyGroup.visible = dom.layerHistory?.getAttribute('aria-pressed') !== 'false';
     scene.add(historyGroup);
@@ -765,6 +771,21 @@ export function createFlybyController(bridge) {
     if (pick === activeHistoryLevel) return;
     for (const level of historyLevels) level.mesh.visible = level === pick;
     activeHistoryLevel = pick;
+  }
+
+  // 0..1 position of a density on the shared log10 colour range (the same scale as the carpet).
+  function fireHistoryNorm(density) {
+    if (!(density > 0)) return 0;
+    const lo = Number.isFinite(historyColorRange?.min) ? historyColorRange.min : -4;
+    const hi = Number.isFinite(historyColorRange?.max) ? historyColorRange.max : -1;
+    return clamp((Math.log10(density) - lo) / (hi - lo || 1), 0, 1);
+  }
+
+  function fireHistoryDensityWord(t) {
+    if (t < 0.25) return 'low';
+    if (t < 0.5) return 'moderate';
+    if (t < 0.75) return 'high';
+    return 'very high';
   }
 
   function fireHistoryYears() {
@@ -1042,6 +1063,25 @@ export function createFlybyController(bridge) {
         envelope: { attack: 0.004, decay: 0.045, sustain: 0, release: 0.02 }
       }).connect(audioBus.filter);
 
+      // Fire history voices: a Geiger-style crackle whose rate follows the 25-year fire
+      // density under the craft, and a pluck each time the craft enters a new H3 cell,
+      // pitched by that cell's density. Their own chain, so the biome filter sweep
+      // does not muffle them.
+      audioBus.historyOut = new Tone.Gain(0.9).toDestination();
+      audioBus.crackleFilter = new Tone.Filter({ frequency: 2600, type: 'bandpass', Q: 0.8 })
+        .connect(audioBus.historyOut);
+      audioBus.crackle = new Tone.NoiseSynth({
+        noise: { type: 'white' },
+        volume: -16,
+        envelope: { attack: 0.001, decay: 0.012, sustain: 0, release: 0.006 }
+      }).connect(audioBus.crackleFilter);
+      audioBus.cellPluck = new Tone.PluckSynth({
+        attackNoise: 0.6,
+        dampening: 3200,
+        resonance: 0.9,
+        volume: -10
+      }).connect(audioBus.historyOut);
+
       audioBus.ready = true;
     } catch (err) {
       console.warn('Flyby audio setup deferred:', err);
@@ -1069,6 +1109,9 @@ export function createFlybyController(bridge) {
     const posZ = rec ? Math.max(0, rec.zScore) : 0;
     const proxBiome = clamp(1 - (distToBiome - 2) / 20, 0.08, 1);
     const tierInfo = bridge.tensionScale(posZ * proxBiome);
+    // d3-audio's scaleTension() names the tier `tier` (consonant / moderate / tense / dissonant).
+    const tierRaw = tierInfo.tier || tierInfo.label?.split(' ')[0] || 'consonant';
+    const tierName = tierRaw.charAt(0).toUpperCase() + tierRaw.slice(1);
 
     if (audioBus.filter && audioBus.filter.frequency) {
       const targetCutoff = clamp(420 + proxBiome * 2600 + sim.craftSpeed * 180 + (fireBin ? Math.min(3500, fireBin.totalFrp * 6) : 0), 320, 8200);
@@ -1096,7 +1139,7 @@ export function createFlybyController(bridge) {
         try {
           window.speechSynthesis.cancel();
           const u = new SpeechSynthesisUtterance(
-            `Flying over ${biome.name}. Climate departure ${(rec?.zScore || 0).toFixed(1)} sigma, ${tierInfo.label.split(' ')[0]}.`
+            `Flying over ${biome.name}. Climate departure ${(rec?.zScore || 0).toFixed(1)} sigma, ${tierName}.`
           );
           u.rate = 1.05;
           window.speechSynthesis.speak(u);
@@ -1127,11 +1170,77 @@ export function createFlybyController(bridge) {
       } catch (_) {}
     }
 
+    updateFireHistorySound(nowMs, scanResult.historyCell);
+
     if (dom.hudAudio) {
       const panPct = Math.round(pan * 100);
       const panTag = Math.abs(panPct) < 8 ? 'C' : (panPct < 0 ? `L${Math.abs(panPct)}` : `R${panPct}`);
-      dom.hudAudio.textContent = `${tierInfo.label.split(' ')[0]} · Pan ${panTag}`;
+      dom.hudAudio.textContent = `${tierName} · Pan ${panTag}`;
     }
+  }
+
+  // C major pentatonic over two octaves: low density plays low, dense fire belts play high.
+  const HISTORY_SCALE = ['C3', 'D3', 'E3', 'G3', 'A3', 'C4', 'D4', 'E4', 'G4', 'A4'];
+
+  function updateFireHistorySound(nowMs, historyCell) {
+    if (!historyCell) {
+      sim.lastHistoryCellKey = null;
+      return;
+    }
+    const t = fireHistoryNorm(historyCell.density);
+
+    // Cell crossing: one note per newly entered cell. Coarser levels from high orbit
+    // mean fewer, slower notes; finer levels near the ground play faster.
+    const key = `${historyCell.res}:${historyCell.id}`;
+    if (key !== sim.lastHistoryCellKey) {
+      sim.lastHistoryCellKey = key;
+      if (audioBus.cellPluck) {
+        const note = HISTORY_SCALE[Math.round(t * (HISTORY_SCALE.length - 1))];
+        try {
+          audioBus.cellPluck.triggerAttackRelease(note, 0.4);
+        } catch (_) {}
+      }
+    }
+
+    // Crackle: random (Poisson-like) clicks, 1.5 to ~32 per second with density.
+    if (audioBus.crackle && nowMs >= (sim.nextCrackleMs || 0)) {
+      const rate = 1.5 + Math.pow(t, 1.4) * 30;
+      sim.nextCrackleMs = nowMs + (-Math.log(1 - Math.random()) * 1000) / rate;
+      try {
+        audioBus.crackle.triggerAttackRelease(0.01, undefined, 0.12 + t * 0.5);
+      } catch (_) {}
+    }
+  }
+
+  // Spoken (and screen-reader) readout of the fire history under the craft: key F.
+  function speakFireHistory() {
+    let text;
+    if (!historyLevels.length) {
+      text = 'Fire history is still loading.';
+    } else if (historyGroup && !historyGroup.visible) {
+      text = 'The fire history layer is hidden.';
+    } else {
+      const cell = sim.lastScan?.historyCell;
+      if (cell) {
+        const t = fireHistoryNorm(cell.density);
+        const years = fireHistoryYears().replace('–', ' to ');
+        text = `${cell.detections.toLocaleString()} fires detected here from ${years}. ${fireHistoryDensityWord(t)} fire density.`;
+      } else {
+        text = 'No fires recorded here in the fire history.';
+      }
+    }
+    const announcer = document.getElementById('sr-live-announcer');
+    if (announcer) announcer.textContent = text;
+    const state = bridge.getState();
+    if ('speechSynthesis' in window && !state.isMuted) {
+      try {
+        window.speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(text);
+        u.rate = 1.05;
+        window.speechSynthesis.speak(u);
+      } catch (_) {}
+    }
+    return text;
   }
 
   function stepFlightPhysics(dt) {
@@ -1203,7 +1312,9 @@ export function createFlybyController(bridge) {
       // Slight gentle bank into turns
       const desiredUp = radialOut.clone().addScaledVector(right, -yawCmd * 0.35).normalize();
       const bankErr = new THREE.Vector3().crossVectors(up, desiredUp).dot(forward);
-      const rollCmd = clamp(bankErr * 2.6, -1.6, 1.6);
+      // Negative: a positive local-Z roll turns `up` away from `desiredUp` here, so the
+      // un-negated command levelled the craft upside down.
+      const rollCmd = clamp(-bankErr * 2.6, -1.6, 1.6);
 
       tmpQ.setFromEuler(new THREE.Euler(pitchCmd * dt, yawCmd * dt, rollCmd * dt, 'YXZ'));
       sim.craftQuat.multiply(tmpQ).normalize();
@@ -1237,7 +1348,8 @@ export function createFlybyController(bridge) {
       let autoRoll = 0;
       if (sim.horizonLock && Math.abs(rollIn) < 0.05) {
         const rollErr = new THREE.Vector3().crossVectors(up, radialOut).dot(forward);
-        autoRoll = clamp(rollErr * 1.9, -1.2, 1.2);
+        // Negative for the same reason as the autopilot bank: keeps the canopy facing space.
+        autoRoll = clamp(-rollErr * 1.9, -1.2, 1.2);
       }
 
       tmpQ.setFromEuler(new THREE.Euler(
@@ -1383,7 +1495,7 @@ export function createFlybyController(bridge) {
     if (window.h3 && activeHistoryLevel && historyGroup?.visible) {
       const id = window.h3.latLngToCell(geo.lat, geo.lon, activeHistoryLevel.res);
       const row = activeHistoryLevel.cells.get(id);
-      if (row) historyCell = { res: activeHistoryLevel.res, detections: row[0], density: row[1] };
+      if (row) historyCell = { id, res: activeHistoryLevel.res, detections: row[0], density: row[1] };
     }
 
     const activeRec = nearestTower
@@ -1473,6 +1585,7 @@ export function createFlybyController(bridge) {
     stepFlightPhysics(dt);
     updateFireHistoryLod((sim.craftPos.length() - EARTH_R) * KM_PER_UNIT);
     const scan = scanFootprint();
+    sim.lastScan = scan;
     updateHudReadout(nowMs, scan);
     updateSpatialAudio(nowMs, scan);
 
@@ -1601,6 +1714,8 @@ export function createFlybyController(bridge) {
         sim.keys.add(e.code);
       } else if (e.code === 'KeyV') {
         dom.btnCam?.click();
+      } else if (e.code === 'KeyF' && !e.repeat) {
+        speakFireHistory();
       }
     });
 
