@@ -120,23 +120,23 @@ export class MapView {
     }
     for (const point of points) {
       const age = minute === null ? 0 : minute - point.minute;
-      const opacity = age < 360 ? 1 : age < 1440 ? 0.72 : 0.48;
+      const fillOpacity = age < 360 ? 1 : age < 1440 ? 0.9 : 0.8;
       const existing = this.fireMarkers.get(point);
       if (existing) {
-        if (existing.opacity !== opacity) {
-          existing.marker.setStyle({ fillOpacity: opacity, opacity });
-          existing.opacity = opacity;
+        if (existing.fillOpacity !== fillOpacity) {
+          existing.marker.setStyle({ fillOpacity });
+          existing.fillOpacity = fillOpacity;
         }
         continue;
       }
       const marker = L.circleMarker([point.latitude, point.longitude], {
         pane: 'hotspots',
-        radius: 5,
+        radius: 7,
         color: '#ffffff',
-        weight: 2,
+        weight: 3,
         fillColor: '#e00023',
-        fillOpacity: opacity,
-        opacity,
+        fillOpacity,
+        opacity: 1,
       }).bindPopup(() => {
         const description = document.createElement('div');
         description.className = 'hotspot-brief';
@@ -147,7 +147,7 @@ export class MapView {
         briefing?.(description, point);
         return description;
       }, { autoPan: false, maxWidth: 360 }).addTo(this.fires);
-      this.fireMarkers.set(point, { marker, opacity });
+      this.fireMarkers.set(point, { marker, fillOpacity });
     }
   }
 

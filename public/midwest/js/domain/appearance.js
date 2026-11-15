@@ -1,18 +1,20 @@
 /** User-defined appearance algorithm. No map, DOM, or dataset dependencies. */
-export const APPEARANCE = Object.freeze({
-  minimumSaturation: 0.05,
-  maximumSaturation: 0.95,
-  lightnessPercent: 35,
-  mutedLightnessPercent: 58,
-  missingColor: '#aeb6b5',
-});
+const MISSING_COLOR = '#aeb6b5';
 
-const GREEN_BROWN = [120, 30];
-// Original palette: rows go from low to high A2, columns from low to high A1.
-const BLUE_ORANGE = [
-  ['#ede9e3', '#e9b997', '#c44f0b'],
-  ['#a7c8db', '#c7b7ab', '#bb7654'],
-  ['#15628e', '#5486a0', '#6c677d'],
+// Adapted from ColorBrewer's YlGn and YlOrBr, with distinct muted low stops.
+// https://colorbrewer2.org/
+const [COOL_RAMP, WARM_RAMP] = [
+  [0xc9e6d1, 0xc2e699, 0x78c679, 0x31a354, 0x006837],
+  [0xf5e0c8, 0xfed98e, 0xfe9929, 0xd95f0e, 0x993404],
+].map(ramp => ramp.map(color => [16, 8, 0].map(shift => (color >> shift) & 0xff)));
+
+// Orange Cyan (OrCy), Jonatan Hildén, Bivariate hue blending (2022), appendix.
+// https://aaltodoc.aalto.fi/bitstream/123456789/119235/1/master_Hilden_Jonatan_2022.pdf
+// Rows go from low to high A2, columns from low to high A1.
+const ORANGE_CYAN = [
+  ['#f1f1f1', '#f5ca5a', '#ee8b15'],
+  ['#73dbfb', '#ada09e', '#9e550d'],
+  ['#00aef1', '#296d9c', '#3f212a'],
 ];
 
 export function normalize(value, range) {
@@ -64,30 +66,36 @@ export function appearanceFor(cell, ranges, palette, breaks) {
   if (secondary !== null && !Number.isFinite(cell.A1)) {
     return { color: `hsl(141, 52%, ${90 - secondary * 64}%)`, missing: false };
   }
-  if (palette === 'blue-orange') {
+  if (palette === 'orange-cyan') {
     const primaryClass = classIndex(cell.A1, breaks?.A1);
     const secondaryClass = classIndex(cell.A2, breaks?.A2);
     if (primaryClass === null || secondaryClass === null) {
-      return { color: APPEARANCE.missingColor, missing: true };
+      return { color: MISSING_COLOR, missing: true };
     }
-    return { color: BLUE_ORANGE[secondaryClass][primaryClass], missing: false };
+    return { color: ORANGE_CYAN[secondaryClass][primaryClass], missing: false };
   }
   const primary = normalize(cell.A1, ranges.A1);
   if (primary === null || secondary === null) {
-    return { color: APPEARANCE.missingColor, missing: true };
+    return { color: MISSING_COLOR, missing: true };
   }
   return { color: colorFor(primary, secondary, palette), missing: false };
 }
 
+function mixColor(from, to, amount) {
+  return from.map((channel, index) => channel + (to[index] - channel) * amount);
+}
+
+function sampleRamp(ramp, amount) {
+  const position = amount * (ramp.length - 1);
+  const index = Math.min(Math.floor(position), ramp.length - 2);
+  return mixColor(ramp[index], ramp[index + 1], position - index);
+}
+
 export function colorFor(primary, secondary, palette) {
-  if (palette === 'blue-orange') {
-    return BLUE_ORANGE[Math.round(secondary * 2)][Math.round(primary * 2)];
+  if (palette === 'orange-cyan') {
+    return ORANGE_CYAN[Math.round(secondary * 2)][Math.round(primary * 2)];
   }
-  const [cool, warm] = GREEN_BROWN;
-  const hue = cool + primary * (warm - cool);
-  const saturation = APPEARANCE.minimumSaturation
-    + secondary * (APPEARANCE.maximumSaturation - APPEARANCE.minimumSaturation);
-  const lightness = APPEARANCE.mutedLightnessPercent
-    + secondary * (APPEARANCE.lightnessPercent - APPEARANCE.mutedLightnessPercent);
-  return `hsl(${hue}, ${saturation * 100}%, ${lightness}%)`;
+  const cool = sampleRamp(COOL_RAMP, secondary);
+  const warm = sampleRamp(WARM_RAMP, secondary);
+  return `rgb(${mixColor(cool, warm, primary).map(Math.round).join(', ')})`;
 }

@@ -3,14 +3,14 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Earth Atlas · MODIS Fire Map</title>
+    <title>Earth Atlas · MODIS Fire Map Prototype</title>
     <link rel="stylesheet" href="vendor/leaflet.css">
     <link rel="stylesheet" href="style.css">
   </head>
   <body>
     <main>
       <header class="row">
-        <h1>MODIS fire map</h1>
+        <h1>MODIS Fire Map Prototype</h1>
         <a href="https://www.earthdata.nasa.gov/data/instruments/modis" target="_blank" rel="noopener">NASA MODIS data ↗</a>
       </header>
 
@@ -36,7 +36,7 @@
           Color palette
           <select id="palette">
             <option value="green-brown">Green–brown</option>
-            <option value="blue-orange">Blue–orange</option>
+            <option value="orange-cyan">Orange–cyan</option>
           </select>
         </label>
         <label class="zoom">
@@ -45,7 +45,8 @@
         </label>
       </div>
 
-      <section id="download-prompt" aria-labelledby="download-title" hidden>
+      <section id="download-prompt" role="dialog" aria-modal="false"
+        aria-labelledby="download-title" aria-describedby="download-message" hidden>
         <strong id="download-title">Allow this map download?</strong>
         <p id="download-message" role="status"></p>
         <div class="row">

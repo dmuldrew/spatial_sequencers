@@ -1,6 +1,8 @@
 import { loadContext } from './fire-source.js';
 
 const HILLSHADE = 'https://server.arcgisonline.com/arcgis/rest/services/Elevation/World_Hillshade/MapServer/tile/{z}/{y}/{x}';
+const COMPASS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+const compass = degrees => COMPASS[Math.round(degrees / 45) % COMPASS.length];
 const timestamp = properties => Number(properties.poly_PolygonDateTime);
 const utc = value => new Date(value).toISOString().slice(0, 16).replace('T', ' ') + ' UTC';
 
@@ -40,9 +42,9 @@ function insidePerimeter(point, geometry) {
 
 function describeWind(hour) {
   const [, speed, from, gust, humidity] = hour;
-  if (!Number.isFinite(speed) || !Number.isFinite(from)) return 'Wind unavailable for this hour.';
+  if (!Number.isFinite(speed) || (speed !== 0 && !Number.isFinite(from))) return 'Wind unavailable for this hour.';
   return [
-    `${speed} mph from ${from}°`,
+    speed === 0 ? 'Calm wind' : `${speed} mph from ${compass(from)} (${from}°)`,
     Number.isFinite(gust) && `gusts ${gust} mph`,
     Number.isFinite(humidity) && `${humidity}% RH`,
   ].filter(Boolean).join(' · ');
@@ -60,6 +62,7 @@ export class FireContext {
       attribution: 'Hillshade © Esri and elevation data contributors',
     });
     this.map.createPane('incident-context').style.zIndex = '415';
+    this.map.createPane('wind-context').style.zIndex = '420';
     this.perimeters = L.geoJSON(null, {
       pane: 'incident-context',
       style: { color: '#652e9b', opacity: 0.95, weight: 2, dashArray: '6 4', fillOpacity: 0.08 },
@@ -69,8 +72,9 @@ export class FireContext {
         layer.bindTooltip(label);
       },
     }).addTo(this.map);
-    this.wind = L.marker(this.map.getCenter(), { interactive: false, keyboard: false, opacity: 0 })
-      .addTo(this.map);
+    this.wind = L.marker(this.map.getCenter(), {
+      pane: 'wind-context', interactive: false, keyboard: false, opacity: 0,
+    }).addTo(this.map);
   }
 
   update(bounds, date) {
@@ -125,15 +129,29 @@ export class FireContext {
   showTime(time) {
     this.time = time;
     const hour = this.weather?.hours.findLast(row => row[0] * 1000 <= time);
-    if (hour && this.hour !== hour) {
+    if (this.weather && this.hour !== hour) {
       this.hour = hour;
-      this.weatherOutput.textContent = `${describeWind(hour)} · ${this.weather.source} at map center`;
-      const from = hour[2];
-      if (Number.isFinite(from) && Number.isFinite(hour[1])) {
+      const [, speed, from] = hour ?? [];
+      this.weatherOutput.textContent = hour
+        ? `${describeWind(hour)} · ${this.weather.source} near map center`
+        : 'Wind unavailable for this hour.';
+      if (Number.isFinite(speed) && (speed === 0 || Number.isFinite(from))) {
+        // The observations give where the wind comes from. The arrow points downwind.
+        const toward = speed === 0 ? 0 : (from + 180) % 360;
+        const caption = speed === 0 ? 'Calm wind' : `Wind ${speed} mph to ${compass(toward)}`;
+        const arrow = document.createElement('span');
+        arrow.textContent = speed === 0 ? '•' : '↑';
+        arrow.style.transform = `rotate(${toward}deg)`;
+        arrow.setAttribute('aria-hidden', 'true');
+        const label = document.createElement('span');
+        label.className = 'wind-label';
+        label.textContent = caption;
+        const icon = document.createElement('div');
+        icon.append(arrow, label);
         this.wind.setLatLng([this.weather.latitude, this.weather.longitude])
           .setIcon(L.divIcon({
             className: 'wind-arrow',
-            html: `<span style="transform:rotate(${from + 180}deg)">↑</span>`,
+            html: icon,
             iconSize: [32, 32], iconAnchor: [16, 16],
           })).setOpacity(1);
       } else {

@@ -188,12 +188,22 @@ spatial_sequencers/
 | **Dancing with the SARs** | NISAR Synthetic Aperture Radar (SAR) | Interactive surface-change tracker & visual narrative | Intermediate / Advanced |
 | **Harmonization of MODIS and VIIRS Hot Spots** | NASA FIRMS active fire hotspots (MODIS & VIIRS) | Harmonized Burning Activity Calendar & web dashboard | Intermediate / Advanced |
 
-## Central Iowa MODIS hexagon map
+## MODIS Fire Map Prototype
 
-The map at `/midwest/map.html` shows **MOD11A2 daytime land surface temperature**
+The prototype at `/midwest/map.html` shows **MOD11A2 daytime land surface temperature**
 and **MOD13Q1 vegetation index (NDVI)** on a hexagonal grid, with
 **NASA FIRMS MODIS fire hotspots** overlaid.
 Cells with only NDVI use the vegetation color scale in either palette.
+Green–brown adapts the YlGn and YlOrBr ramps from [ColorBrewer](https://colorbrewer2.org/).
+The Orange–Cyan palette is from [Jonatan Hildén’s *Bivariate hue blending* (2022)](https://aaltodoc.aalto.fi/bitstream/123456789/119235/1/master_Hilden_Jonatan_2022.pdf).
+
+The challenge goal is a burning activity calendar built from harmonized MODIS
+and VIIRS detections. Adding VIIRS and reconciling detections across the two
+sensors are future work.
+
+For the [Earth Information Jukebox challenge](#1-the-earth-information-jukebox),
+the goal is to turn map data into music in real time. Map audio is currently
+disabled.
 
 - Focus the map and use the arrow keys to pan.
 - Select **Replay** or scrub the **Fire timeline (UTC)** to see when hotspots

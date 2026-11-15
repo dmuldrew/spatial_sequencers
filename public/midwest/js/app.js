@@ -17,6 +17,8 @@ import { sonifyCell } from './domain/sonification.js';
 import { MapAudio } from './infrastructure/map-audio.js';
 
 const element = id => document.getElementById(id);
+const frame = window.frameElement;
+const downloadPrompt = element('download-prompt');
 // Keep the map silent and its Sound control hidden until the instrument blend is distinguishable.
 const MAP_AUDIO_ENABLED = false;
 const mapAudio = MAP_AUDIO_ENABLED ? new MapAudio() : null;
@@ -42,6 +44,7 @@ let renderFrame = null;
 let blockSource = null;
 let blockStatus = '';
 let manifestGate = null;
+let downloadReturnFocus = null;
 
 function scheduleRender() {
   if (renderFrame !== null) cancelAnimationFrame(renderFrame);
@@ -141,7 +144,7 @@ function render() {
   view.render(cells, cell => appearanceFor(cell, ranges, palette, breaks), cellPopup);
   for (const [key, input] of Object.entries(INPUTS)) {
     const cutoffs = breaks?.[key];
-    element(`${key.toLowerCase()}-range`).textContent = palette === 'blue-orange'
+    element(`${key.toLowerCase()}-range`).textContent = palette === 'orange-cyan'
       ? cutoffs ? `classes split at ${cutoffs.map(value => formatValue(value, input.units)).join(' and ')}`
         : 'No paired observations'
       : formatRange(ranges[key], input.units);
@@ -270,9 +273,23 @@ function moveWithArrows(event) {
   }
 }
 
+function positionDownloadPrompt() {
+  if (!frame || downloadPrompt.hidden) return;
+  // The dashboard scrolls the full-height iframe from the parent page.
+  const visibleTop = Math.max(0, -frame.getBoundingClientRect().top);
+  const maxTop = Math.max(12, window.innerHeight - downloadPrompt.offsetHeight - 12);
+  downloadPrompt.style.top = `${Math.min(visibleTop + 12, maxTop)}px`;
+}
+
 function showDownloadPrompt(details) {
-  element('download-prompt').hidden = !details;
-  if (!details) return;
+  if (!details) {
+    const restoreFocus = downloadPrompt.contains(document.activeElement);
+    downloadPrompt.hidden = true;
+    if (restoreFocus) downloadReturnFocus?.focus({ preventScroll: true });
+    downloadReturnFocus = null;
+    return;
+  }
+  if (downloadPrompt.hidden) downloadReturnFocus = document.activeElement;
   const size = bytes => bytes >= 1_000_000
     ? `${(bytes / 1_000_000).toFixed(1)} MB` : `${Math.ceil(bytes / 1000)} KB`;
   const progress = details.total
@@ -281,6 +298,8 @@ function showDownloadPrompt(details) {
   const state = details.ready ? 'Ready to load into the map.'
     : details.paused ? 'Paused at the preview limit.' : 'A small preview can download while you decide.';
   element('download-message').textContent = `${progress} ${state}`;
+  downloadPrompt.hidden = false;
+  positionDownloadPrompt();
 }
 
 async function loadSelection(next = selection, fromForm = false) {
@@ -491,10 +510,18 @@ function bindControls() {
 }
 
 // The parent dashboard embeds this standalone map without a second scrollbar.
-const frame = window.frameElement;
 if (frame) {
+  const host = frame.ownerDocument.defaultView;
+  host.addEventListener('scroll', positionDownloadPrompt, { passive: true });
+  host.addEventListener('resize', positionDownloadPrompt);
+  window.addEventListener('pagehide', event => {
+    if (event.persisted) return;
+    host.removeEventListener('scroll', positionDownloadPrompt);
+    host.removeEventListener('resize', positionDownloadPrompt);
+  });
   new ResizeObserver(() => {
     frame.style.height = `${Math.ceil(document.body.getBoundingClientRect().height)}px`;
+    positionDownloadPrompt();
   }).observe(document.body);
 }
 
