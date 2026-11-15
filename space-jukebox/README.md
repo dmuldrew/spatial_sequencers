@@ -30,35 +30,50 @@ Live demo: https://dmuldrew.github.io/spatial_sequencers/space-jukebox/fly.html
 Six fire regions, west to east, ~80 seconds per loop: California
 & W. US, Boreal N. America, Amazon & Cerrado, Mediterranean Basin,
 Sahel & N. Savanna, Australian Outback. The dataset is the main
-project's: 330 NASA FIRMS (MODIS) hotspots with fire radiative
-power (FRP), embedded from PyroSync's bundled data.
+project's: the 330 largest NASA FIRMS (MODIS) hotspots — selected
+from 80,347 detections in the bundled 7-day set — with fire
+radiative power (FRP), embedded from PyroSync's data.
 
 ## How it sounds
 
-- **Continuous tone:** two detuned saws through a pitch-tracking
-  lowpass filter. Pitch and brightness follow the FRP-weighted fire
+- **Continuous tone:** a bowed-string voice — two detuned saws with
+  vibrato and a formant peak, through a pitch-tracking lowpass
+  filter. Pitch and brightness follow the FRP-weighted fire
   intensity near the ship (Gaussian falloff, ~16° radius) — calm
   ocean is a low hum; a fire region climbs.
 - **Pings:** passing within ~5.5° of a major hotspot (FRP ≥ 280)
-  strikes a note whose pitch and loudness scale with that fire's
-  FRP. The loudest moment on the planet: Australia, FRP 5083.
-- **Narration:** entering a region speaks its name, hotspot count,
-  and strongest FRP. Toggle with the Narration button or the N key.
-- **On the map:** hotspot dots are sized by FRP as well as coloured —
-  the biggest, reddest dots are the strongest fires.
+  strikes a short pizzicato note whose pitch and loudness scale
+  with that fire's FRP. The loudest moment on the planet:
+  Australia, FRP 5083.
+- **Narration:** before takeoff, the start screen speaks a short
+  briefing (what a hotspot is, fire power in megawatts, the keys) —
+  the Start button stays a Skip button until it finishes. In
+  flight, entering a region speaks its name, hotspot count, total
+  megawatts, strongest fire, and strength ranking; crossing open
+  water names the ocean and the compass heading; a region's
+  densest core gets a callout. Toggle with the Narration button
+  or the N key.
+- **On the map:** hotspot dots are sized by FRP as well as coloured,
+  each fire flickers on its own phase, and the dots swell and
+  brighten with the intensity under the ship. Every hotspot also
+  wears a **bar of light** extruded from the surface — height on
+  the same log FRP scale, so the strongest fires stand tallest.
 
 ## Controls
 
 Space play/pause · S whereabouts · N narration · M mute · C
-chase/orbit camera · ↑/↓ speed. Shortcuts stand down while a button
-has focus, so Space still activates the control you are on.
+chase/orbit camera · G manual pilot · ↑/↓ speed. Shortcuts stand
+down while a button has focus, so Space still activates the
+control you are on.
 
 The HUD shows the current region, a fire-intensity meter, the
 ship's coordinates, and tour progress (which stop you are at, and
 the next one); a screen-reader live region announces each region
-as it is reached, and **S** speaks the current region, its hotspot
-count and the live fire intensity on demand. Hotspot pings are
-panned left/right toward the side the fire is on.
+as it is reached, and **S** speaks the current region (or the
+ocean being crossed), the compass heading, and the live fire
+intensity on demand. The intensity meter grows in height as well
+as width. Hotspot pings are panned left/right toward the side the
+fire is on.
 
 ## Manual pilot
 
@@ -73,7 +88,9 @@ B camera, bumpers set tour speed, and Start switches pilot mode.
 Everything sonified keeps working in manual flight, because the
 sound has always been driven by where the ship is, not by the
 tour path. Switching to manual also flattens the globe into a
-flat (equirectangular) map for the flight; switching back
+flat (equirectangular) map for the flight; flight on the map is
+planar — straight lines stay straight, east holds your latitude,
+the world loops at the left and right edges — and switching back
 restores the sphere.
 
 ## Technical notes

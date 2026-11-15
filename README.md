@@ -4,6 +4,27 @@
 
 An interactive **audio-visual NASA wildfire, meteorology, and Earth-data sonification repository** built for the **2026 NASA International Space Apps Challenge** (Seattle), pairing the **[PyroSync Fire-Weather Observatory](pyrosync/)** (`d3-audio`, D3.js v7, Three.js, Tone.js, H3) with the accessible **[Space Jukebox](space-jukebox/)** prototype.
 
+**Our challenge:** [The Earth Information Jukebox](https://www.spaceappschallenge.org/2026/challenges/the-earth-information-jukebox/) — translate NASA Earth Information Center visuals into sound, so Earth data can be *heard*, not just seen, including by blind and low-vision audiences. That is the challenge this submission answers. The same fire data also touches *Dancing with the SARs* and *Harmonization of MODIS and VIIRS Hot Spots* (summaries at the bottom of this README), but the Jukebox is the primary challenge.
+
+## TL;DR
+
+- **Who:** Anyone trying to understand a changing planet — researchers, land and fire managers, students, and blind and low-vision audiences who are shut out of Earth data published only as maps and charts.
+- **What:** Spatial Sequencers — a hub of interactive sonifications of NASA Earth data (POWER meteorology, EONET wildfire events, FIRMS hotspots, MODIS land data): PyroSync's fire-weather observatory, the Space Jukebox fire flight, and a combined flyby. Built for the **2026 NASA Space Apps Challenge** (Seattle); submission challenge: **The Earth Information Jukebox**.
+- **Why:** Sound reveals what pictures hide — patterns, tension, and change over time — and it includes the people pictures leave out. A changing planet shouldn't require eyes to perceive.
+- **PyroSync** — a fire-weather observatory: 26 years of NASA POWER meteorology, EONET wildfires, and FIRMS hotspots, sonified with `d3-audio` across a climate spiral, an Iowa H3 hex map, and an orbital flyby.
+- **Space Jukebox** — an audio-first 3D fire flight designed for blind and low-vision listeners: a ship tours the 330 largest NASA FIRMS hotspots on Earth this week while spoken narration, a bowed-string tone, and extruded light bars make the fires audible and visible.
+- **Live demo:** https://dmuldrew.github.io/spatial_sequencers/
+- **Run it locally:** `npm run preview` from the repo root → http://localhost:8123 (see *Local preview* under How to Run).
+
+## Team
+
+**Spatial Sequencers.** Project repository: [github.com/dmuldrew/spatial_sequencers](https://github.com/dmuldrew/spatial_sequencers) — live demo at [dmuldrew.github.io/spatial_sequencers](https://dmuldrew.github.io/spatial_sequencers/).
+
+- **@dmuldrew** — repo owner; PyroSync and the `d3-audio` sonification library
+- **Lan Ly** ([@lanly-dev](https://github.com/lanly-dev)) — Space Jukebox (3D Fire Flight); his work lands in the project repository by pull request from his fork
+- **Brian Pickrell** — MODIS map and fire timeline (Midwest)
+- **Monica** ([@mcaraway1](https://github.com/mcaraway1)) — contributor
+
 ---
 
 ## Sub-projects at a Glance
@@ -51,6 +72,16 @@ An interactive **audio-visual NASA wildfire, meteorology, and Earth-data sonific
 ---
 
 ## How to Run the App
+
+### Local preview (fastest — Node.js only, no Docker)
+
+From the repo root:
+
+```bash
+npm run preview
+```
+
+then open **[http://localhost:8123](http://localhost:8123)** — the hub is at `/`, PyroSync at `/pyrosync/`, and Space Jukebox at `/space-jukebox/`. The preview server mirrors the GitHub Pages layout exactly, needs only Node.js (it has no dependencies of its own), opens your browser automatically, and installs PyroSync's dependencies on first run if they are missing. Use a different port with `npm run preview -- 9000`; stop it with Ctrl+C.
 
 ### Option 1: Docker Compose (Recommended)
 
@@ -227,7 +258,9 @@ The third home page tab (**Orbital Flyby (3D)** / `/#flyby`) launches a controll
 
 ## 2026 NASA Space Apps Challenge Summaries
 
-### 1. [The Earth Information Jukebox](https://www.spaceappschallenge.org/2026/challenges/the-earth-information-jukebox/)
+*The team's submission answers **#1, The Earth Information Jukebox**. The other two are included because the project's fire data and sonification approach also speak to them.*
+
+### 1. [The Earth Information Jukebox](https://www.spaceappschallenge.org/2026/challenges/the-earth-information-jukebox/) — **our challenge**
 
 - **Subjects:** Arts & Multimedia, Earth Science, Software
 - **Difficulty:** Beginner (Youth) / Intermediate

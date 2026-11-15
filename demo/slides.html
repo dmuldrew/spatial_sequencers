@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spatial Sequencers — Demo Slides</title>
+<style>
+  :root { --bg:#050914; --panel:#0b1226; --ink:#eaf0ff; --dim:#9fb0d8; --accent:#ffb454; --hot:#ff5a3c; }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; }
+  body { background: var(--bg); color: var(--ink); font-family: "Segoe UI", system-ui, -apple-system, sans-serif; overflow: hidden; }
+  .slide { position: absolute; inset: 0; display: none; flex-direction: column; justify-content: center; padding: 6vh 8vw; }
+  .slide.active { display: flex; }
+  .kicker { color: var(--accent); font-size: clamp(13px, 1.6vw, 19px); letter-spacing: .35em; text-transform: uppercase; margin-bottom: 2.2vh; }
+  h1 { font-size: clamp(38px, 6.2vw, 84px); line-height: 1.04; font-weight: 800; }
+  h2 { font-size: clamp(30px, 4.4vw, 58px); line-height: 1.1; font-weight: 800; margin-bottom: 2.6vh; }
+  p, li { font-size: clamp(17px, 2.1vw, 27px); line-height: 1.45; color: var(--ink); }
+  .dim { color: var(--dim); }
+  ul { list-style: none; padding: 0; }
+  li { margin: 1.4vh 0; padding-left: 1.2em; position: relative; }
+  li::before { content: "▸"; position: absolute; left: 0; color: var(--accent); }
+  b { color: #fff; }
+  .accent { color: var(--accent); }
+  .hot { color: var(--hot); }
+  .row { display: flex; gap: 3vw; align-items: center; }
+  .row > * { flex: 1; }
+  img.shot { width: 100%; border-radius: 14px; border: 1px solid #22315e; box-shadow: 0 18px 50px rgba(0,0,0,.55); }
+  img.icon { width: clamp(120px, 18vw, 230px); border-radius: 24px; }
+  .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 1vh; }
+  .card { background: var(--panel); border: 1px solid #22315e; border-radius: 14px; padding: 18px 22px; }
+  .card img.thumb { width: 100%; height: 118px; object-fit: cover; border-radius: 9px; margin-bottom: 12px; border: 1px solid #22315e; }
+  figure { margin: 0; }
+  figcaption { color: var(--dim); font-size: clamp(13px, 1.4vw, 18px); margin-top: 8px; text-align: center; }
+  .card h3 { font-size: clamp(20px, 2.4vw, 32px); margin-bottom: 8px; }
+  .card p { font-size: clamp(15px, 1.7vw, 22px); color: var(--dim); line-height: 1.4; }
+  .card p b { color: var(--ink); }
+  .chips { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 3vh; }
+  .chip { background: var(--panel); border: 1px solid #22315e; border-radius: 12px; padding: 14px 20px; font-size: clamp(15px, 1.8vw, 23px); }
+  .chip b { font-size: 1.35em; display: block; }
+  .big-quote { font-size: clamp(28px, 4vw, 52px); font-weight: 700; line-height: 1.25; }
+  .footer { position: absolute; left: 8vw; right: 8vw; bottom: 3.2vh; display: flex; justify-content: space-between; color: var(--dim); font-size: clamp(12px, 1.3vw, 16px); }
+  a { color: var(--accent); text-decoration: none; }
+  #counter { position: fixed; top: 18px; right: 24px; color: var(--dim); font-size: 14px; letter-spacing: .2em; z-index: 5; }
+  @media print { body { overflow: visible; } .slide { position: static; display: flex !important; page-break-after: always; height: 100vh; } #counter { display: none; } }
+</style>
+</head>
+<body>
+<div id="counter">1 / 7</div>
+
+<!-- 1 · TITLE -->
+<section class="slide active">
+  <div class="row">
+    <div style="flex:1.4">
+      <div class="kicker">NASA Space Apps Challenge 2026 · Seattle</div>
+      <h1>Spatial<br>Sequencers</h1>
+      <p style="margin-top:2.4vh" class="big-quote">Earth data you can <span class="accent">hear</span>.</p>
+      <p class="dim" style="margin-top:2vh">A hub of sonification projects — one ensemble, four instruments.<br>Challenge: <b style="color:var(--ink)">The Earth Information Jukebox</b></p>
+      <p class="dim">@dmuldrew · Lan Ly · Brian Pickrell · Monica</p>
+    </div>
+    <div style="flex:1; text-align:center">
+      <img class="icon" src="img/team-icon.webp" alt="Team icon: a rocket with headphones orbiting a smiling Earth">
+    </div>
+  </div>
+  <div class="footer"><span>Spatial Sequencers</span><span>Live: dmuldrew.github.io/spatial_sequencers</span></div>
+</section>
+
+<!-- 2 · WHO / WHY -->
+<section class="slide">
+  <div class="kicker">Who · Why</div>
+  <h2>The planet's story is published<br>as <span class="hot">pictures</span>.</h2>
+  <ul>
+    <li><b>Who:</b> researchers, land &amp; fire managers, students — and blind and low-vision audiences, who are shut out of data released only as maps and charts.</li>
+    <li>Even for sighted readers, pictures hide <b>pattern, rhythm, and change over time</b>.</li>
+    <li><b>Why:</b> sound reveals what pictures hide — and a changing planet shouldn't require eyes to perceive.</li>
+  </ul>
+  <div class="footer"><span>The problem</span><span>2 / 7</span></div>
+</section>
+
+<!-- 3 · WHAT — THE WHOLE ENSEMBLE -->
+<section class="slide">
+  <div class="kicker">What · The whole project</div>
+  <h2>One hub. Four instruments.</h2>
+  <div class="cards">
+    <div class="card">
+      <img class="thumb" src="img/pyrosync.gif" alt="PyroSync's Wildfire Spiral, animated">
+      <h3>PyroSync</h3>
+      <p>The team's main project — a <b>fire-weather observatory</b>: climate spiral, Iowa hex map, and orbital flyby over 26 years of NASA POWER data, EONET wildfires, and FIRMS hotspots.</p>
+    </div>
+    <div class="card">
+      <img class="thumb" src="img/jukebox.gif" alt="The Space Jukebox fire flight, animated">
+      <h3>Space Jukebox</h3>
+      <p>An <b>audio-first</b> experience of this week's global fires — spoken narration and sound first, built for blind and low-vision listeners.</p>
+    </div>
+    <div class="card">
+      <img class="thumb" src="img/midwest.gif" alt="The Midwest MODIS fire map and timeline, animated">
+      <h3>Midwest Fire Timeline</h3>
+      <p><b>MODIS</b> fire history across the US Midwest — a map and timeline you can scrub, watching fire seasons come and go.</p>
+    </div>
+    <div class="card">
+      <img class="thumb" src="img/flyby.gif" alt="The Combined Spaceship Flyby over the Iowa hex grid, animated">
+      <h3>The Combined Flyby</h3>
+      <p>One orbital pass that <b>merges the ensemble</b> — fire weather and live hotspots together in a single spacecraft flight.</p>
+    </div>
+  </div>
+  <div class="footer"><span>All four, one hub</span><span>3 / 7</span></div>
+</section>
+
+<!-- 4 · PYROSYNC -->
+<section class="slide">
+  <div class="kicker">Sub-project · PyroSync</div>
+  <div class="row">
+    <div>
+      <h2>A fire-weather observatory<br>you can <span class="accent">hear</span> building.</h2>
+      <ul>
+        <li><b>Climate spiral</b> — temperature winding across 26 years of NASA POWER data.</li>
+        <li><b>Iowa H3 hex map</b> and <b>orbital flyby</b> — the same data, three viewpoints.</li>
+        <li>Sonified with <b>d3-audio</b>, a data-to-sound library built for this project.</li>
+      </ul>
+      <div class="chips">
+        <div class="chip"><b>26 years</b>of meteorology</div>
+        <div class="chip"><b>3 views</b>spiral · hex map · flyby</div>
+        <div class="chip"><b>Live</b>EONET + FIRMS fires</div>
+      </div>
+    </div>
+    <div><img class="shot" src="img/pyrosync.gif" alt="PyroSync's Wildfire Spiral with live fire-weather data panels, animated"></div>
+  </div>
+  <div class="footer"><span>PyroSync — @dmuldrew</span><span>4 / 7</span></div>
+</section>
+
+<!-- 5 · SPACE JUKEBOX -->
+<section class="slide">
+  <div class="kicker">Sub-project · Space Jukebox</div>
+  <div class="row">
+    <div>
+      <h2>The week's fires,<br>as an album you fly through.</h2>
+      <ul>
+        <li>The <b>330 largest fires on Earth this week</b> — of <b>80,347</b> FIRMS detections — each a bar of light with a voice in the tone.</li>
+        <li><b>Designed to be used eyes-closed:</b> a spoken briefing before takeoff, narration with totals and rankings throughout, keyboard or Xbox controller.</li>
+        <li>Australia: <b>101,440 MW</b> — a roar. The Mediterranean: <b>1,779 MW</b> — nearly silent. <b>The contrast is the data.</b></li>
+      </ul>
+    </div>
+    <div><img class="shot" src="img/jukebox.gif" alt="The Space Jukebox flight approaching a wall of light bars over a fire region, animated"></div>
+  </div>
+  <div class="footer"><span>Space Jukebox — Lan Ly</span><span>5 / 7</span></div>
+</section>
+
+<!-- 6 · MIDWEST + COMBINED FLYBY -->
+<section class="slide">
+  <div class="kicker">Sub-projects · Midwest &amp; the Flyby</div>
+  <h2>Same fires, heard<br>from the ground — and from orbit.</h2>
+  <ul>
+    <li><b>Midwest Fire Timeline</b> — MODIS fire history on a map you can scrub through time: seasons ignite, spread, and fade, region by region. <span class="dim">(Brian Pickrell)</span></li>
+    <li><b>The Combined Flyby</b> — the ensemble in one pass: a spacecraft orbit carrying PyroSync's fire weather and the week's live FIRMS hotspots together.</li>
+    <li>Every instrument in the hub plays the <b>same NASA data</b> — the hub is the band, the data is the score.</li>
+  </ul>
+  <div class="row" style="margin-top:2.5vh">
+    <figure><img class="shot" src="img/midwest.gif" alt="The Midwest MODIS fire map with its timeline playing, animated"><figcaption>Midwest — the MODIS timeline, playing</figcaption></figure>
+    <figure><img class="shot" src="img/flyby.gif" alt="The Combined Spaceship Flyby over the Iowa H3 hex grid, animated"><figcaption>Combined Flyby — one orbit, all datasets</figcaption></figure>
+  </div>
+  <div class="footer"><span>Midwest · Combined Flyby</span><span>6 / 7</span></div>
+</section>
+
+<!-- 7 · POSSIBILITY / CLOSE -->
+<section class="slide">
+  <div class="kicker">Possibility</div>
+  <h2>Any dataset can be heard.</h2>
+  <p style="max-width: 60ch">If fire weather can sing, so can oceans, ice, cities, and storms. Sonification isn't an extra feature — it's another way in, for everyone the pictures left out.</p>
+  <p class="big-quote" style="margin-top:4vh">“The planet is singing.<br>We built the <span class="accent">instrument</span>.”</p>
+  <p style="margin-top:4vh">Live demo: <a href="https://dmuldrew.github.io/spatial_sequencers/">dmuldrew.github.io/spatial_sequencers</a><br>
+  Project repository: <a href="https://github.com/dmuldrew/spatial_sequencers">github.com/dmuldrew/spatial_sequencers</a></p>
+  <p class="dim" style="margin-top:2vh">Built at F5 Tower, Seattle — NASA Space Apps Challenge 2026.</p>
+  <div class="footer"><span>Spatial Sequencers</span><span>7 / 7</span></div>
+</section>
+
+<script>
+  const slides = [...document.querySelectorAll(".slide")];
+  const counter = document.getElementById("counter");
+  let i = 0;
+  function show(n) {
+    i = Math.max(0, Math.min(slides.length - 1, n));
+    slides.forEach((s, k) => s.classList.toggle("active", k === i));
+    counter.textContent = (i + 1) + " / " + slides.length;
+    history.replaceState(null, "", "#" + (i + 1));
+  }
+  addEventListener("keydown", e => {
+    if (["ArrowRight", " ", "PageDown"].includes(e.key)) { show(i + 1); e.preventDefault(); }
+    if (["ArrowLeft", "PageUp"].includes(e.key)) { show(i - 1); e.preventDefault(); }
+    if (e.key === "Home") show(0);
+    if (e.key === "End") show(slides.length - 1);
+  });
+  addEventListener("click", e => show(i + (e.clientX > innerWidth / 2 ? 1 : -1)));
+  show(parseInt((location.hash || "#1").slice(1)) - 1 || 0);
+</script>
+</body>
+</html>
