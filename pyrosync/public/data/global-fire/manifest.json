@@ -82,6 +82,25 @@
     },
     "processor": "https://github.com/dmuldrew/raster_h3"
   },
+  "trend": {
+    "field": "trend_log2",
+    "early": [
+      2001,
+      2010
+    ],
+    "late": [
+      2016,
+      2025
+    ],
+    "definition": "log2((late mean detections per year + 0.5) / (early mean + 0.5))"
+  },
+  "season": {
+    "fields": [
+      "peak_month",
+      "peak_share"
+    ],
+    "definition": "calendar month (1-12) with the most detections, and its share of the cell total"
+  },
   "resolutions": [
     0,
     1,
@@ -95,7 +114,9 @@
     "maxResolution": 4,
     "properties": [
       "detections",
-      "density"
+      "density",
+      "trend_log2",
+      "peak_month"
     ]
   }
 }

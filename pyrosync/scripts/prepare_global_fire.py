@@ -135,8 +135,10 @@ def load_bins(con, paths, min_confidence, vegetation_only, snap_degrees, high_co
     else:
         lat_expr, lon_expr = 'latitude', 'longitude'
 
+    # Detections grouped by snapped location, year and month. Locations (bins) drive the
+    # H3 indexing; the per-month rows (bin_time) feed the trend and fire-season statistics.
     con.execute(f'''
-        CREATE TABLE bins AS
+        CREATE TABLE det AS
         WITH detections AS (
             SELECT CAST(latitude AS DOUBLE) AS latitude,
                    CAST(longitude AS DOUBLE) AS longitude,
@@ -145,9 +147,10 @@ def load_bins(con, paths, min_confidence, vegetation_only, snap_degrees, high_co
                    TRY_CAST(frp AS DOUBLE) AS frp,
                    {type_expr} AS fire_type
             FROM raw
-        ),
-        grouped AS (
+        )
         SELECT {lat_expr} AS lat, {lon_expr} AS lon,
+               CAST(year(acq_date) AS SMALLINT) AS y,
+               CAST(month(acq_date) AS TINYINT) AS m,
                count(*) AS detections,
                count(*) FILTER (WHERE conf >= {int(high_confidence)}) AS high_conf_detections,
                COALESCE(sum(frp), 0) AS frp_sum,
@@ -156,10 +159,28 @@ def load_bins(con, paths, min_confidence, vegetation_only, snap_degrees, high_co
                max(acq_date) AS last_date
         FROM detections
         WHERE {' AND '.join(filters)}
-        GROUP BY 1, 2
-        )
-        SELECT row_number() OVER (ORDER BY lat, lon) - 1 AS bin_id, * FROM grouped
+        GROUP BY 1, 2, 3, 4
     ''')
+    con.execute('''
+        CREATE TABLE bins AS
+        SELECT row_number() OVER (ORDER BY lat, lon) - 1 AS bin_id, *
+        FROM (
+            SELECT lat, lon,
+                   sum(detections) AS detections,
+                   sum(high_conf_detections) AS high_conf_detections,
+                   sum(frp_sum) AS frp_sum,
+                   max(frp_max) AS frp_max,
+                   min(first_date) AS first_date,
+                   max(last_date) AS last_date
+            FROM det GROUP BY lat, lon
+        )
+    ''')
+    con.execute('''
+        CREATE TABLE bin_time AS
+        SELECT b.bin_id, d.y, d.m, CAST(d.detections AS INTEGER) AS n
+        FROM det d JOIN bins b USING (lat, lon)
+    ''')
+    con.execute('DROP TABLE det')
     n_bins, n_detections, first, last = con.execute(
         'SELECT count(*), COALESCE(sum(detections), 0), min(first_date), max(last_date) FROM bins'
     ).fetchone()
@@ -236,6 +257,69 @@ def aggregate_cells(con, resolutions, years, min_detections, fine_from):
     ).fetchall()
 
 
+def trend_windows(first_year, last_year, max_window=10):
+    """Equal early and late windows of whole years, up to a decade each, or None."""
+    span = last_year - first_year + 1
+    window = min(max_window, span // 2)
+    if window < 1:
+        return None
+    return (first_year, first_year + window - 1), (last_year - window + 1, last_year)
+
+
+def add_temporal_stats(con, resolutions, windows):
+    """Add trend_log2, peak_month and peak_share to every cell, per resolution.
+
+    trend_log2 = log2((late + 0.5) / (early + 0.5)) on mean detections per year in the
+    late and early windows (+0.5 keeps sparse cells from swinging wildly); 1.0 means
+    doubled, -1.0 halved. peak_month is the calendar month (1-12) with the most
+    detections over all years (ties go to the earlier month), and peak_share its
+    fraction of the cell's detections. Each resolution is computed from its own cells,
+    like the counts, not rolled up from finer ones. Assumes whole years at both ends.
+    """
+    if windows:
+        (e0, e1), (l0, l1) = windows
+        width = e1 - e0 + 1
+        late = f'COALESCE(sum(n) FILTER (WHERE y BETWEEN {l0} AND {l1}), 0)'
+        early = f'COALESCE(sum(n) FILTER (WHERE y BETWEEN {e0} AND {e1}), 0)'
+        trend_sql = f'log2(({late} / {width} + 0.5) / ({early} / {width} + 0.5))'
+    else:
+        trend_sql = 'NULL::DOUBLE'
+    parts = []
+    for res in resolutions:
+        parts.append(f'''
+            SELECT h3_index, {res} AS resolution, trend_log2, peak_month, peak_share
+            FROM (
+                SELECT h3_index, {trend_sql} AS trend_log2
+                FROM (
+                    SELECT c.r{res} AS h3_index, t.y, sum(t.n) AS n
+                    FROM bin_time t JOIN bin_cells c USING (bin_id) GROUP BY 1, 2
+                ) GROUP BY h3_index
+            ) yearly
+            JOIN (
+                SELECT h3_index,
+                       arg_max(m, n * 100 - m) AS peak_month,
+                       max(n) / sum(n) AS peak_share
+                FROM (
+                    SELECT c.r{res} AS h3_index, t.m, sum(t.n) AS n
+                    FROM bin_time t JOIN bin_cells c USING (bin_id) GROUP BY 1, 2
+                ) GROUP BY h3_index
+            ) monthly USING (h3_index)
+        ''')
+    con.execute('CREATE TABLE cell_stats AS ' + ' UNION ALL '.join(parts))
+    con.execute('''
+        CREATE TABLE cells_t AS
+        SELECT c.*,
+               CAST(round(s.trend_log2, 4) AS FLOAT) AS trend_log2,
+               CAST(s.peak_month AS TINYINT) AS peak_month,
+               CAST(round(s.peak_share, 4) AS FLOAT) AS peak_share
+        FROM cells c LEFT JOIN cell_stats s USING (h3_index, resolution)
+        ORDER BY c.resolution, c.h3_index
+    ''')
+    con.execute('DROP TABLE cells')
+    con.execute('ALTER TABLE cells_t RENAME TO cells')
+    con.execute('DROP TABLE cell_stats')
+
+
 def write_parquet(con, path):
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix('.tmp.parquet')
@@ -248,7 +332,8 @@ def write_parquet(con, path):
 # Cell-table columns that can go into the PMTiles features. raster_h3 always adds
 # h3_index, h3_hex and resolution.
 PMTILES_COLUMNS = ('detections', 'high_conf_detections', 'frp_sum', 'frp_max', 'first_year',
-                   'last_year', 'area_km2', 'density', 'frp_density')
+                   'last_year', 'area_km2', 'density', 'frp_density', 'trend_log2',
+                   'peak_month', 'peak_share')
 GITHUB_WARN_BYTES = 50 * 1024 * 1024
 GITHUB_LIMIT_BYTES = 100 * 1024 * 1024
 
@@ -329,14 +414,18 @@ def write_lod_arrow(path, res, rows, period_label, color_range):
     import pyarrow as pa
     from h3.api import basic_int as h3i
 
-    centres = [h3i.cell_to_latlng(cell) for cell, *_ in rows]
+    centres = [h3i.cell_to_latlng(row[0]) for row in rows]
+    column = lambda i: [row[i] for row in rows]  # noqa: E731
     table = pa.table({
-        'h3_index': pa.array([cell for cell, *_ in rows], pa.uint64()),
+        'h3_index': pa.array(column(0), pa.uint64()),
         'lat': pa.array([c[0] for c in centres], pa.float32()),
         'lng': pa.array([c[1] for c in centres], pa.float32()),
-        'detections': pa.array([d for _, d, _, _ in rows], pa.uint32()),
-        'density': pa.array([float(v) for _, _, v, _ in rows], pa.float32()),
-        'frp_max': pa.array([f for _, _, _, f in rows], pa.float32()),
+        'detections': pa.array(column(1), pa.uint32()),
+        'density': pa.array([float(v) for v in column(2)], pa.float32()),
+        'frp_max': pa.array(column(3), pa.float32()),
+        'trend_log2': pa.array(column(4), pa.float32()),
+        'peak_month': pa.array(column(5), pa.uint8()),
+        'peak_share': pa.array(column(6), pa.float32()),
     })
     table = table.replace_schema_metadata({
         'schemaVersion': '1',
@@ -355,11 +444,13 @@ def write_lod_json(path, res, rows, period_label):
         'schemaVersion': 1,
         'resolution': res,
         'periodLabel': period_label,
-        'fields': ['id', 'detections', 'density', 'frpMax'],
+        'fields': ['id', 'detections', 'density', 'frpMax', 'trendLog2', 'peakMonth', 'peakShare'],
         'cells': [
             [format(cell, 'x'), detections, float(f'{density:.4g}'),
-             None if frp_max is None else round(frp_max, 1)]
-            for cell, detections, density, frp_max in rows
+             None if frp_max is None else round(frp_max, 1),
+             None if trend is None else round(trend, 3), peak_month,
+             None if peak_share is None else round(peak_share, 3)]
+            for cell, detections, density, frp_max, trend, peak_month, peak_share in rows
         ],
     }
     tmp = path.with_name(path.name + '.tmp')
@@ -391,7 +482,7 @@ def write_lod(con, out_dir, lod_resolutions, period_label, years, meta, lod_form
     files = []
     for res in levels:
         rows = con.execute(f'''
-            SELECT h3_index, detections, density, frp_max
+            SELECT h3_index, detections, density, frp_max, trend_log2, peak_month, peak_share
             FROM cells WHERE resolution = {res} ORDER BY h3_index
         ''').fetchall()
         name = f'lod-r{res}.{lod_format}'
@@ -461,9 +552,9 @@ def main():
                         help='Finest H3 resolution in the PMTiles (default 4: ~9 MB, commit-sized; '
                              '5 roughly 6x larger)')
     parser.add_argument('--pmtiles-columns', type=parse_pmtiles_columns,
-                        default=parse_pmtiles_columns('detections,density'),
+                        default=parse_pmtiles_columns('detections,density,trend_log2,peak_month'),
                         help='Feature properties in the PMTiles: comma list or "all" '
-                             '(default detections,density)')
+                             '(default detections,density,trend_log2,peak_month)')
     parser.add_argument('--cli-bin', default=None, help='Path to raster-h3-cli')
     parser.add_argument('--threads', type=int, default=None, help='DuckDB threads')
     args = parser.parse_args()
@@ -496,6 +587,10 @@ def main():
     for res, cells, detections in summary:
         print(f'  res {res:>2}: {cells:>10,} cells, {int(detections):>12,} detections')
 
+    windows = trend_windows(first.year, last.year)
+    add_temporal_stats(con, resolutions, windows)
+    print(f'trend windows {windows}, peak months [{time.perf_counter() - started:.1f}s]')
+
     parquet_path = args.out_dir / 'global_fire_h3.parquet'
     write_parquet(con, parquet_path)
     print(f'wrote {parquet_path} ({parquet_path.stat().st_size / 1e6:.1f} MB) '
@@ -514,6 +609,16 @@ def main():
                 'minDetections': {'value': args.min_detections, 'fromResolution': args.fine_from},
             },
             'processor': 'https://github.com/dmuldrew/raster_h3',
+        },
+        'trend': None if not windows else {
+            'field': 'trend_log2',
+            'early': list(windows[0]),
+            'late': list(windows[1]),
+            'definition': 'log2((late mean detections per year + 0.5) / (early mean + 0.5))',
+        },
+        'season': {
+            'fields': ['peak_month', 'peak_share'],
+            'definition': 'calendar month (1-12) with the most detections, and its share of the cell total',
         },
         'resolutions': [row[0] for row in summary],
     }
