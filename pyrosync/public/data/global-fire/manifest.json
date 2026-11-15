@@ -1,0 +1,148 @@
+{
+  "schemaVersion": 1,
+  "periodLabel": "2001-01-01 – 2025-12-31",
+  "years": 24.999,
+  "densityUnits": "detections per km² per year",
+  "colorRange": {
+    "field": "density",
+    "scale": "log10",
+    "min": -4.0984,
+    "max": -0.7506
+  },
+  "colorRangeByResolution": {
+    "0": {
+      "min": -7.478,
+      "max": -1.418
+    },
+    "1": {
+      "min": -6.3131,
+      "max": -1.1088
+    },
+    "2": {
+      "min": -5.5119,
+      "max": -0.954
+    },
+    "3": {
+      "min": -4.8465,
+      "max": -0.8249
+    },
+    "4": {
+      "min": -3.9659,
+      "max": -0.735
+    },
+    "5": {
+      "min": -3.3347,
+      "max": -0.6451
+    }
+  },
+  "levels": [
+    {
+      "resolution": 2,
+      "file": "lod-r2.arrow",
+      "format": "arrow",
+      "cells": 2027,
+      "altitudeKm": {
+        "min": 3000,
+        "max": null
+      }
+    },
+    {
+      "resolution": 3,
+      "file": "lod-r3.arrow",
+      "format": "arrow",
+      "cells": 11211,
+      "altitudeKm": {
+        "min": 1000,
+        "max": 3000
+      }
+    },
+    {
+      "resolution": 4,
+      "file": "lod-r4.arrow",
+      "format": "arrow",
+      "cells": 62417,
+      "altitudeKm": {
+        "min": 0,
+        "max": 1000
+      }
+    }
+  ],
+  "description": "NASA FIRMS active-fire detections binned to H3 at each resolution directly from detection coordinates.",
+  "source": {
+    "provider": "NASA FIRMS",
+    "files": [
+      "modis_2001.parquet",
+      "modis_2002.parquet",
+      "modis_2003.parquet",
+      "modis_2004.parquet",
+      "modis_2005.parquet",
+      "modis_2006.parquet",
+      "modis_2007.parquet",
+      "modis_2008.parquet",
+      "modis_2009.parquet",
+      "modis_2010.parquet",
+      "modis_2011.parquet",
+      "modis_2012.parquet",
+      "modis_2013.parquet",
+      "modis_2014.parquet",
+      "modis_2015.parquet",
+      "modis_2016.parquet",
+      "modis_2017.parquet",
+      "modis_2018.parquet",
+      "modis_2019.parquet",
+      "modis_2020.parquet",
+      "modis_2021.parquet",
+      "modis_2022.parquet",
+      "modis_2023.parquet",
+      "modis_2024.parquet",
+      "modis_2025.parquet"
+    ],
+    "filters": {
+      "minConfidence": 30,
+      "vegetationOnly": true,
+      "snapDegrees": 0.01,
+      "minDetections": {
+        "value": 2,
+        "fromResolution": 4
+      }
+    },
+    "processor": "https://github.com/dmuldrew/raster_h3"
+  },
+  "trend": {
+    "field": "trend_log2",
+    "early": [
+      2001,
+      2010
+    ],
+    "late": [
+      2016,
+      2025
+    ],
+    "definition": "log2((late mean detections per year + 0.5) / (early mean + 0.5))"
+  },
+  "season": {
+    "fields": [
+      "peak_month",
+      "peak_share"
+    ],
+    "definition": "calendar month (1-12) with the most detections, and its share of the cell total"
+  },
+  "resolutions": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5
+  ],
+  "pmtiles": {
+    "file": "global_fire.pmtiles",
+    "maxResolution": 4,
+    "properties": [
+      "detections",
+      "density",
+      "trend_log2",
+      "peak_month"
+    ]
+  }
+}

@@ -1,0 +1,118 @@
+:root {
+  color-scheme: dark;
+  --bg: #0b1120;
+  --panel: #111a2e;
+  --ink: #e2e8f0;
+  --muted: #94a3b8;
+  --accent: #f97316;
+  --line: #24324d;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--ink);
+  font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.gf-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 1rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.gf-header nav { display: flex; flex-wrap: wrap; gap: 0.9rem; }
+.gf-header a { color: var(--ink); text-decoration: none; }
+.gf-header a:hover, .gf-header a:focus-visible { color: var(--accent); }
+
+.gf-layout {
+  display: grid;
+  grid-template-columns: minmax(250px, 320px) 1fr;
+  height: calc(100% - 49px);
+}
+
+.gf-panel {
+  overflow-y: auto;
+  padding: 1rem;
+  background: var(--panel);
+  border-right: 1px solid var(--line);
+}
+
+.gf-eyebrow {
+  margin: 0;
+  color: var(--accent);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.gf-panel h1 { margin: 0.2rem 0 0.4rem; font-size: 1.45rem; }
+.gf-intro, .gf-note { color: var(--muted); margin: 0.4rem 0; font-size: 0.85rem; }
+.gf-h2 { margin: 1rem 0 0.4rem; font-size: 0.95rem; }
+
+.gf-modes {
+  margin: 0.9rem 0 0.6rem;
+  padding: 0.5rem 0.75rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+}
+.gf-modes legend { padding: 0 0.3rem; color: var(--muted); font-size: 0.8rem; }
+.gf-modes label { display: block; padding: 0.15rem 0; cursor: pointer; }
+
+.gf-row { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+
+.gf-btn {
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 0.45rem;
+  background: #1b2742;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.gf-btn:hover, .gf-btn:focus-visible { border-color: var(--accent); }
+.gf-btn[aria-pressed="true"] { background: #2a3a5f; }
+
+.gf-legend { display: grid; gap: 0.25rem; }
+.gf-ramp { height: 12px; border-radius: 3px; }
+.gf-ramp-labels { display: flex; justify-content: space-between; color: var(--muted); font-size: 0.75rem; }
+.gf-months { display: grid; grid-template-columns: repeat(6, 1fr); gap: 3px; }
+.gf-months span {
+  padding: 2px 0;
+  border-radius: 3px;
+  color: #0b1120;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.gf-details {
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  background: #0e1628;
+  font-size: 0.85rem;
+}
+.gf-details dl { display: grid; grid-template-columns: auto 1fr; gap: 0.15rem 0.6rem; margin: 0; }
+.gf-details dt { color: var(--muted); }
+.gf-details dd { margin: 0; }
+
+.gf-map-wrap { position: relative; min-height: 420px; }
+.gf-map { position: absolute; inset: 0; }
+
+/* Embedded in the PyroSync tab: the parent page provides navigation. */
+body.embedded .gf-header { display: none; }
+body.embedded .gf-layout { height: 100%; }
+
+@media (max-width: 760px) {
+  .gf-layout { grid-template-columns: 1fr; grid-template-rows: auto 70vh; height: auto; }
+  .gf-panel { border-right: 0; border-bottom: 1px solid var(--line); }
+}

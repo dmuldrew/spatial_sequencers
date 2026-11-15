@@ -1,4 +1,8 @@
 import * as THREE from '../vendor/three.module.min.js';
+import {
+  TOUR_STOPS, TOUR_INTRO, TOUR_TIP, MONTH_NAMES, firstStopLine, nextStopLine, resumeLine,
+  arrivalLine, dataLine, trendPercentFromLog2
+} from './tour-content.js';
 
 const EARTH_R = 24;
 const MIN_RADIUS = EARTH_R + 1.15;
@@ -8,6 +12,26 @@ const RAD2DEG = 180 / Math.PI;
 const UP_Y = new THREE.Vector3(0, 1, 0);
 const FWD_Z = new THREE.Vector3(0, 0, -1);
 const RIGHT_X = new THREE.Vector3(1, 0, 0);
+
+// Scene units per km: EARTH_R scene units span the Earth's 6,371 km radius (the HUD uses 265 km/unit).
+const KM_PER_UNIT = 265;
+const FIRE_HISTORY_DIR = './data/global-fire/';
+// Low-to-high fire density ramp for the multi-year H3 fire history carpet.
+// Same ramp as the Global Fire Map: dark purple (least fire) to bright yellow (most); no
+// pale top end, which turned grey through the semi-transparent carpet.
+const FIRE_HISTORY_STOPS = ['#2a0f45', '#8b1a3e', '#e2481c', '#f59f0b', '#ffe94d'];
+
+// Tour flight: a great-circle transit that arcs up for a wider view, then a constant
+// circle around each hotspot. Scene units: 1 unit = 265 km.
+const TOUR_ORBIT_ALT = 2.7;      // about 715 km
+const TOUR_ORBIT_RADIUS = 1.1;   // about 290 km, so the featured hexagon stays in view
+const TOUR_ORBIT_SPEED = 0.8;    // units per second along the circle (about 9 s per lap)
+const TOUR_TRANSIT_SPEED = 5.5;  // ground-track units per second
+
+// Chase camera aims below the ship so it sits in the upper third of the screen
+// (about 40% of the way up from centre with the 56-degree field of view) and more
+// Earth shows below.
+const CHASE_LOOK_DOWN_RAD = 0.21;
 
 const CAM_MODES = ['chase', 'cockpit', 'orbit'];
 const CAM_LABELS = {
@@ -29,6 +53,22 @@ function loadH3Once() {
     document.head.appendChild(script);
   });
   return h3LoadPromise;
+}
+
+// Apache Arrow JS (UMD, global `Arrow`), loaded only when the fire history uses Arrow files.
+let arrowLoadPromise = null;
+function loadArrowOnce() {
+  if (window.Arrow?.tableFromIPC) return Promise.resolve(window.Arrow);
+  if (arrowLoadPromise) return arrowLoadPromise;
+  arrowLoadPromise = new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = './vendor/arrow.min.js';
+    script.async = true;
+    script.onload = () => (window.Arrow?.tableFromIPC ? resolve(window.Arrow) : reject(new Error('Arrow failed to expose global')));
+    script.onerror = () => reject(new Error('Failed to load ./vendor/arrow.min.js'));
+    document.head.appendChild(script);
+  });
+  return arrowLoadPromise;
 }
 
 function clamp(v, lo, hi) {
@@ -102,6 +142,9 @@ export function createFlybyController(bridge) {
     layerHex: document.getElementById('flyby-layer-hex'),
     layerSpirals: document.getElementById('flyby-layer-spirals'),
     layerFires: document.getElementById('flyby-layer-fires'),
+    layerHistory: document.getElementById('flyby-layer-history'),
+    subtitle: document.getElementById('flyby-subtitle'),
+    btnNarration: document.getElementById('flyby-btn-narration'),
     metricSelect: document.getElementById('flyby-metric-select')
   };
 
@@ -115,7 +158,9 @@ export function createFlybyController(bridge) {
     camMode: 'chase',
     autopilot: true,
     horizonLock: true,
-    targetId: 'cruise',
+    targetId: 'tour',
+    narrationOn: true,
+    tour: { index: 0, phase: 'idle', dwellUntil: 0, started: false },
     timelinePlaying: false,
     timelineAccum: 0,
     monthIndex: 0,
@@ -138,6 +183,12 @@ export function createFlybyController(bridge) {
     // Audio timing
     lastDroneMs: 0,
     lastPingMs: 0,
+    // Fire history sonification
+    lastHistoryCellKey: null,
+    lastTrendMs: 0,
+    lastSeasonMonth: 0,
+    nextCrackleMs: 0,
+    lastScan: null,
     lastHudMs: 0
   };
 
@@ -161,6 +212,15 @@ export function createFlybyController(bridge) {
   let hexGroup = null;
   let spiralGroup = null;
   let fireGroup = null;
+  let historyGroup = null;
+  // Multi-resolution FIRMS fire history, one level per H3 resolution:
+  // [{ res, mesh, cells: Map(id -> [detections, density, frpMax]), altMinKm, altMaxKm }]
+  let historyLevels = [];
+  let historyMeta = null;
+  let activeHistoryLevel = null;
+  // Blinking highlight on the featured hexagon of the current tour stop.
+  let tourHighlight = null;
+  let historyColorRange = null;
   let craftGroup = null;
   let plumeLeft = null;
   let plumeRight = null;
@@ -191,7 +251,7 @@ export function createFlybyController(bridge) {
     dom.statusBanner.classList.toggle('is-hidden', hide);
   }
 
-  function createEarthTexture(worldGeo, biomes) {
+  function createEarthTexture(worldGeo, biomes, worldCoast, worldBorders) {
     const canvas = document.createElement('canvas');
     canvas.width = 2048;
     canvas.height = 1024;
@@ -217,14 +277,27 @@ export function createFlybyController(bridge) {
     ctx.lineWidth = 1;
     ctx.stroke();
 
-    // Land masses
+    // Land masses: a lighter fill than the ocean, thin country borders, and a bright
+    // coastline with a soft glow, so continents stay legible under the hex layers.
     if (worldGeo) {
       ctx.beginPath();
       path(worldGeo);
-      ctx.fillStyle = '#0f2238';
+      ctx.fillStyle = '#2a3e55';
       ctx.fill();
-      ctx.strokeStyle = 'rgba(56, 189, 248, 0.58)';
-      ctx.lineWidth = 1.4;
+      if (worldBorders) {
+        ctx.beginPath();
+        path(worldBorders);
+        ctx.strokeStyle = 'rgba(203, 213, 225, 0.42)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+      ctx.beginPath();
+      path(worldCoast || worldGeo);
+      ctx.strokeStyle = 'rgba(125, 211, 252, 0.35)';
+      ctx.lineWidth = 6;
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(224, 242, 254, 0.95)';
+      ctx.lineWidth = 2;
       ctx.stroke();
     }
 
@@ -599,6 +672,199 @@ export function createFlybyController(bridge) {
     scene.add(fireGroup);
   }
 
+  function fireHistoryColor(t, out) {
+    const scaled = clamp(t, 0, 1) * (FIRE_HISTORY_STOPS.length - 1);
+    const i = Math.min(FIRE_HISTORY_STOPS.length - 2, Math.floor(scaled));
+    out.set(FIRE_HISTORY_STOPS[i]).lerp(new THREE.Color(FIRE_HISTORY_STOPS[i + 1]), scaled - i);
+    return out;
+  }
+
+  // Columnar fire history for one level: { ids, lat, lng, detections, density, frpMax }.
+  // Arrow files carry typed columns and cell centres; JSON rows get centres from h3-js.
+  async function fetchFireHistoryColumns(h3, level) {
+    const url = `${FIRE_HISTORY_DIR}${level.file}`;
+    if (level.format === 'arrow' || level.file.endsWith('.arrow')) {
+      const [Arrow, buffer] = await Promise.all([
+        loadArrowOnce(),
+        fetch(url).then((r) => (r.ok ? r.arrayBuffer() : null))
+      ]);
+      if (!buffer) return null;
+      const table = Arrow.tableFromIPC(new Uint8Array(buffer));
+      const col = (name) => table.getChild(name)?.toArray();
+      const h3Index = col('h3_index');
+      if (!h3Index) return null;
+      const ids = Array.from(h3Index, (v) => v.toString(16));
+      return {
+        ids,
+        lat: col('lat'),
+        lng: col('lng'),
+        detections: col('detections'),
+        density: col('density'),
+        frpMax: col('frp_max'),
+        // Optional (older extracts lack them): trend and fire season.
+        trend: col('trend_log2') || null,
+        peakMonth: col('peak_month') || null,
+        peakShare: col('peak_share') || null
+      };
+    }
+    const payload = await fetch(url).then((r) => (r.ok ? r.json() : null));
+    const rows = Array.isArray(payload?.cells) ? payload.cells : [];
+    const n = rows.length;
+    const out = {
+      ids: rows.map((r) => r[0]),
+      lat: new Float32Array(n),
+      lng: new Float32Array(n),
+      detections: Float64Array.from(rows, (r) => r[1]),
+      density: Float64Array.from(rows, (r) => r[2]),
+      frpMax: Float64Array.from(rows, (r) => (r[3] == null ? NaN : r[3])),
+      trend: rows.length && rows[0].length > 4 ? Float64Array.from(rows, (r) => (r[4] == null ? NaN : r[4])) : null,
+      peakMonth: rows.length && rows[0].length > 5 ? Uint8Array.from(rows, (r) => r[5] || 0) : null,
+      peakShare: rows.length && rows[0].length > 6 ? Float64Array.from(rows, (r) => (r[6] == null ? NaN : r[6])) : null
+    };
+    out.ids.forEach((id, i) => {
+      [out.lat[i], out.lng[i]] = h3.cellToLatLng(id);
+    });
+    return out;
+  }
+
+  function buildFireHistoryLevel(h3, level, data, colorRange) {
+    const n = data?.ids?.length || 0;
+    if (!n) return null;
+    // A hexagon's circumradius equals its edge length.
+    const radius = (h3.getHexagonEdgeLengthAvg(level.resolution, 'km') / KM_PER_UNIT) * 0.94;
+    const lo = Number.isFinite(colorRange?.min) ? colorRange.min : -4;
+    const hi = Number.isFinite(colorRange?.max) ? colorRange.max : -1;
+
+    const geo = new THREE.CylinderGeometry(1, 1, 1, 6);
+    // Semi-transparent so coastlines and land show through the carpet. Cells do not
+    // overlap, so skipping depth writes avoids sorting artefacts between them.
+    const mat = new THREE.MeshLambertMaterial({
+      color: '#ffffff',
+      transparent: true,
+      opacity: 0.55,
+      depthWrite: false
+    });
+    const mesh = new THREE.InstancedMesh(geo, mat, n);
+    mesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
+    mesh.visible = false;
+
+    const cells = new Map();
+    const col = new THREE.Color();
+    const pos = new THREE.Vector3();
+    const scale = new THREE.Vector3();
+    const quat = new THREE.Quaternion();
+    for (let idx = 0; idx < n; idx += 1) {
+      const density = data.density[idx];
+      cells.set(data.ids[idx], [
+        data.detections[idx],
+        density,
+        data.frpMax[idx],
+        data.trend ? data.trend[idx] : NaN,
+        data.peakMonth ? data.peakMonth[idx] : 0,
+        data.peakShare ? data.peakShare[idx] : NaN
+      ]);
+      const t = density > 0 ? (Math.log10(density) - lo) / (hi - lo || 1) : 0;
+      // Same absolute heights at every level, so swapping levels does not jump.
+      const height = 0.012 + clamp(t, 0, 1) * 0.11;
+      latLonAltToVec3(data.lat[idx], data.lng[idx], EARTH_R, pos);
+      tmpUp.copy(pos).normalize();
+      quat.setFromUnitVectors(UP_Y, tmpUp);
+      pos.addScaledVector(tmpUp, height * 0.5 + 0.006);
+      scale.set(radius, height, radius);
+      tmpM4.compose(pos, quat, scale);
+      mesh.setMatrixAt(idx, tmpM4);
+      mesh.setColorAt(idx, fireHistoryColor(t, col));
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    return {
+      res: level.resolution,
+      mesh,
+      cells,
+      altMinKm: Number.isFinite(level.altitudeKm?.min) ? level.altitudeKm.min : 0,
+      altMaxKm: Number.isFinite(level.altitudeKm?.max) ? level.altitudeKm.max : Infinity
+    };
+  }
+
+  // Loads after the scene is up; the layer is optional, so a missing manifest is not an error.
+  async function loadFireHistory(h3) {
+    const manifest = await fetch(`${FIRE_HISTORY_DIR}manifest.json`)
+      .then((r) => (r.ok ? r.json() : null))
+      .catch(() => null);
+    if (!manifest || !Array.isArray(manifest.levels) || !manifest.levels.length) return;
+    historyMeta = manifest;
+    historyColorRange = manifest.colorRange || null;
+    historyGroup = new THREE.Group();
+    historyGroup.visible = dom.layerHistory?.getAttribute('aria-pressed') !== 'false';
+    scene.add(historyGroup);
+    // Coarsest first, so the high-orbit view appears soonest.
+    const levels = [...manifest.levels].sort((a, b) => a.resolution - b.resolution);
+    for (const level of levels) {
+      const data = await fetchFireHistoryColumns(h3, level).catch((err) => {
+        console.warn(`Fire history level r${level.resolution} unavailable:`, err);
+        return null;
+      });
+      const built = buildFireHistoryLevel(h3, level, data, manifest.colorRange);
+      if (!built) continue;
+      historyGroup.add(built.mesh);
+      historyLevels.push(built);
+    }
+  }
+
+  // Show the finest level whose altitude band contains the craft.
+  function updateFireHistoryLod(altKm) {
+    if (!historyLevels.length) return;
+    let pick = null;
+    for (const level of historyLevels) {
+      if (altKm >= level.altMinKm && altKm < level.altMaxKm && (!pick || level.res > pick.res)) {
+        pick = level;
+      }
+    }
+    if (!pick) {
+      // Outside every band: nearest by altitude.
+      pick = historyLevels.reduce((best, level) => {
+        const gap = altKm < level.altMinKm ? level.altMinKm - altKm : altKm - level.altMaxKm;
+        const bestGap = altKm < best.altMinKm ? best.altMinKm - altKm : altKm - best.altMaxKm;
+        return gap < bestGap ? level : best;
+      });
+    }
+    if (pick === activeHistoryLevel) return;
+    for (const level of historyLevels) level.mesh.visible = level === pick;
+    activeHistoryLevel = pick;
+  }
+
+  // 0..1 position of a density on the shared log10 colour range (the same scale as the carpet).
+  function fireHistoryNorm(density) {
+    if (!(density > 0)) return 0;
+    const lo = Number.isFinite(historyColorRange?.min) ? historyColorRange.min : -4;
+    const hi = Number.isFinite(historyColorRange?.max) ? historyColorRange.max : -1;
+    return clamp((Math.log10(density) - lo) / (hi - lo || 1), 0, 1);
+  }
+
+  function fireHistoryDensityWord(t) {
+    if (t < 0.25) return 'low';
+    if (t < 0.5) return 'moderate';
+    if (t < 0.75) return 'high';
+    return 'very high';
+  }
+
+
+  // Percent change in mean yearly detections, late window vs early window.
+  function fireTrendPercent(trendLog2) {
+    return Number.isFinite(trendLog2) ? Math.round((Math.pow(2, trendLog2) - 1) * 100) : null;
+  }
+
+  function fireTrendWindows() {
+    const t = historyMeta?.trend;
+    return t?.early && t?.late ? { early: `${t.early[0]}–${t.early[1]}`, late: `${t.late[0]}–${t.late[1]}` } : null;
+  }
+
+  function fireHistoryYears() {
+    const label = historyMeta?.periodLabel || '';
+    const years = label.match(/\d{4}/g);
+    return years && years.length >= 2 ? `${years[0]}–${years[years.length - 1]}` : 'History';
+  }
+
   function computeRadialNorm(biome, rec, metric) {
     if (metric === 'ffwi') {
       const peak = Math.max(45, d3.max(biome.records, (r) => r.ffwi) || 50);
@@ -840,7 +1106,9 @@ export function createFlybyController(bridge) {
       audioBus.panner = new Tone.Panner(0);
       audioBus.filter = new Tone.Filter(1200, 'lowpass');
       audioBus.panner.connect(audioBus.filter);
-      audioBus.filter.toDestination();
+      // Fire sounds pass through a ducking gain that dips while narration clips play.
+      audioBus.duck = new Tone.Gain(1).toDestination();
+      audioBus.filter.connect(audioBus.duck);
 
       audioBus.drone = new Tone.PolySynth(Tone.Synth, {
         oscillator: { type: 'triangle' },
@@ -867,6 +1135,39 @@ export function createFlybyController(bridge) {
         volume: -24,
         envelope: { attack: 0.004, decay: 0.045, sustain: 0, release: 0.02 }
       }).connect(audioBus.filter);
+
+      // Fire history voices: a Geiger-style crackle whose rate follows the 25-year fire
+      // density under the craft, and a pluck each time the craft enters a new H3 cell,
+      // pitched by that cell's density. Their own chain, so the biome filter sweep
+      // does not muffle them.
+      audioBus.historyOut = new Tone.Gain(0.9).connect(audioBus.duck);
+      audioBus.crackleFilter = new Tone.Filter({ frequency: 2600, type: 'bandpass', Q: 0.8 })
+        .connect(audioBus.historyOut);
+      audioBus.crackle = new Tone.NoiseSynth({
+        noise: { type: 'white' },
+        volume: -16,
+        envelope: { attack: 0.001, decay: 0.012, sustain: 0, release: 0.006 }
+      }).connect(audioBus.crackleFilter);
+      // Trend: a short, quiet chord from d3-audio's tension scale. Rising fire activity
+      // sounds tense / dissonant, steady or falling sounds consonant.
+      audioBus.trendPad = new Tone.PolySynth(Tone.AMSynth, {
+        volume: -24,
+        envelope: { attack: 0.06, decay: 0.3, sustain: 0.25, release: 0.9 }
+      }).connect(audioBus.historyOut);
+      // Season: a bell whose pitch steps through 12 semitones with the peak fire month.
+      audioBus.seasonBell = new Tone.FMSynth({
+        harmonicity: 3.01,
+        modulationIndex: 9,
+        volume: -18,
+        envelope: { attack: 0.002, decay: 0.9, sustain: 0, release: 0.6 },
+        modulationEnvelope: { attack: 0.002, decay: 0.4, sustain: 0, release: 0.3 }
+      }).connect(audioBus.historyOut);
+      audioBus.cellPluck = new Tone.PluckSynth({
+        attackNoise: 0.6,
+        dampening: 3200,
+        resonance: 0.9,
+        volume: -10
+      }).connect(audioBus.historyOut);
 
       audioBus.ready = true;
     } catch (err) {
@@ -895,6 +1196,9 @@ export function createFlybyController(bridge) {
     const posZ = rec ? Math.max(0, rec.zScore) : 0;
     const proxBiome = clamp(1 - (distToBiome - 2) / 20, 0.08, 1);
     const tierInfo = bridge.tensionScale(posZ * proxBiome);
+    // d3-audio's scaleTension() names the tier `tier` (consonant / moderate / tense / dissonant).
+    const tierRaw = tierInfo.tier || tierInfo.label?.split(' ')[0] || 'consonant';
+    const tierName = tierRaw.charAt(0).toUpperCase() + tierRaw.slice(1);
 
     if (audioBus.filter && audioBus.filter.frequency) {
       const targetCutoff = clamp(420 + proxBiome * 2600 + sim.craftSpeed * 180 + (fireBin ? Math.min(3500, fireBin.totalFrp * 6) : 0), 320, 8200);
@@ -916,15 +1220,16 @@ export function createFlybyController(bridge) {
     }
 
     // Spoken biome arrival narration (from 3D Fire Flight + PyroSync telemetry)
-    if (biome && distToBiome < 7.5 && audioBus.lastSpokenBiomeId !== biome.id) {
+    if (biome && distToBiome < 7.5 && audioBus.lastSpokenBiomeId !== biome.id && !tourActive()) {
       audioBus.lastSpokenBiomeId = biome.id;
       if ('speechSynthesis' in window && !state.isMuted) {
         try {
           window.speechSynthesis.cancel();
           const u = new SpeechSynthesisUtterance(
-            `Flying over ${biome.name}. Climate departure ${(rec?.zScore || 0).toFixed(1)} sigma, ${tierInfo.label.split(' ')[0]}.`
+            `Flying over ${biome.name}. Climate departure ${(rec?.zScore || 0).toFixed(1)} sigma, ${tierName}.`
           );
           u.rate = 1.05;
+          u.onstart = u.onend = () => window.PyroAudioUnlock?.resumeContext?.();
           window.speechSynthesis.speak(u);
         } catch (_) {}
       }
@@ -953,11 +1258,545 @@ export function createFlybyController(bridge) {
       } catch (_) {}
     }
 
+    updateFireHistorySound(nowMs, scanResult.historyCell);
+
     if (dom.hudAudio) {
       const panPct = Math.round(pan * 100);
       const panTag = Math.abs(panPct) < 8 ? 'C' : (panPct < 0 ? `L${Math.abs(panPct)}` : `R${panPct}`);
-      dom.hudAudio.textContent = `${tierInfo.label.split(' ')[0]} · Pan ${panTag}`;
+      dom.hudAudio.textContent = `${tierName} · Pan ${panTag}`;
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Narration: one line at a time, spoken (when audio is enabled and not muted) and
+  // shown as a subtitle. Without speech, lines advance on a reading-time timer.
+  // ---------------------------------------------------------------------------
+  const narrator = { queue: [], busy: false, token: 0, timers: [], hideTimer: null };
+
+  function clearNarratorTimers() {
+    narrator.timers.forEach(clearTimeout);
+    narrator.timers = [];
+  }
+
+  function showSubtitle(text) {
+    if (!dom.subtitle) return;
+    clearTimeout(narrator.hideTimer);
+    dom.subtitle.textContent = text;
+    dom.subtitle.hidden = false;
+  }
+
+  function hideSubtitle(delayMs = 0) {
+    if (!dom.subtitle) return;
+    clearTimeout(narrator.hideTimer);
+    narrator.hideTimer = setTimeout(() => { dom.subtitle.hidden = true; }, delayMs);
+  }
+
+  function narrate(lines, onDone) {
+    if (!sim.narrationOn) {
+      if (onDone) onDone();
+      return;
+    }
+    // A function entry is evaluated when it is reached (e.g. data read at speaking time).
+    for (const line of lines) narrator.queue.push(typeof line === 'function' ? { lazy: line } : { text: line });
+    if (onDone) narrator.queue.push({ done: onDone });
+    if (!narrator.busy) nextNarrationLine();
+  }
+
+  // Pre-rendered narration clips (data/tour/narration.json maps line text -> MP3, built
+  // by scripts/build_tour_narration.py). Played through Web Audio, they mix with the
+  // fire sounds on every platform; iOS cannot play speechSynthesis and Web Audio at once.
+  const NARRATION_DIR = './data/tour/';
+  const narrationClips = { lines: null, loading: null, buffers: new Map() };
+
+  function loadNarrationManifest() {
+    if (!narrationClips.loading) {
+      narrationClips.loading = fetch(`${NARRATION_DIR}narration.json`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((m) => { narrationClips.lines = m?.lines || {}; })
+        .catch(() => { narrationClips.lines = {}; });
+    }
+    return narrationClips.loading;
+  }
+
+  function rawAudioContext() {
+    const Tone = bridge.Tone || window.Tone;
+    return Tone?.context?.rawContext || null;
+  }
+
+  const clipFor = (text) => (typeof text === 'string' ? narrationClips.lines?.[text] || null : null);
+
+  function fetchClip(file) {
+    if (!narrationClips.buffers.has(file)) {
+      const ctx = rawAudioContext();
+      const promise = fetch(`${NARRATION_DIR}${file}`)
+        .then((r) => {
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          return r.arrayBuffer();
+        })
+        // Callback form: older Safari has no promise-returning decodeAudioData.
+        .then((data) => new Promise((resolve, reject) => ctx.decodeAudioData(data, resolve, reject)));
+      promise.catch(() => narrationClips.buffers.delete(file));
+      narrationClips.buffers.set(file, promise);
+    }
+    return narrationClips.buffers.get(file);
+  }
+
+  function prefetchNarration(lines) {
+    if (!rawAudioContext() || !narrationClips.lines) return;
+    for (const line of lines) {
+      const file = clipFor(line);
+      if (file) fetchClip(file).catch(() => {});
+    }
+  }
+
+  // Lower the fire sounds a little while narration plays, so speech stays clear.
+  function duckFireSounds(on) {
+    const gain = audioBus.duck?.gain;
+    if (gain?.rampTo) gain.rampTo(on ? 0.45 : 1, on ? 0.15 : 0.5);
+  }
+
+  function playClip(buffer, onEnded) {
+    const Tone = bridge.Tone || window.Tone;
+    const ctx = rawAudioContext();
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    const gain = ctx.createGain();
+    src.connect(gain);
+    try {
+      // Through Tone's destination, so the page's Mute button silences narration too.
+      Tone.connect(gain, Tone.getDestination());
+    } catch (_) {
+      gain.connect(ctx.destination);
+    }
+    src.onended = () => {
+      try { gain.disconnect(); } catch (_) {}
+      onEnded();
+    };
+    src.start();
+    return src;
+  }
+
+  function nextNarrationLine() {
+    clearNarratorTimers();
+    const item = narrator.queue.shift();
+    if (!item) {
+      narrator.busy = false;
+      hideSubtitle(1500);
+      return;
+    }
+    if (item.done) {
+      item.done();
+      nextNarrationLine();
+      return;
+    }
+    if (item.lazy) {
+      const more = (item.lazy() || []).map((text) => ({ text }));
+      narrator.queue.unshift(...more);
+      nextNarrationLine();
+      return;
+    }
+    narrator.busy = true;
+    showSubtitle(item.text);
+    const token = ++narrator.token;
+    const advance = (delay) => narrator.timers.push(setTimeout(() => {
+      if (token === narrator.token) nextNarrationLine();
+    }, delay));
+    const readingMs = 1600 + item.text.length * 55;
+    const state = bridge.getState();
+    const clip = clipFor(item.text);
+    if (clip && state.audioReady && !state.isMuted && rawAudioContext()) {
+      initFlybyAudio();
+      window.PyroAudioUnlock?.resumeContext?.();
+      fetchClip(clip)
+        .then((buffer) => {
+          if (token !== narrator.token) return;
+          duckFireSounds(true);
+          narrator.source = playClip(buffer, () => {
+            narrator.source = null;
+            duckFireSounds(false);
+            if (token === narrator.token) advance(350);
+          });
+        })
+        .catch(() => { if (token === narrator.token) advance(readingMs); });
+      // Safety net in case playback never ends (e.g. the context stays suspended).
+      advance(readingMs * 2 + 8000);
+      return;
+    }
+    if ('speechSynthesis' in window && state.audioReady && !state.isMuted) {
+      try {
+        const u = new SpeechSynthesisUtterance(item.text);
+        u.rate = 1.0;
+        // Speech can interrupt the AudioContext on iOS and some Android browsers; nudge it
+        // back on as each line starts and ends (the unlock helper also polls).
+        const keepSound = () => window.PyroAudioUnlock?.resumeContext?.();
+        u.onstart = keepSound;
+        u.onend = () => { keepSound(); advance(400); };
+        u.onerror = () => { keepSound(); advance(400); };
+        window.speechSynthesis.speak(u);
+        // Safety net: some browsers never fire onend.
+        advance(readingMs * 2 + 5000);
+        return;
+      } catch (_) { /* fall through to the timer */ }
+    }
+    advance(readingMs);
+  }
+
+  function stopNarration() {
+    narrator.token += 1;
+    narrator.queue = [];
+    narrator.busy = false;
+    clearNarratorTimers();
+    if (narrator.source) {
+      try { narrator.source.stop(); } catch (_) {}
+      narrator.source = null;
+      duckFireSounds(false);
+    }
+    if ('speechSynthesis' in window) {
+      try { window.speechSynthesis.cancel(); } catch (_) {}
+    }
+    hideSubtitle(0);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Guided fire hotspot tour
+  // ---------------------------------------------------------------------------
+  function tourActive() {
+    return sim.autopilot && sim.targetId === 'tour';
+  }
+
+  function tourStop() {
+    return TOUR_STOPS[sim.tour.index % TOUR_STOPS.length];
+  }
+
+  // Data sentences for a stop, from the resolution-3 history cell under it.
+  function tourDataLines(stop) {
+    const level = historyLevels.find((l) => l.res === 3) || historyLevels[historyLevels.length - 1];
+    if (!level || !window.h3) return [];
+    const row = level.cells.get(window.h3.latLngToCell(stop.lat, stop.lon, level.res));
+    if (!row) return [];
+    const [detections, , , trend, peakMonth] = row;
+    const startYear = (fireHistoryYears().match(/\d{4}/) || ['2001'])[0];
+    return [dataLine({
+      detections,
+      trendPercent: fireTrendWindows() ? trendPercentFromLog2(trend) : null,
+      peakMonth,
+      startYear
+    })];
+  }
+
+  function startTour({ intro = true, resume = false } = {}) {
+    stopNarration();
+    beginTourLeg(tourStop());
+    loadNarrationManifest().then(() => prefetchNarration([TOUR_TIP, ...TOUR_INTRO]));
+    sim.tour.started = true;
+    const lines = [];
+    const state = bridge.getState();
+    if (!state.audioReady && intro) lines.push(TOUR_TIP);
+    if (intro) lines.push(...TOUR_INTRO);
+    // Lazy: skip the announcement if the ship already reached the stop during the intro.
+    lines.push(() => (sim.tour.phase === 'transit'
+      ? [resume ? resumeLine(tourStop()) : (intro ? firstStopLine(tourStop()) : nextStopLine(tourStop()))]
+      : []));
+    narrate(lines);
+  }
+
+  // East/north unit vectors on the sphere at unit direction `dir`.
+  function surfaceFrame(dir) {
+    const east = new THREE.Vector3().crossVectors(UP_Y, dir);
+    if (east.lengthSq() < 1e-8) east.set(1, 0, 0);
+    east.normalize();
+    const north = new THREE.Vector3().crossVectors(dir, east).normalize();
+    return { east, north };
+  }
+
+  // Unit direction of the point at bearing `theta` on the circle around `stop`.
+  function tourCircleDir(stop, theta) {
+    const c = latLonAltToVec3(stop.lat, stop.lon, 1, new THREE.Vector3()).normalize();
+    const { east, north } = surfaceFrame(c);
+    const a = TOUR_ORBIT_RADIUS / EARTH_R;
+    return c.multiplyScalar(Math.cos(a))
+      .addScaledVector(east, Math.cos(theta) * Math.sin(a))
+      .addScaledVector(north, Math.sin(theta) * Math.sin(a))
+      .normalize();
+  }
+
+  // Great-circle leg from the ship to the circle around `stop`, entering the circle on the
+  // side facing the ship, with an altitude arc that peaks higher on longer legs.
+  function beginTourLeg(stop) {
+    loadNarrationManifest().then(() => prefetchNarration([
+      firstStopLine(stop), nextStopLine(stop), resumeLine(stop), arrivalLine(stop),
+      ...stop.context, ...tourDataLines(stop)
+    ]));
+    const from = sim.craftPos.clone().normalize();
+    const c = latLonAltToVec3(stop.lat, stop.lon, 1, new THREE.Vector3()).normalize();
+    const { east, north } = surfaceFrame(c);
+    const theta = Math.atan2(from.dot(north), from.dot(east)) || 0;
+    const to = tourCircleDir(stop, theta);
+    const arc = Math.acos(clamp(from.dot(to), -1, 1));
+    const ground = arc * EARTH_R;
+    const slow = bridge.getState().prefersReducedMotion ? 1.6 : 1;
+    const fromAlt = sim.craftPos.length() - EARTH_R;
+    sim.tour.phase = 'transit';
+    sim.tour.leg = {
+      from,
+      to,
+      arc,
+      t: 0,
+      duration: Math.max(4, (ground / TOUR_TRANSIT_SPEED) * slow),
+      fromAlt,
+      // About 1,600-2,900 km at the top of longer legs, for a wider frame of reference.
+      peakAlt: clamp(3 + ground * 0.18, TOUR_ORBIT_ALT, 11),
+      theta
+    };
+  }
+
+  function slerpUnit(a, b, arc, t, out) {
+    if (arc < 1e-5) return out.copy(b);
+    const s0 = Math.sin((1 - t) * arc) / Math.sin(arc);
+    const s1 = Math.sin(t * arc) / Math.sin(arc);
+    return out.copy(a).multiplyScalar(s0).addScaledVector(b, s1).normalize();
+  }
+
+  function arriveAtStop(stop) {
+    sim.tour.phase = 'arrived';
+    sim.tour.theta = sim.tour.leg?.theta || 0;
+    sim.tour.arrivedAt = performance.now();
+    narrate([arrivalLine(stop), ...stop.context, () => tourDataLines(stop)], () => {
+      sim.tour.phase = 'dwell';
+      // Wall-clock: a short pause after the narration, and at least ~12 s of circling.
+      sim.tour.dwellUntil = Math.max(performance.now() + 4000, sim.tour.arrivedAt + 12000);
+    });
+  }
+
+  // Highlight the stop's featured resolution-3 hexagon (the one the narration describes):
+  // a cyan fill and outline just above the carpet, so it reads against the fire colours.
+  function setTourHighlight(stop) {
+    if (tourHighlight) {
+      scene.remove(tourHighlight);
+      tourHighlight.traverse((o) => { o.geometry?.dispose(); o.material?.dispose(); });
+      tourHighlight = null;
+    }
+    if (!window.h3 || !scene) return;
+    const id = window.h3.latLngToCell(stop.lat, stop.lon, 3);
+    const boundary = window.h3.cellToBoundary(id);
+    const [cLat, cLon] = window.h3.cellToLatLng(id);
+    const radius = EARTH_R + 0.15; // above the tallest carpet prisms (~0.13)
+    const center = latLonAltToVec3(cLat, cLon, radius);
+    const ring = boundary.map(([lat, lon]) => latLonAltToVec3(lat, lon, radius));
+    const positions = [];
+    ring.forEach((p, i) => {
+      const q = ring[(i + 1) % ring.length];
+      positions.push(center.x, center.y, center.z, p.x, p.y, p.z, q.x, q.y, q.z);
+    });
+    const fillGeo = new THREE.BufferGeometry();
+    fillGeo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    const fill = new THREE.Mesh(fillGeo, new THREE.MeshBasicMaterial({
+      color: '#22d3ee', transparent: true, opacity: 0.4, depthWrite: false,
+      side: THREE.DoubleSide, blending: THREE.AdditiveBlending
+    }));
+    // Solid band along the edge (WebGL lines are only 1 px wide).
+    const inner = ring.map((p) => p.clone().lerp(center, 0.25));
+    const band = [];
+    ring.forEach((p, i) => {
+      const j = (i + 1) % ring.length;
+      const q = ring[j];
+      const pi = inner[i];
+      const qi = inner[j];
+      band.push(p.x, p.y, p.z, q.x, q.y, q.z, qi.x, qi.y, qi.z, p.x, p.y, p.z, qi.x, qi.y, qi.z, pi.x, pi.y, pi.z);
+    });
+    const bandGeo = new THREE.BufferGeometry();
+    bandGeo.setAttribute('position', new THREE.Float32BufferAttribute(band, 3));
+    const outline = new THREE.Mesh(bandGeo, new THREE.MeshBasicMaterial({
+      color: '#ecfeff', transparent: true, opacity: 0.9, depthWrite: false,
+      side: THREE.DoubleSide, blending: THREE.AdditiveBlending
+    }));
+    // Thin light column at the centre, visible from high transits.
+    const beaconHeight = 2.2;
+    const beacon = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.035, 0.035, beaconHeight, 8, 1, true),
+      new THREE.MeshBasicMaterial({
+        color: '#67e8f9', transparent: true, opacity: 0.6, depthWrite: false, blending: THREE.AdditiveBlending
+      })
+    );
+    const up = center.clone().normalize();
+    beacon.position.copy(center).addScaledVector(up, beaconHeight / 2);
+    beacon.quaternion.setFromUnitVectors(UP_Y, up);
+    tourHighlight = new THREE.Group();
+    tourHighlight.add(fill, outline, beacon);
+    tourHighlight.userData = { stopId: stop.id, fill, outline, beacon };
+    scene.add(tourHighlight);
+  }
+
+  // Blink about once a second (steady glow when the user prefers reduced motion).
+  function updateTourHighlight(nowMs) {
+    if (!tourHighlight) return;
+    const on = tourActive() && historyGroup?.visible !== false;
+    tourHighlight.visible = on;
+    if (!on) return;
+    const steady = bridge.getState().prefersReducedMotion;
+    const pulse = steady ? 0.6 : 0.5 + 0.5 * Math.sin((nowMs / 1000) * Math.PI * 2 * 1.1);
+    tourHighlight.userData.fill.material.opacity = 0.2 + 0.6 * pulse;
+    tourHighlight.userData.outline.material.opacity = 0.45 + 0.55 * pulse;
+    tourHighlight.userData.beacon.material.opacity = 0.25 + 0.6 * pulse;
+  }
+
+  // Scripted tour flight, replacing the steering physics while the tour is active.
+  function stepTourFlight(dt) {
+    const stop = tourStop();
+    if (!sim.tour.leg) beginTourLeg(stop);
+    if (tourHighlight?.userData.stopId !== stop.id) setTourHighlight(stop);
+    const prev = sim.craftPos.clone();
+    const radial = new THREE.Vector3();
+    let speed;
+
+    if (sim.tour.phase === 'transit') {
+      const leg = sim.tour.leg;
+      leg.t += dt;
+      const s = clamp(leg.t / leg.duration, 0, 1);
+      const e = s * s * (3 - 2 * s); // ease in and out
+      slerpUnit(leg.from, leg.to, leg.arc, e, radial);
+      const base = leg.fromAlt + (TOUR_ORBIT_ALT - leg.fromAlt) * e;
+      const bump = Math.max(0, leg.peakAlt - Math.max(leg.fromAlt, TOUR_ORBIT_ALT));
+      sim.craftPos.copy(radial).multiplyScalar(EARTH_R + base + bump * Math.sin(Math.PI * e));
+      speed = (leg.arc * EARTH_R) / leg.duration;
+      if (s >= 1) arriveAtStop(stop);
+    } else {
+      if (sim.tour.phase === 'dwell' && performance.now() >= sim.tour.dwellUntil) {
+        sim.tour.index = (sim.tour.index + 1) % TOUR_STOPS.length;
+        beginTourLeg(tourStop());
+        narrate([nextStopLine(tourStop())]);
+        return stepTourFlight(dt);
+      }
+      // Constant-altitude, constant-speed circle around the hotspot.
+      sim.tour.theta += (TOUR_ORBIT_SPEED / TOUR_ORBIT_RADIUS) * dt;
+      radial.copy(tourCircleDir(stop, sim.tour.theta));
+      sim.craftPos.copy(radial).multiplyScalar(EARTH_R + TOUR_ORBIT_ALT);
+      speed = TOUR_ORBIT_SPEED;
+    }
+
+    // Orientation: nose along the path, wings level with the ground (a slight inward
+    // bank while circling), eased so direction changes never snap.
+    const fwd = sim.craftPos.clone().sub(prev);
+    fwd.addScaledVector(radial, -fwd.dot(radial));
+    if (fwd.lengthSq() < 1e-10) fwd.copy(FWD_Z).applyQuaternion(sim.craftQuat);
+    fwd.normalize();
+    const up = radial.clone();
+    if (sim.tour.phase !== 'transit') {
+      const center = latLonAltToVec3(stop.lat, stop.lon, 1, new THREE.Vector3()).normalize();
+      const inward = center.addScaledVector(radial, -center.dot(radial));
+      if (inward.lengthSq() > 1e-10) up.addScaledVector(inward.normalize(), 0.14).normalize();
+    }
+    const right = new THREE.Vector3().crossVectors(fwd, up).normalize();
+    up.crossVectors(right, fwd).normalize();
+    tmpM4.makeBasis(right, up, fwd.clone().negate());
+    tmpQ.setFromRotationMatrix(tmpM4);
+    sim.craftQuat.slerp(tmpQ, Math.min(1, dt * 4)).normalize();
+    sim.craftSpeed = speed;
+    sim.angVel.set(0, 0, 0);
+  }
+
+  // C major pentatonic over two octaves: low density plays low, dense fire belts play high.
+  const HISTORY_SCALE = ['C3', 'D3', 'E3', 'G3', 'A3', 'C4', 'D4', 'E4', 'G4', 'A4'];
+
+  function updateFireHistorySound(nowMs, historyCell) {
+    if (!historyCell) {
+      sim.lastHistoryCellKey = null;
+      return;
+    }
+    const t = fireHistoryNorm(historyCell.density);
+
+    // Cell crossing: one note per newly entered cell. Coarser levels from high orbit
+    // mean fewer, slower notes; finer levels near the ground play faster.
+    const key = `${historyCell.res}:${historyCell.id}`;
+    if (key !== sim.lastHistoryCellKey) {
+      sim.lastHistoryCellKey = key;
+      if (audioBus.cellPluck) {
+        const note = HISTORY_SCALE[Math.round(t * (HISTORY_SCALE.length - 1))];
+        try {
+          audioBus.cellPluck.triggerAttackRelease(note, 0.4);
+        } catch (_) {}
+      }
+      playFireTrendAndSeason(nowMs, historyCell);
+    }
+
+    // Crackle: random (Poisson-like) clicks, 1.5 to ~32 per second with density.
+    if (audioBus.crackle && nowMs >= (sim.nextCrackleMs || 0)) {
+      const rate = 1.5 + Math.pow(t, 1.4) * 30;
+      sim.nextCrackleMs = nowMs + (-Math.log(1 - Math.random()) * 1000) / rate;
+      try {
+        audioBus.crackle.triggerAttackRelease(0.01, undefined, 0.12 + t * 0.5);
+      } catch (_) {}
+    }
+  }
+
+  // Trend chord and season bell, on cell entry. The chord is throttled so fast low-altitude
+  // flight does not smear it; the bell only rings when the peak month changes, so it
+  // marks fire-season boundaries (e.g. crossing the African savanna belts north to south).
+  function playFireTrendAndSeason(nowMs, cell) {
+    if (Number.isFinite(cell.trend) && audioBus.trendPad && nowMs - (sim.lastTrendMs || 0) >= 1100) {
+      sim.lastTrendMs = nowMs;
+      // Rising activity maps onto the tension domain [0, 3]: doubling (+1) is already tense.
+      const tension = bridge.tensionScale(clamp(cell.trend * 2, 0, 3));
+      const gain = 0.18 + clamp(Math.abs(cell.trend), 0, 1.5) * 0.25;
+      try {
+        audioBus.trendPad.set({ detune: tension.detuneCents || 0 });
+        audioBus.trendPad.triggerAttackRelease(tension.chord, 0.5, undefined, gain);
+      } catch (_) {}
+    }
+    if (cell.peakMonth >= 1 && audioBus.seasonBell && cell.peakMonth !== sim.lastSeasonMonth) {
+      const previous = sim.lastSeasonMonth;
+      sim.lastSeasonMonth = cell.peakMonth;
+      if (previous) {
+        const midi = 72 + (cell.peakMonth - 1); // January = C5 ... December = B5
+        const strength = Number.isFinite(cell.peakShare) ? clamp(cell.peakShare * 2.2, 0.25, 0.9) : 0.5;
+        try {
+          audioBus.seasonBell.triggerAttackRelease(440 * Math.pow(2, (midi - 69) / 12), 0.6, undefined, strength);
+        } catch (_) {}
+      }
+    }
+  }
+
+  // Spoken (and screen-reader) readout of the fire history under the craft: key F.
+  function speakFireHistory() {
+    let text;
+    if (!historyLevels.length) {
+      text = 'Fire history is still loading.';
+    } else if (historyGroup && !historyGroup.visible) {
+      text = 'The fire history layer is hidden.';
+    } else {
+      const cell = sim.lastScan?.historyCell;
+      if (cell) {
+        const t = fireHistoryNorm(cell.density);
+        const years = fireHistoryYears().replace('–', ' to ');
+        text = `${cell.detections.toLocaleString()} fires detected here from ${years}. ${fireHistoryDensityWord(t)} fire density.`;
+        const pct = fireTrendPercent(cell.trend);
+        const win = fireTrendWindows();
+        if (pct !== null && win) {
+          text += Math.abs(pct) < 5
+            ? ` Fire activity about the same in ${win.late} as in ${win.early}.`
+            : ` Fire activity ${pct > 0 ? 'up' : 'down'} ${Math.abs(pct)} percent from ${win.early} to ${win.late}.`;
+        }
+        if (cell.peakMonth >= 1) {
+          const share = Number.isFinite(cell.peakShare) ? Math.round(cell.peakShare * 100) : null;
+          text += ` Fire season peaks in ${MONTH_NAMES[cell.peakMonth - 1]}${share === null ? '' : `, with ${share} percent of fires`}.`;
+        }
+      } else {
+        text = 'No fires recorded here in the fire history.';
+      }
+    }
+    const announcer = document.getElementById('sr-live-announcer');
+    if (announcer) announcer.textContent = text;
+    const state = bridge.getState();
+    if ('speechSynthesis' in window && !state.isMuted) {
+      try {
+        window.speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(text);
+        u.rate = 1.05;
+        u.onstart = u.onend = () => window.PyroAudioUnlock?.resumeContext?.();
+        window.speechSynthesis.speak(u);
+      } catch (_) {}
+    }
+    return text;
   }
 
   function stepFlightPhysics(dt) {
@@ -972,6 +1811,12 @@ export function createFlybyController(bridge) {
 
     if (manualInput && sim.autopilot) {
       setAutopilot(false);
+    }
+
+    if (tourActive()) {
+      stepTourFlight(dt);
+      syncCraftVisuals(dt);
+      return;
     }
 
     const forward = FWD_Z.clone().applyQuaternion(sim.craftQuat).normalize();
@@ -1029,7 +1874,9 @@ export function createFlybyController(bridge) {
       // Slight gentle bank into turns
       const desiredUp = radialOut.clone().addScaledVector(right, -yawCmd * 0.35).normalize();
       const bankErr = new THREE.Vector3().crossVectors(up, desiredUp).dot(forward);
-      const rollCmd = clamp(bankErr * 2.6, -1.6, 1.6);
+      // Negative: a positive local-Z roll turns `up` away from `desiredUp` here, so the
+      // un-negated command levelled the craft upside down.
+      const rollCmd = clamp(-bankErr * 2.6, -1.6, 1.6);
 
       tmpQ.setFromEuler(new THREE.Euler(pitchCmd * dt, yawCmd * dt, rollCmd * dt, 'YXZ'));
       sim.craftQuat.multiply(tmpQ).normalize();
@@ -1063,7 +1910,8 @@ export function createFlybyController(bridge) {
       let autoRoll = 0;
       if (sim.horizonLock && Math.abs(rollIn) < 0.05) {
         const rollErr = new THREE.Vector3().crossVectors(up, radialOut).dot(forward);
-        autoRoll = clamp(rollErr * 1.9, -1.2, 1.2);
+        // Negative for the same reason as the autopilot bank: keeps the canopy facing space.
+        autoRoll = clamp(-rollErr * 1.9, -1.2, 1.2);
       }
 
       tmpQ.setFromEuler(new THREE.Euler(
@@ -1107,6 +1955,10 @@ export function createFlybyController(bridge) {
       sim.craftQuat.premultiply(nudge).normalize();
     }
 
+    syncCraftVisuals(dt);
+  }
+
+  function syncCraftVisuals(dt) {
     if (craftGroup) {
       craftGroup.position.copy(sim.craftPos);
       craftGroup.quaternion.copy(sim.craftQuat);
@@ -1153,13 +2005,30 @@ export function createFlybyController(bridge) {
     }
 
     // Default: Chase Cam
-    const chaseOffset = fwd.clone().multiplyScalar(-3.35).addScaledVector(up, 1.05);
+    // Pull back as the ship climbs, so high transits frame more of the planet.
+    const pullBack = 1 + Math.max(0, sim.craftPos.length() - EARTH_R - 3) * 0.22;
+    const chaseOffset = fwd.clone().multiplyScalar(-3.35 * pullBack).addScaledVector(up, 1.05 * pullBack);
     const desiredCamPos = sim.craftPos.clone().add(chaseOffset);
     // Keep camera above planet surface too
     if (desiredCamPos.length() < EARTH_R + 0.85) {
       desiredCamPos.normalize().multiplyScalar(EARTH_R + 0.85);
     }
-    const desiredLook = sim.craftPos.clone().addScaledVector(fwd, 6.5).addScaledVector(radialOut, -0.8);
+    // Aim below the ship (towards the planet) so the ship sits in the upper third.
+    const toCraft = sim.craftPos.clone().sub(desiredCamPos);
+    const craftDist = toCraft.length();
+    toCraft.normalize();
+    const downAxis = new THREE.Vector3().crossVectors(toCraft, radialOut);
+    let desiredLook;
+    if (downAxis.lengthSq() > 1e-6) {
+      downAxis.normalize();
+      // Tilt a little further down on high transits so more of the planet fills the view.
+      const altUnits = sim.craftPos.length() - EARTH_R;
+      const lookDown = CHASE_LOOK_DOWN_RAD + clamp((altUnits - 3) * 0.015, 0, 0.09);
+      const lookDir = toCraft.clone().applyAxisAngle(downAxis, -lookDown);
+      desiredLook = desiredCamPos.clone().addScaledVector(lookDir, craftDist + 6.5);
+    } else {
+      desiredLook = sim.craftPos.clone().addScaledVector(fwd, 6.5).addScaledVector(radialOut, -0.8);
+    }
 
     const smooth = Math.min(1, dt * 8.5);
     sim.camPos.lerp(desiredCamPos, smooth);
@@ -1205,6 +2074,23 @@ export function createFlybyController(bridge) {
       currentH3Res3 = window.h3.latLngToCell(geo.lat, geo.lon, 3);
     }
 
+    let historyCell = null;
+    if (window.h3 && activeHistoryLevel && historyGroup?.visible) {
+      const id = window.h3.latLngToCell(geo.lat, geo.lon, activeHistoryLevel.res);
+      const row = activeHistoryLevel.cells.get(id);
+      if (row) {
+        historyCell = {
+          id,
+          res: activeHistoryLevel.res,
+          detections: row[0],
+          density: row[1],
+          trend: row[3],
+          peakMonth: row[4],
+          peakShare: row[5]
+        };
+      }
+    }
+
     const activeRec = nearestTower
       ? nearestTower.biome.records[clamp(sim.monthIndex, 0, nearestTower.biome.records.length - 1)]
       : null;
@@ -1225,6 +2111,7 @@ export function createFlybyController(bridge) {
       fireBin: nearestFire,
       distToFire: minFireDist,
       iowaCell,
+      historyCell,
       currentH3Res3,
       pan
     };
@@ -1240,12 +2127,16 @@ export function createFlybyController(bridge) {
     const lonStr = `${Math.abs(scan.geo.lon).toFixed(1)}°${scan.geo.lon >= 0 ? 'E' : 'W'}`;
 
     if (dom.hudMode) {
-      dom.hudMode.textContent = sim.autopilot ? `AUTO · ${sim.targetId.toUpperCase()}` : 'MANUAL PILOT';
+      dom.hudMode.textContent = sim.autopilot ? `AUTO · ${sim.targetId === 'tour' ? 'TOUR' : sim.targetId.toUpperCase()}` : 'MANUAL PILOT';
     }
     if (dom.hudAlt) dom.hudAlt.textContent = `${kmAlt.toLocaleString()} km`;
     if (dom.hudSpd) dom.hudSpd.textContent = `${kmSpd} km/s`;
     if (dom.hudLatLon) dom.hudLatLon.textContent = `${latStr}, ${lonStr}`;
-    if (dom.hudTarget) dom.hudTarget.textContent = scan.iowaCell ? 'Iowa MODIS H3' : (scan.biome ? scan.biome.name : 'Open Ocean');
+    if (dom.hudTarget) {
+      dom.hudTarget.textContent = tourActive()
+        ? `Tour ${(sim.tour.index % TOUR_STOPS.length) + 1}/${TOUR_STOPS.length} · ${tourStop().name}`
+        : (scan.iowaCell ? 'Iowa MODIS H3' : (scan.biome ? scan.biome.name : 'Open Ocean'));
+    }
 
     if (dom.hudSigma && scan.rec) {
       const sign = scan.rec.zScore >= 0 ? '+' : '';
@@ -1256,8 +2147,15 @@ export function createFlybyController(bridge) {
       if (scan.iowaCell && Number.isFinite(scan.iowaCell.A1)) {
         const ndviStr = Number.isFinite(scan.iowaCell.A2) ? scan.iowaCell.A2.toFixed(2) : '—';
         dom.hudHex.textContent = `H3 ${scan.iowaCell.id.slice(0, 7)}… ${scan.iowaCell.A1.toFixed(1)}°C · NDVI ${ndviStr}`;
-      } else if (scan.fireBin && scan.distToFire < 8.5) {
+      } else if (scan.fireBin && scan.distToFire < 8.5 && fireGroup?.visible !== false) {
         dom.hudHex.textContent = `${scan.fireBin.count} hotspots · ${Math.round(scan.fireBin.totalFrp)} MW FRP`;
+      } else if (scan.historyCell) {
+        const { res, detections, density, trend, peakMonth } = scan.historyCell;
+        const per1000 = (density * 1000).toPrecision(2);
+        const pct = fireTrendPercent(trend);
+        const trendTag = pct === null ? '' : ` · ${pct >= 0 ? '↑' : '↓'}${Math.abs(pct)}%`;
+        const peakTag = peakMonth >= 1 ? ` · peak ${MONTH_NAMES[peakMonth - 1].slice(0, 3)}` : '';
+        dom.hudHex.textContent = `${fireHistoryYears()} r${res}: ${detections.toLocaleString()} fires · ${per1000}/1000 km²/yr${trendTag}${peakTag}`;
       } else if (scan.currentH3Res3) {
         dom.hudHex.textContent = `H3 r3 ${scan.currentH3Res3}`;
       }
@@ -1285,7 +2183,10 @@ export function createFlybyController(bridge) {
     }
 
     stepFlightPhysics(dt);
+    updateFireHistoryLod((sim.craftPos.length() - EARTH_R) * KM_PER_UNIT);
+    updateTourHighlight(nowMs);
     const scan = scanFootprint();
+    sim.lastScan = scan;
     updateHudReadout(nowMs, scan);
     updateSpatialAudio(nowMs, scan);
 
@@ -1296,7 +2197,12 @@ export function createFlybyController(bridge) {
   }
 
   function setAutopilot(enabled) {
+    const wasTour = tourActive();
     sim.autopilot = enabled;
+    if (wasTour && !tourActive()) stopNarration();
+    else if (!wasTour && tourActive() && sim.active && sim.initialized) {
+      startTour({ intro: !sim.tour.started, resume: sim.tour.started });
+    }
     if (dom.btnAutopilot) {
       dom.btnAutopilot.setAttribute('aria-pressed', String(enabled));
       dom.btnAutopilot.textContent = enabled ? '🛰️ Autopilot Cruise' : '🕹️ Manual Pilot';
@@ -1304,7 +2210,12 @@ export function createFlybyController(bridge) {
   }
 
   function selectWaypoint(targetId) {
+    const wasTour = tourActive();
     sim.targetId = targetId;
+    if (wasTour && targetId !== 'tour') stopNarration();
+    if (targetId === 'tour' && sim.autopilot) {
+      startTour({ intro: !sim.tour.started, resume: sim.tour.started });
+    }
     setAutopilot(true);
     if (dom.waypoints) {
       dom.waypoints.querySelectorAll('button').forEach((btn) => {
@@ -1317,6 +2228,7 @@ export function createFlybyController(bridge) {
     if (!dom.waypoints) return;
     dom.waypoints.innerHTML = '';
     const targets = [
+      { id: 'tour', label: '🔥 Fire Hotspot Tour' },
       { id: 'cruise', label: '🌍 Global Orbit' },
       { id: 'iowa', label: '⬡ Iowa MODIS H3' },
       ...biomes.map((b) => ({ id: b.id, label: `🌀 ${b.name.split(' & ')[0]}` }))
@@ -1387,6 +2299,20 @@ export function createFlybyController(bridge) {
       if (fireGroup) fireGroup.visible = next;
     });
 
+    dom.btnNarration?.addEventListener('click', (e) => {
+      sim.narrationOn = !sim.narrationOn;
+      e.currentTarget.setAttribute('aria-pressed', String(sim.narrationOn));
+      e.currentTarget.textContent = sim.narrationOn ? '💬 Narration: On' : '💬 Narration: Off';
+      if (!sim.narrationOn) stopNarration();
+      else if (tourActive()) startTour({ intro: false, resume: true });
+    });
+
+    dom.layerHistory?.addEventListener('click', (e) => {
+      const next = e.currentTarget.getAttribute('aria-pressed') !== 'true';
+      e.currentTarget.setAttribute('aria-pressed', String(next));
+      if (historyGroup) historyGroup.visible = next;
+    });
+
     dom.metricSelect?.addEventListener('change', (e) => {
       sim.metric = e.target.value;
       updateSpiralMetricPositions();
@@ -1408,6 +2334,8 @@ export function createFlybyController(bridge) {
         sim.keys.add(e.code);
       } else if (e.code === 'KeyV') {
         dom.btnCam?.click();
+      } else if (e.code === 'KeyF' && !e.repeat) {
+        speakFireHistory();
       }
     });
 
@@ -1495,7 +2423,7 @@ export function createFlybyController(bridge) {
       scene.add(rimLight);
 
       // Planet Earth sphere + atmosphere + starfield
-      const earthTex = createEarthTexture(state.worldGeo, state.biomes);
+      const earthTex = createEarthTexture(state.worldGeo, state.biomes, state.worldCoast, state.worldBorders);
       const earth = new THREE.Mesh(
         new THREE.SphereGeometry(EARTH_R, 72, 48),
         new THREE.MeshStandardMaterial({ map: earthTex, roughness: 0.78, metalness: 0.08 })
@@ -1516,6 +2444,7 @@ export function createFlybyController(bridge) {
 
       sim.initialized = true;
       setBanner('', true);
+      loadFireHistory(h3).catch((err) => console.warn('Fire history layer unavailable:', err));
     } catch (err) {
       console.error('Orbital flyby initialization failed:', err);
       setBanner(`Failed to initialize 3D view: ${err.message}`);
@@ -1527,6 +2456,11 @@ export function createFlybyController(bridge) {
   async function setActive(isActive) {
     sim.active = isActive;
     if (!isActive) {
+      if (tourActive()) {
+        stopNarration();
+        // Re-arrive (and re-narrate) the current stop when the tab returns.
+        if (sim.tour.phase !== 'transit') sim.tour.phase = 'transit';
+      }
       sim.keys.clear();
       sim.padCtrls.clear();
       if (sim.rafId) {
@@ -1538,6 +2472,9 @@ export function createFlybyController(bridge) {
 
     await ensureInitialized();
     syncRendererSize();
+    if (sim.initialized && tourActive() && !narrator.busy) {
+      startTour({ intro: !sim.tour.started, resume: sim.tour.started });
+    }
     sim.lastTime = 0;
     if (sim.initialized && !sim.rafId && sim.active) {
       sim.rafId = requestAnimationFrame(animate);

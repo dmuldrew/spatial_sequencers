@@ -83,6 +83,9 @@
         <button type="button" id="tab-flyby" class="page-tab" role="tab" aria-selected="false" aria-controls="panel-flyby-view" tabindex="-1">
           🚀 Orbital Flyby (3D)
         </button>
+        <button type="button" id="tab-globalfire" class="page-tab" role="tab" aria-selected="false" aria-controls="panel-globalfire-view" tabindex="-1">
+          🌍 Global Fire Map
+        </button>
       </div>
 
       <section id="panel-spiral-view" role="tabpanel" aria-labelledby="tab-spiral" tabindex="0">
@@ -360,6 +363,21 @@
         </div>
       </section>
 
+      <section id="panel-globalfire-view" role="tabpanel" aria-labelledby="tab-globalfire" tabindex="0" hidden>
+        <div id="global-fire" class="panel midwest-map-panel">
+          <div class="midwest-map-header">
+            <h2 id="global-fire-heading">Global fire history on an H3 grid (2001–2025)</h2>
+            <a class="btn btn-mini" href="./global-fire/" target="_blank" rel="noopener noreferrer">Open standalone map ↗</a>
+          </div>
+          <iframe
+            id="global-fire-frame"
+            class="midwest-map-frame global-fire-frame"
+            data-src="./global-fire/"
+            title="Interactive global map of fire density, trend and peak fire month on H3 hexagons"
+          ></iframe>
+        </div>
+      </section>
+
       <section id="panel-flyby-view" role="tabpanel" aria-labelledby="tab-flyby" tabindex="0" hidden>
         <div class="panel flyby-shell">
           <div class="flyby-topbar">
@@ -374,10 +392,11 @@
               <button type="button" id="flyby-btn-cam" class="btn btn-mini">🎥 Cam: Chase</button>
               <button type="button" id="flyby-btn-horizon" class="btn btn-mini" aria-pressed="true">🧭 Horizon Lock</button>
               <button type="button" id="flyby-btn-reset" class="btn btn-mini">↺ Reset Orbit</button>
+              <button type="button" id="flyby-btn-narration" class="btn btn-mini" aria-pressed="true" title="Spoken tour narration with subtitles">💬 Narration: On</button>
             </div>
           </div>
 
-          <div id="flyby-viewport" class="flyby-viewport" tabindex="0" aria-label="Interactive Three.js spacecraft flyby viewport. Click inside and use W A S D or Arrow keys to steer, Q E to roll, Shift to boost, Space to brake.">
+          <div id="flyby-viewport" class="flyby-viewport" tabindex="0" aria-label="Interactive Three.js spacecraft flyby viewport. Click inside and use W A S D or Arrow keys to steer, Q E to roll, Shift to boost, Space to brake, F to hear the fire history under the craft.">
             <canvas id="flyby-canvas"></canvas>
 
             <!-- Top Left HUD: Craft Attitude & Position -->
@@ -404,6 +423,9 @@
               <span class="flyby-reticle-ring"></span>
               <span class="flyby-reticle-dot"></span>
             </div>
+
+            <!-- Tour narration subtitles (speech is read aloud separately, so not a live region) -->
+            <div id="flyby-subtitle" class="flyby-caption" hidden></div>
 
             <!-- Loading / WebGL status banner -->
             <div id="flyby-status-banner" class="flyby-status-banner">Initializing Three.js planetary core…</div>
@@ -434,6 +456,7 @@
                   <button type="button" id="flyby-layer-hex" class="btn btn-mini" aria-pressed="true">⬡ H3 Hexes</button>
                   <button type="button" id="flyby-layer-spirals" class="btn btn-mini" aria-pressed="true">🌀 3D Spirals</button>
                   <button type="button" id="flyby-layer-fires" class="btn btn-mini" aria-pressed="true">🔥 MODIS Towers</button>
+                  <button type="button" id="flyby-layer-history" class="btn btn-mini" aria-pressed="true" title="25-year NASA FIRMS fire density on an H3 grid; resolution follows altitude">🗺️ Fire History</button>
                   <select id="flyby-metric-select" class="select-input flyby-metric-select" aria-label="3D spiral radial variable">
                     <option value="sigma">Radial: Norm Dev (σ)</option>
                     <option value="ffwi">Radial: Fosberg FWI</option>
@@ -445,7 +468,7 @@
             </div>
 
             <div class="flyby-deck-thrusters">
-              <span class="control-label">MANUAL THRUSTERS (KEYS: W/A/S/D OR ARROWS · Q/E ROLL · SHIFT BOOST · SPACE BRAKE · DRAG TO STEER)</span>
+              <span class="control-label">MANUAL THRUSTERS (KEYS: W/A/S/D OR ARROWS · Q/E ROLL · SHIFT BOOST · SPACE BRAKE · F FIRE HISTORY · DRAG TO STEER)</span>
               <div class="flyby-thruster-grid" role="group" aria-label="On-screen spacecraft thrusters">
                 <button type="button" class="btn btn-mini flyby-ctrl-btn" data-ctrl="rollLeft">↺ Q Roll</button>
                 <button type="button" class="btn btn-mini flyby-ctrl-btn" data-ctrl="pitchUp">▲ W Pitch Up</button>
