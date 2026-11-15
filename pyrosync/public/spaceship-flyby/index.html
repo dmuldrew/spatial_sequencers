@@ -1,0 +1,1799 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Combined Spaceship Flyby — PyroSync × 3D Fire Flight | Spatial Sequencers</title>
+  <meta name="description" content="Fly a spacecraft across a 3D Earth uniting the 3D Fire Flight continuous thermal violin, hotspot proximity bells, and spoken narration with PyroSync harmonic tension chords, Euclidean wind-ember pulses, 26-year climate spirals, and Central Iowa MODIS H3 hexagons.">
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #040711;
+      --surface: rgba(11, 18, 38, 0.88);
+      --surface-solid: #0d152c;
+      --surface-elevated: rgba(20, 31, 61, 0.92);
+      --border: #2c3e6b;
+      --border-bright: #38bdf8;
+      --text: #f8fafc;
+      --muted: #cbd5e1;
+      --accent-gold: #ffd166;
+      --accent-green: #7ee0a3;
+      --accent-cyan: #38bdf8;
+      --accent-orange: #ff7847;
+      --accent-rose: #f43f5e;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      min-block-size: 100dvh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 1rem;
+      line-height: 1.5;
+      overflow-x: hidden;
+    }
+
+    .visually-hidden:where(:not(:focus-within, :active)) {
+      position: absolute !important;
+      clip-path: inset(50%) !important;
+      overflow: hidden !important;
+      width: 1px !important;
+      height: 1px !important;
+      margin: -1px !important;
+      padding: 0 !important;
+      border: 0 !important;
+      white-space: nowrap !important;
+    }
+
+    .skip-link {
+      position: fixed;
+      top: 0.75rem;
+      left: 0.75rem;
+      z-index: 100;
+      padding: 0.65rem 1.1rem;
+      background: var(--accent-gold);
+      color: #0f172a;
+      font-weight: 800;
+      border-radius: 0.5rem;
+      text-decoration: none;
+    }
+
+    :where(a:any-link, button, input, select, [tabindex="0"]):focus-visible {
+      outline: 3px solid var(--accent-gold);
+      outline-offset: 3px;
+    }
+
+    #scene-canvas {
+      position: fixed;
+      inset: 0;
+      inline-size: 100dvw;
+      block-size: 100dvh;
+      display: block;
+      z-index: 1;
+      touch-action: none;
+    }
+
+    /* Top bar */
+    .top-header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 10;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.75rem 1.25rem;
+      padding: 0.75rem 1.25rem;
+      background: linear-gradient(180deg, rgba(4, 7, 17, 0.94) 0%, rgba(4, 7, 17, 0.65) 80%, transparent 100%);
+      pointer-events: none;
+    }
+
+    .top-header > * {
+      pointer-events: auto;
+    }
+
+    .brand-block h1 {
+      margin: 0;
+      font-size: clamp(1.2rem, 0.95rem + 1.1vw, 1.75rem);
+      font-weight: 800;
+      letter-spacing: -0.01em;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .brand-block p {
+      margin: 0.15rem 0 0;
+      color: var(--muted);
+      font-size: clamp(0.82rem, 0.78rem + 0.25vw, 0.95rem);
+      max-inline-size: 62ch;
+    }
+
+    .site-switcher {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+      align-items: center;
+    }
+
+    .site-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      min-block-size: 2.25rem;
+      padding: 0.35rem 0.8rem;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      font-size: 0.85rem;
+      font-weight: 700;
+      text-decoration: none;
+      backdrop-filter: blur(8px);
+    }
+
+    .site-link:hover {
+      border-color: var(--accent-gold);
+      color: var(--accent-gold);
+    }
+
+    .site-link[aria-current="page"] {
+      background: rgba(56, 189, 248, 0.18);
+      border-color: var(--accent-cyan);
+      color: #bae6fd;
+    }
+
+    /* Main overlay layout */
+    .cockpit-shell {
+      position: fixed;
+      inset: 4.5rem 1rem 5.4rem 1rem;
+      z-index: 8;
+      display: grid;
+      grid-template-columns: minmax(270px, 340px) 1fr minmax(280px, 355px);
+      gap: 1rem;
+      align-items: end;
+      pointer-events: none;
+    }
+
+    .hud-card {
+      pointer-events: auto;
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: 1rem;
+      padding: 0.95rem 1.1rem;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 14px 34px rgba(0, 0, 0, 0.5);
+      max-block-size: calc(100dvh - 10.5rem);
+      overflow-y: auto;
+    }
+
+    .hud-card h2 {
+      margin: 0 0 0.45rem;
+      font-size: clamp(0.95rem, 0.88rem + 0.3vw, 1.1rem);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--accent-gold);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .region-Banner {
+      font-size: clamp(1.15rem, 1rem + 0.55vw, 1.45rem);
+      font-weight: 800;
+      margin: 0 0 0.2rem;
+      color: #ffffff;
+    }
+
+    .region-sub {
+      margin: 0 0 0.65rem;
+      font-size: 0.88rem;
+      color: var(--muted);
+    }
+
+    .meter-track {
+      block-size: 0.65rem;
+      background: #172342;
+      border-radius: 999px;
+      overflow: hidden;
+      margin-bottom: 0.25rem;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .meter-fill {
+      block-size: 100%;
+      inline-size: 0%;
+      background: linear-gradient(90deg, var(--accent-green), var(--accent-gold), var(--accent-orange), var(--accent-rose));
+      transition: inline-size 0.16s ease-out;
+    }
+
+    .meter-caption {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.76rem;
+      color: var(--muted);
+      margin-bottom: 0.65rem;
+    }
+
+    .telemetry-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.45rem;
+      margin: 0.55rem 0;
+    }
+
+    .stat-box {
+      background: rgba(7, 12, 28, 0.72);
+      border: 1px solid rgba(56, 189, 248, 0.22);
+      border-radius: 0.6rem;
+      padding: 0.4rem 0.6rem;
+    }
+
+    .stat-label {
+      display: block;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+    }
+
+    .stat-val {
+      font-size: 0.92rem;
+      font-weight: 700;
+      color: #f8fafc;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Waypoint pills */
+    .waypoint-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      margin-top: 0.55rem;
+    }
+
+    .chip-btn {
+      min-block-size: 2rem;
+      padding: 0.28rem 0.65rem;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(15, 23, 42, 0.85);
+      color: var(--text);
+      font-size: 0.78rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .chip-btn[aria-pressed="true"] {
+      background: var(--accent-cyan);
+      color: #061224;
+      border-color: #bae6fd;
+    }
+
+    /* Soundscape mixer (right card) */
+    .sound-layer-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.48rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .layer-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 0.35rem 0.6rem;
+      align-items: center;
+      background: rgba(7, 12, 28, 0.68);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 0.65rem;
+      padding: 0.42rem 0.65rem;
+    }
+
+    .layer-title {
+      font-size: 0.84rem;
+      font-weight: 700;
+      color: #f1f5f9;
+    }
+
+    .layer-desc {
+      grid-column: 1 / -1;
+      font-size: 0.74rem;
+      color: var(--muted);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .mini-bar {
+      inline-size: 64px;
+      block-size: 6px;
+      background: #172342;
+      border-radius: 999px;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .mini-bar > span {
+      display: block;
+      block-size: 100%;
+      inline-size: 0%;
+      background: var(--accent-gold);
+      transition: inline-size 0.14s ease-out;
+    }
+
+    .toggle-pill {
+      min-block-size: 1.85rem;
+      min-inline-size: 3.4rem;
+      padding: 0.2rem 0.6rem;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: #16213e;
+      color: var(--muted);
+      font-size: 0.76rem;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    .toggle-pill[aria-pressed="true"] {
+      background: var(--accent-green);
+      color: #052010;
+      border-color: var(--accent-green);
+    }
+
+    .control-field {
+      margin-top: 0.55rem;
+    }
+
+    .control-field label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--muted);
+      margin-bottom: 0.22rem;
+    }
+
+    .control-field input[type="range"],
+    .control-field select {
+      inline-size: 100%;
+      min-block-size: 2rem;
+      accent-color: var(--accent-gold);
+    }
+
+    .control-field select {
+      background: #0b1329;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 0.5rem;
+      padding: 0.3rem 0.5rem;
+      font-size: 0.84rem;
+    }
+
+    /* Bottom transport bar */
+    .bottom-bar {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 10;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: center;
+      gap: 0.55rem;
+      padding: 0.7rem 1rem;
+      background: rgba(6, 10, 23, 0.94);
+      border-top: 1.5px solid var(--border);
+      backdrop-filter: blur(10px);
+    }
+
+    .act-btn {
+      min-block-size: 2.55rem;
+      padding: 0.48rem 1.05rem;
+      border-radius: 999px;
+      border: 1.5px solid var(--border);
+      background: var(--surface-solid);
+      color: var(--text);
+      font-size: 0.92rem;
+      font-weight: 800;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .act-btn.primary {
+      background: var(--accent-gold);
+      color: #111827;
+      border-color: var(--accent-gold);
+    }
+
+    .act-btn[aria-pressed="true"]:not(.primary) {
+      background: var(--accent-green);
+      color: #062112;
+      border-color: var(--accent-green);
+    }
+
+    .key-hint {
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-left: 0.35rem;
+    }
+
+    kbd {
+      background: #1a2647;
+      border: 1px solid var(--border);
+      border-radius: 0.3rem;
+      padding: 0.08rem 0.38rem;
+      font-size: 0.74rem;
+      font-weight: 700;
+    }
+
+    /* Native modal dialog for audio unlock & orientation */
+    dialog#launchDialog {
+      background: var(--surface-solid);
+      color: var(--text);
+      border: 2px solid var(--accent-cyan);
+      border-radius: 1.2rem;
+      max-inline-size: 38rem;
+      width: calc(100% - 2rem);
+      padding: 1.65rem;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.75);
+    }
+
+    dialog#launchDialog::backdrop {
+      background: rgba(3, 6, 15, 0.8);
+      backdrop-filter: blur(6px);
+    }
+
+    dialog#launchDialog h2 {
+      margin: 0 0 0.5rem;
+      font-size: clamp(1.35rem, 1.1rem + 1vw, 1.85rem);
+      color: var(--accent-gold);
+    }
+
+    dialog#launchDialog p {
+      margin: 0 0 0.85rem;
+      color: var(--muted);
+      font-size: 0.98rem;
+    }
+
+    .dialog-features {
+      margin: 0 0 1.1rem;
+      padding-left: 1.2rem;
+      color: #e2e8f0;
+      font-size: 0.9rem;
+    }
+
+    .dialog-features li {
+      margin-bottom: 0.35rem;
+    }
+
+    .dialog-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.65rem;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    @media (max-width: 1024px) {
+      .cockpit-shell {
+        grid-template-columns: 1fr 1fr;
+        inset: 4.8rem 0.75rem 5.8rem 0.75rem;
+      }
+      .center-spacer {
+        display: none;
+      }
+    }
+
+    @media (max-width: 680px) {
+      .cockpit-shell {
+        grid-template-columns: 1fr;
+        align-content: end;
+      }
+      .hud-card {
+        max-block-size: 34dvh;
+      }
+      .key-hint {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <a href="#main-cockpit" class="skip-link visually-hidden">Skip to flight &amp; soundscape controls</a>
+
+  <canvas id="scene-canvas" aria-label="3D Earth with spacecraft flying through PyroSync 26-year wildfire spirals, Central Iowa MODIS H3 hexagons, and NASA FIRMS hotspots"></canvas>
+
+  <header class="top-header">
+    <div class="brand-block">
+      <h1>🚀 Combined Spaceship Flyby</h1>
+      <p>Uniting <strong>3D Fire Flight</strong> continuous thermal violin, hotspot bells &amp; spoken narration with <strong>PyroSync</strong> harmonic tension chords, Euclidean wind rhythms &amp; 3D H3/Spiral towers.</p>
+    </div>
+
+    <nav aria-label="Experiences" class="site-switcher">
+      <a class="site-link" href="../">🪐 All Experiences Hub</a>
+      <a class="site-link" href="../pyrosync/#spiral">🌀 Wildfire Spiral</a>
+      <a class="site-link" href="../pyrosync/#iowa-map">⬡ Iowa Hex Map</a>
+      <a class="site-link" href="./" aria-current="page">🚀 Combined Flyby</a>
+      <a class="site-link" href="../pyrosync/#flyby">🛰️ PyroSat-1 3D</a>
+      <a class="site-link" href="../space-jukebox/fly.html">🔥 3D Fire Flight</a>
+    </nav>
+  </header>
+
+  <main id="main-cockpit" tabindex="-1" class="cockpit-shell">
+    <!-- Left Card: Flight Telemetry, Fire Intensity Meter, & Waypoints -->
+    <section class="hud-card" aria-labelledby="telemetry-heading">
+      <h2 id="telemetry-heading">
+        <span>Flight &amp; Fire Telemetry</span>
+        <span id="hud-mode-tag">TOUR</span>
+      </h2>
+
+      <p class="region-Banner" id="hud-region">Standing by over Pacific</p>
+      <p class="region-sub" id="hud-region-sub">Press Launch Combined Flight to unlock Web Audio &amp; narration</p>
+
+      <div class="meter-track" role="progressbar" aria-label="Fire intensity beneath spacecraft" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="fire-progressbar">
+        <div class="meter-fill" id="hud-fire-meter"></div>
+      </div>
+      <div class="meter-caption">
+        <span>THERMAL FRP FOOTPRINT</span>
+        <span id="hud-frp-readout">0 MW nearby</span>
+      </div>
+
+      <div class="telemetry-grid">
+        <div class="stat-box">
+          <span class="stat-label">Coordinates</span>
+          <span class="stat-val" id="hud-coords">26.0°N, 124.0°W</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-label">Altitude / Speed</span>
+          <span class="stat-val" id="hud-alt-spd">1,540 km · 1.0×</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-label">PyroSync Norm (σ)</span>
+          <span class="stat-val" id="hud-sigma">+0.00σ · Consonant</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-label">H3 / Stereo Field</span>
+          <span class="stat-val" id="hud-hex-pan">Pan C · 330 fires</span>
+        </div>
+      </div>
+
+      <div class="control-field">
+        <label for="timeline-slider">
+          <span>26-Year Spiral Month</span>
+          <span id="hud-month-label">2024-07</span>
+        </label>
+        <input id="timeline-slider" type="range" min="0" max="308" value="282">
+      </div>
+
+      <div class="waypoint-strip" role="group" aria-label="Flight route and biome waypoints">
+        <button type="button" class="chip-btn" data-waypoint="tour" aria-pressed="true">🌍 6-Biome Tour</button>
+        <button type="button" class="chip-btn" data-waypoint="iowa" aria-pressed="false">⬡ Iowa H3 Grid</button>
+        <button type="button" class="chip-btn" data-waypoint="california" aria-pressed="false">California</button>
+        <button type="button" class="chip-btn" data-waypoint="boreal" aria-pressed="false">Boreal</button>
+        <button type="button" class="chip-btn" data-waypoint="amazon" aria-pressed="false">Amazon</button>
+        <button type="button" class="chip-btn" data-waypoint="africa" aria-pressed="false">Sahel</button>
+        <button type="button" class="chip-btn" data-waypoint="mediterranean" aria-pressed="false">Mediterranean</button>
+        <button type="button" class="chip-btn" data-waypoint="australia" aria-pressed="false">Outback</button>
+      </div>
+    </section>
+
+    <div class="center-spacer" aria-hidden="true"></div>
+
+    <!-- Right Card: Combined Sound Landscape Mixer -->
+    <section class="hud-card" aria-labelledby="mixer-heading">
+      <h2 id="mixer-heading">
+        <span>Combined Sound Landscape</span>
+        <span id="hud-chord-badge">C3 G3 C4 E4</span>
+      </h2>
+
+      <div class="sound-layer-list">
+        <div class="layer-row">
+          <span class="layer-title">🎻 Thermal Violin Line (Fire Flight)</span>
+          <button type="button" class="toggle-pill" id="toggle-violin" aria-pressed="true" aria-label="Thermal Violin Line">Active</button>
+          <div class="layer-desc">
+            <span id="readout-violin">110 Hz · Detuned sawtooth glide</span>
+            <div class="mini-bar" aria-hidden="true"><span id="bar-violin"></span></div>
+          </div>
+        </div>
+
+        <div class="layer-row">
+          <span class="layer-title">🎹 Harmonic Tension Pad (PyroSync)</span>
+          <button type="button" class="toggle-pill" id="toggle-harmony" aria-pressed="true" aria-label="Harmonic Tension Pad">Active</button>
+          <div class="layer-desc">
+            <span id="readout-harmony">1991–2020 σ departure chord</span>
+            <div class="mini-bar" aria-hidden="true"><span id="bar-harmony"></span></div>
+          </div>
+        </div>
+
+        <div class="layer-row">
+          <span class="layer-title">🔔 Hotspot Pings &amp; H3 Hex Plucks</span>
+          <button type="button" class="toggle-pill" id="toggle-pings" aria-pressed="true" aria-label="Hotspot Pings and H3 Hex Plucks">Active</button>
+          <div class="layer-desc">
+            <span id="readout-pings">FRP ≥ 280 MW bells + Iowa LST</span>
+            <div class="mini-bar" aria-hidden="true"><span id="bar-pings"></span></div>
+          </div>
+        </div>
+
+        <div class="layer-row">
+          <span class="layer-title">🥁 Euclidean Wind &amp; Jet Stream</span>
+          <button type="button" class="toggle-pill" id="toggle-wind" aria-pressed="true" aria-label="Euclidean Wind and Jet Stream">Active</button>
+          <div class="layer-desc">
+            <span id="readout-wind">WS10M pulse + VPD filter</span>
+            <div class="mini-bar" aria-hidden="true"><span id="bar-wind"></span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="control-field">
+        <label for="preset-select">
+          <span>Soundscape Preset</span>
+          <span>Mix profile</span>
+        </label>
+        <select id="preset-select">
+          <option value="combined" selected>Combined Ensemble (3D Fire Flight + PyroSync)</option>
+          <option value="fireflight">3D Fire Flight Classic (Violin + Pings + Narration)</option>
+          <option value="pyrosync">PyroSync Observatory (Harmonic σ Chords + Euclidean + H3)</option>
+        </select>
+      </div>
+    </section>
+  </main>
+
+  <footer class="bottom-bar">
+    <button type="button" id="btn-fly" class="act-btn primary" aria-pressed="false">▶ Launch Flight</button>
+    <button type="button" id="btn-pilot-mode" class="act-btn" aria-pressed="true">🛰️ Guided Tour</button>
+    <button type="button" id="btn-narrate" class="act-btn" aria-pressed="true">🗣️ Spoken Narration</button>
+    <button type="button" id="btn-where" class="act-btn">🧭 Where Am I?</button>
+    <button type="button" id="btn-home-tone" class="act-btn">🎧 Home Tone (0σ)</button>
+    <button type="button" id="btn-cam" class="act-btn" aria-pressed="false">🎥 Cam: Chase</button>
+    <button type="button" id="btn-speed" class="act-btn">⚡ Speed: 1×</button>
+    <span class="key-hint">
+      Keys: <kbd>Space</kbd> fly · <kbd>WASD</kbd> steer · <kbd>N</kbd> narrate · <kbd>I</kbd> where am I · <kbd>R</kbd> home tone · <kbd>C</kbd> camera
+    </span>
+  </footer>
+
+  <p id="sr-live" class="visually-hidden" aria-live="polite" aria-atomic="true"></p>
+
+  <dialog id="launchDialog" aria-labelledby="launchTitle">
+    <h2 id="launchTitle">🚀 Combined Spaceship Flyby</h2>
+    <p>
+      One spacecraft, two united sound landscapes: experience <strong>Space Jukebox&rsquo;s 3D Fire Flight</strong> and the <strong>PyroSync Fire-Weather Observatory</strong> simultaneously as you orbit Earth.
+    </p>
+    <ul class="dialog-features">
+      <li><strong>Continuous Thermal Violin &amp; Hotspot Bells:</strong> Pitch and filter brightness climb smoothly with the Gaussian-weighted NASA FIRMS fire power beneath the hull, while major hotspots (FRP &ge; 280 MW) ring out in stereo.</li>
+      <li><strong>PyroSync Harmonic Tension &amp; Euclidean Wind:</strong> 26-year climate spirals (`2001–2026`) shift chords from warm C-major (`0σ` normal) into tense tritones (`+2.2σ+`), pulsed by 10m wind Euclidean rhythms and Central Iowa MODIS H3 hexagons.</li>
+      <li><strong>Audio-First Narration &amp; Reference Landmarks:</strong> Spoken biome briefings work eyes-closed; press <kbd>I</kbd> for <em>Where Am I?</em> or <kbd>R</kbd> for the `0σ` Home Tone at any time.</li>
+    </ul>
+    <div class="dialog-actions">
+      <button type="button" id="btn-dialog-start" class="act-btn primary">▶ Start Combined Flight &amp; Audio</button>
+      <a class="site-link" href="../">← Back to Website Choices</a>
+    </div>
+  </dialog>
+
+  <script type="module">
+    const THREE = await import('../pyrosync/vendor/three.module.min.js')
+      .catch(() => import('../vendor/three.module.min.js'));
+
+    // Normalize top-bar links when opened under /pyrosync/spaceship-flyby/ or on localhost:3000
+    if (window.location.pathname.includes('/pyrosync/')) {
+      document.querySelectorAll('.site-switcher a, .dialog-actions a').forEach((a) => {
+        const href = a.getAttribute('href');
+        if (href === '../') a.setAttribute('href', '../../');
+        else if (href === '../pyrosync/') a.setAttribute('href', '../');
+        else if (href === '../space-jukebox/') a.setAttribute('href', '../../space-jukebox/');
+      });
+    }
+
+    /* ============================== Embedded Baseline Dataset ==============================
+       Immediate zero-latency startup using the 330 NASA FIRMS MODIS hotspots, 6 biomes,
+       and 1.5° Natural Earth land mask from 3D Fire Flight, enriched automatically with
+       PyroSync's 309-month spiral records and 7,443 Central Iowa MODIS H3 cells. */
+    const MASK = {step: 1.5, rows: 120, cols: 240, b64: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB//8////44AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPx/n/////AAAA/AAYAAAAfAAAAAAAAAAAAAAAAEO3v4f////+AAAPgAAAAAAAAcAAAAAAAAAAAAAAA9jjCAAP///+AAAAAAAAHgAAP/8AAPAAAAAAAAAAcAAAAAAD///8AAAAAAAAYAAD//gAAAAAAAAAAAAAe6zs/AAB///4AAAAAAABgDA/////wGAAAAP/7///3APzAA//gAAH///////xwHf/////z/+AAAAB//wPI/+sEP4A///wAAAAf8AACHf////////8B8P4AAAAAPPIZ+H/gAD////8AAOcgEQAAAAAAAAAAAE/AAAAAAAAB+AfAAf////4AAHAAAgAAAAAAAAAAA54AAAAAAAALwG/gH/4H//wOB4AAAAAAAAAAAAAAAAAf///////Ng+AP4ADAAA/n////////////////+AD///////8COMAHwAAAAD/P///////////////v8AD/7/////4APwABgAAAAH/P//////////////wfAAA+AH////4APzAAAAAAAD/D/////////////JhgAAAHAAf///8AH/gAAAAAIAOD////////////4AHAAAAQAAP////wH/gAAAAAMBuP////////////wAPgAACAAAH////+f/8AAAAAWAhf////////////AAPAAAAAAAT////+f/+AAAAA3H//////////////+AOAAAAAAAB/////f/8AAAAAHn//////////////+AIAAAAAAAB//////8wAAAAAMf//////////////9AAAAAAAAAA//////2HAAAAAF///////////////4AAAAAAAAAAf/////+AgAAAAD///////////////4AAAAAAAAAAf//////wAAAAAB///yfx/////////wAAAAAAAAAAf/////yAAAAAAB/z/gPj/////////jAAAAAAAAAAf/////gAAAAAA/wY/gDx////////8HAAAAAAAAAAf/////AAAAAAA/gGfnn4////////wAAAAAAAAAAAf////+AAAAAAA/ACY//4///////1gGAAAAAAAAAAP////8AAAAAAA/ACM//4///////hwEAAAAAAAAAAH////4AAAAAAAOLgA//////////4wcAAAAAAAAAAH////4AAAAAAAN/gDC/////////wz8AAAAAAAAAAB////wAAAAAAAf/gAA/////////wDgAAAAAAAAAAA////AAAAAAAA//8YB/////////4EAAAAAAAAAAAAX///AAAAAAAA///f//////////4AAAAAAAAAAAAAX/5BAAAAAAAB//////z///////4AAAAAAAAAAAAAb/gBAAAAAAAH////8/5///////4AAAAAAAAAAAAAF/gBoAAAAAAP////+/4f//////wAAAAAAAAAAAAAE/gAAAAAAAAP////+f8wH/////gAAAAAAAAAAAAAAfgAAAAAAAAf/////P/4D/////IAAAAAAAAAAAAAAPgAQAAAAAAf/////v/8D/+f/4AAAAAAAAAAAAAAAPgwOAAAAAAf/////n/4Af8P+AAAAAAAAAAAAAAAAHxwAwAAAAAf/////n/wAfwH+wAAAAAAAAAAAAAAAB/gAAAAAAAf/////z/gAfgH+AMAAAAAAAAAAAAAAAT8AAAAAAAf/////z+AAfAF/AIAAAAAAAAAAAAAAAB+AAAAAAAf/////94AAOAB/gIAAAAAAAAAAAAAAAAMAAAAAAAf//////AAAOAA/gCAAAAAAAAAAAAAAAAEBQAAAAAP/////+MAAGAAHAFAAAAAAAAAAAAAAAACDfgAAAAH//////8AAGAACAAAAAAAAAAAAAAAAAABP/wAAAAH//////4AABABgADAAAAAAAAAAAAAAAAAP/4AAAAD//////4AABAAQABAAAAAAAAAAAAAAAAAP//gAAAA/H////wAAAACYBgAAAAAAAAAAAAAAAAAH//wAAAAAA////wAAAADYDAAAAAAAAAAAAAAAAAAP//wAAAAAA////gAAAABoPgAAAAAAAAAAAAAAAAAf//4AAAAAA///+AAAAAA4fuQAAAAAAAAAAAAAAAA///+AAAAAA///8AAAAAAYfASAAAAAAAAAAAAAAAA////AAAAAA///4AAAAAAcfYBYAAAAAAAAAAAAAAA////8AAAAAf//4AAAAAAOCEh/AAAAAAAAAAAAAAA/////AAAAAP//wAAAAAAGAAAPgAAAAAAAAAAAAAA/////gAAAAP//wAAAAAADIABPwIAAAAAAAAAAAAAf////gAAAAH//wAAAAAAAOAAPYCAAAAAAAAAAAAAP////AAAAAH//4AAAAAAAACAAMAAAAAAAAAAAAAAP///+AAAAAH//4AAAAAAAAAAAAAAAAAAAAAAAAAAH///+AAAAAH//4AAAAAAAAAHhAAAAAAAAAAAAAAAH///8AAAAAP//4IAAAAAAAAvjAAAAAAAAAAAAAAAD///8AAAAAP//4cAAAAAAAB/jgAAAAAAAAAAAAAAA///8AAAAAP//h4AAAAAAAD/7gAAAAAAAAAAAAAAAf//8AAAAAP//B4AAAAAAAH//wAAAAAAAAAAAAAAAf//4AAAAAH/+AwAAAAAAAf//4AQAAAAAAAAAAAAAf//4AAAAAH//BwAAAAAAB///8AIAAAAAAAAAAAAAf//gAAAAAD//BwAAAAAAD///+AAAAAAAAAAAAAAAf/8AAAAAAD/+BgAAAAAAD////AAAAAAAAAAAAAAAf/8AAAAAAD/8AAAAAAAAD////AAAAAAAAAAAAAAAf/8AAAAAAD/8AAAAAAAAD////AAAAAAAAAAAAAAA//4AAAAAAB/4AAAAAAAAB////AAAAAAAAAAAAAAA//wAAAAAAA/wAAAAAAAAB////AAAAAAAAAAAAAAA//gAAAAAAA/gAAAAAAAAB/h//AAAAAAAAAAAAAAA//AAAAAAAA+AAAAAAAAAB+Av+AAAAAAAAAAAAAAA/8AAAAAAAAAAAAAAAAAAAAAP8AAQAAAAAAAAAAAB/8AAAAAAAAAAAAAAAAAAAAAH8AAIAAAAAAAAAAAB/4AAAAAAAAAAAAAAAAAAAAADQAAOAAAAAAAAAAAB/gAAAAAAAAAAAAAAAAAAAAAAAAAMAAAAAAAAAAAB+AAAAAAAAAAAAAAAAAAAAAAAYAAIAAAAAAAAAAAB+AAAAAAAAAAAAAAAAAAAAAAAYAAwAAAAAAAAAAAD8AAAAAAAAAAAAAAAAAAAAAAAAADAAAAAAAAAAAAD4AAAAAAAAAAAAAAAAAAAAAAAAAHAAAAAAAAAAAAD8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADwYAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGAAAAAAAAAAAADwAACAefH/gAAAAAAAAAAAAAAAAEAAAAAAAAAAAB//8B///////4AAAAAAAAAAAAAAA/AAAAAAAAAAH///8P////////8AAAAAAAAAAAAAB3gAAAAATf//////8//////////+AAAAAAAAAAAgAHgAAAAH////////////////////AAAAAAAB4B////gAAAAP///////////////////4AAAAD////////4AAAAD////////////////////gAAALP///////8AAAAD/////////////////////gAABj////////wAAHg//////////////////////4AAAAD///////8AQ/AB////////////////////+AAAAB//////////AGP//////////////////////AAAAA///////////////////////////////////8AAD//gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"};
+    const HOTSPOTS = [[42.29,-120.38,424],[42.28,-120.38,311],[35.05,-120.31,301],[35.06,-120.32,227],[36.98,-119.05,224],[33.64,-116.67,204],[37.29,-119.44,203],[36.98,-119.03,141],[33.63,-116.66,129],[39.11,-122.22,119],[37.01,-119.23,114],[32.62,-115.4,108],[41.27,-121.97,102],[39.09,-122.22,100],[41.28,-121.96,93],[33.65,-116.68,90],[41.28,-121.95,88],[41.27,-122.78,83],[36.96,-119.06,79],[41.71,-121.94,79],[35.05,-120.31,74],[40.37,-123.06,74],[42.28,-120.39,71],[33.65,-116.67,71],[39.09,-122.19,70],[41.71,-121.96,62],[38.94,-122.02,60],[36.97,-119.06,60],[41.28,-122.79,56],[41.27,-122.77,55],[37.01,-119.24,52],[36.95,-119.06,49],[41.27,-122.81,49],[41.72,-121.96,46],[32.62,-115.39,45],[42.27,-120.39,45],[39.1,-122.18,43],[41.27,-121.94,43],[37.01,-119.25,42],[41.14,-123.88,42],[39.66,-121.02,42],[41.14,-123.91,41],[32.61,-114.6,40],[41.26,-122.81,40],[38.76,-117.39,40],[41.27,-122.83,39],[40.3,-123.84,36],[41.15,-123.88,36],[41.27,-121.96,34],[35.04,-120.35,34],[33.63,-116.66,34],[32.61,-114.59,33],[41.99,-123.57,32],[41.26,-122.78,32],[39.09,-122.21,32],[50.45,-98.95,218],[48.08,-98.51,186],[56.56,-118.97,156],[50.46,-98.95,151],[53.73,-122.91,140],[57.06,-117.68,135],[58.0,-116.69,118],[57.05,-117.7,95],[58.57,-116.48,94],[54.19,-122.74,88],[48.5,-118.36,85],[49.34,-99.82,77],[49.62,-92.87,76],[56.56,-118.98,76],[57.63,-117.26,75],[49.37,-99.21,74],[48.94,-94.06,72],[57.75,-116.76,70],[50.62,-101.23,67],[49.84,-113.55,66],[57.63,-117.27,64],[53.89,-126.12,64],[49.58,-92.94,63],[48.4,-99.35,58],[57.05,-117.67,57],[50.61,-101.25,54],[48.65,-98.35,54],[57.75,-116.77,53],[49.88,-101.83,52],[48.38,-117.53,52],[56.36,-121.52,51],[48.98,-98.95,51],[53.04,-109.14,50],[58.0,-116.65,50],[53.88,-126.14,50],[57.06,-117.66,50],[56.36,-121.5,48],[48.38,-117.54,48],[56.12,-116.92,47],[58.0,-116.66,46],[50.81,-99.55,45],[48.99,-99.57,43],[56.27,-117.99,43],[49.88,-101.82,43],[49.3,-99.03,43],[48.17,-117.15,42],[50.08,-118.43,42],[57.63,-117.25,41],[57.63,-117.24,41],[49.87,-101.86,41],[53.05,-109.15,40],[55.42,-123.68,40],[48.94,-94.07,38],[48.39,-99.34,38],[56.27,-117.96,37],[-4.07,-46.06,1640],[-5.51,-60.27,1562],[-1.05,-53.54,1440],[-10.58,-42.31,1119],[-10.58,-42.3,1039],[-1.41,-52.53,1033],[-3.27,-49.8,923],[-0.95,-51.64,922],[-5.51,-60.28,911],[-3.27,-48.62,911],[-20.3,-59.27,902],[-18.18,-60.2,894],[-1.36,-52.62,859],[-0.86,-52.74,816],[-20.72,-61.27,754],[-1.04,-53.54,730],[-4.64,-45.2,728],[-20.3,-59.28,721],[-3.6,-44.58,703],[-4.25,-43.45,692],[-0.99,-47.37,676],[-1.66,-45.79,675],[-20.66,-60.31,652],[1.95,-60.38,639],[-20.2,-59.13,636],[2.66,-60.18,629],[-1.14,-53.58,622],[-20.67,-60.31,619],[-20.65,-60.22,609],[-2.62,-48.68,609],[-4.07,-46.04,602],[-3.26,-49.79,601],[-2.62,-48.68,592],[-0.98,-47.4,583],[-3.27,-48.62,580],[-3.43,-51.42,574],[-3.35,-44.31,563],[-2.28,-46.56,557],[-11.07,-40.88,542],[-3.27,-49.82,536],[-3.39,-51.49,526],[-1.89,-54.04,525],[-3.27,-48.61,520],[-5.64,-43.94,515],[-4.83,-40.73,514],[-20.73,-61.29,503],[-0.98,-47.37,501],[-13.47,-65.13,497],[-4.64,-45.21,494],[-3.6,-44.59,486],[-4.29,-43.45,481],[-20.3,-59.26,463],[-20.66,-60.3,461],[-20.75,-61.25,459],[-5.65,-43.93,458],[9.12,21.03,2022],[9.13,21.02,1377],[7.53,30.02,1339],[9.12,21.03,1115],[7.53,30.02,1114],[7.29,29.6,1063],[7.31,29.62,995],[7.29,29.6,988],[7.1,29.64,902],[7.54,29.99,898],[12.31,20.49,859],[7.1,29.64,838],[6.96,29.99,820],[7.6,30.09,818],[7.58,30.07,816],[7.55,30.05,797],[10.19,23.05,745],[7.53,29.99,743],[8.74,26.41,731],[12.3,20.49,727],[7.6,30.1,716],[8.44,32.85,713],[8.75,26.41,708],[12.07,14.58,696],[9.2,20.79,693],[7.11,29.64,686],[7.11,29.82,680],[9.12,21.08,663],[7.8,29.67,649],[9.65,30.4,638],[7.32,29.66,637],[7.81,29.7,637],[10.19,23.04,632],[9.5,31.18,612],[7.54,30.02,595],[7.11,29.63,576],[8.74,26.4,576],[7.34,31.64,572],[9.07,21.18,568],[8.06,31.35,567],[10.2,23.06,563],[5.54,29.91,531],[9.5,31.19,520],[10.12,29.45,516],[7.55,31.39,516],[9.12,21.08,512],[7.25,29.83,506],[7.8,29.69,500],[9.9,31.2,500],[7.64,29.42,500],[8.56,32.57,480],[12.07,14.59,472],[8.42,32.85,470],[9.5,31.17,466],[9.6,29.48,465],[36.63,6.98,287],[36.63,6.97,175],[41.34,21.37,88],[38.7,22.48,75],[41.58,0.9,75],[45.32,28.57,69],[38.06,30.39,63],[36.63,6.97,46],[37.27,27.66,41],[38.51,-7.82,35],[35.8,-0.26,34],[38.51,-7.84,34],[35.85,0.54,30],[41.57,0.88,30],[38.69,22.5,29],[38.79,30.25,28],[40.83,21.48,25],[39.66,30.6,24],[36.62,5.9,23],[42.2,25.39,23],[36.86,6.96,23],[38.98,-6.44,23],[36.87,7.0,22],[39.11,33.46,21],[39.31,22.32,21],[36.77,6.46,20],[38.65,32.79,19],[36.64,6.98,19],[45.14,9.94,19],[37.55,14.95,18],[35.81,-0.26,17],[36.73,5.75,17],[35.8,-0.25,16],[35.05,32.88,16],[40.86,26.28,16],[43.3,25.03,16],[39.32,22.34,16],[39.82,33.13,16],[35.81,-0.27,16],[44.91,17.86,15],[42.36,21.72,14],[45.14,9.95,13],[37.81,13.67,13],[37.82,13.68,13],[41.34,21.39,13],[36.74,6.25,12],[39.54,32.25,12],[43.3,25.05,12],[35.07,32.91,11],[39.42,22.52,11],[38.58,27.6,11],[42.33,26.18,11],[36.2,7.5,11],[38.7,22.49,11],[38.69,22.48,11],[-19.57,124.36,5083],[-19.56,124.37,5077],[-19.56,124.37,4079],[-20.03,136.33,3730],[-20.35,124.87,3166],[-20.35,124.87,2961],[-20.41,125.15,2755],[-20.03,136.36,2704],[-19.31,125.19,2677],[-20.25,125.06,2392],[-19.31,125.18,2391],[-19.56,124.35,2318],[-20.26,125.1,2240],[-20.01,136.39,2236],[-19.52,124.64,2102],[-17.5,122.95,2002],[-24.42,122.92,1793],[-20.24,125.09,1724],[-20.57,124.77,1670],[-17.51,122.95,1657],[-20.41,124.57,1654],[-20.41,124.57,1638],[-17.73,136.52,1622],[-20.59,124.77,1587],[-18.44,123.92,1572],[-20.01,136.38,1559],[-20.43,124.57,1508],[-20.57,124.77,1466],[-19.32,125.15,1462],[-17.73,136.53,1455],[-19.52,124.65,1446],[-20.43,124.58,1428],[-19.68,125.63,1424],[-20.24,125.1,1400],[-20.37,125.13,1390],[-17.74,136.49,1390],[-20.02,136.36,1315],[-20.26,125.06,1248],[-20.6,124.78,1248],[-20.59,124.78,1242],[-19.51,124.63,1232],[-19.57,124.34,1220],[-20.8,139.83,1207],[-19.21,125.5,1197],[-21.29,119.78,1195],[-19.45,125.12,1193],[-19.33,125.14,1187],[-19.36,125.13,1180],[-20.33,125.12,1172],[-20.35,125.12,1168],[-20.24,125.05,1157],[-17.52,122.92,1148],[-19.75,124.34,1138],[-17.75,136.49,1118],[-19.69,136.29,1117]];
+    const BIOMES = [
+      { id: 'california', name: 'California & W. US', lat: 37.5, lon: -120.2, count: 55, maxFrp: 424, color: '#f97316', records: [] },
+      { id: 'boreal', name: 'Boreal N. America', lat: 55.5, lon: -115.0, count: 55, maxFrp: 218, color: '#38bdf8', records: [] },
+      { id: 'amazon', name: 'Amazon & Cerrado', lat: -10.5, lon: -55.0, count: 55, maxFrp: 1640, color: '#34d399', records: [] },
+      { id: 'africa', name: 'Sahel & N. Savanna', lat: 9.5, lon: 23.0, count: 55, maxFrp: 2022, color: '#facc15', records: [] },
+      { id: 'mediterranean', name: 'Mediterranean Basin', lat: 39.0, lon: 21.5, count: 55, maxFrp: 287, color: '#fb7185', records: [] },
+      { id: 'australia', name: 'Australian Outback', lat: -17.5, lon: 129.0, count: 55, maxFrp: 5083, color: '#c084fc', records: [] }
+    ];
+    const IOWA_WAYPOINT = { id: 'iowa', name: 'Central Iowa MODIS H3', lat: 42.0, lon: -93.5, count: 7443, maxFrp: 380 };
+
+    const $ = (id) => document.getElementById(id);
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const DEG2RAD = Math.PI / 180;
+    const RAD2DEG = 180 / Math.PI;
+    const EARTH_R = 1.0;
+
+    function latLonToVec3(lat, lon, r = EARTH_R) {
+      const phi = (90 - lat) * DEG2RAD;
+      const theta = (lon + 180) * DEG2RAD;
+      return new THREE.Vector3(
+        -r * Math.sin(phi) * Math.cos(theta),
+        r * Math.cos(phi),
+        r * Math.sin(phi) * Math.sin(theta)
+      );
+    }
+
+    function vecToLatLon(v) {
+      const r = v.length() || 1;
+      let lon = Math.atan2(v.z, -v.x) * RAD2DEG + 180;
+      if (lon > 180) lon -= 360;
+      const lat = 90 - Math.acos(clamp(v.y / r, -1, 1)) * RAD2DEG;
+      return { lat, lon, altRatio: r - EARTH_R };
+    }
+
+    function angDist(aLat, aLon, bLat, bLon) {
+      const p1 = aLat * DEG2RAD;
+      const p2 = bLat * DEG2RAD;
+      const dp = (bLat - aLat) * DEG2RAD;
+      const dl = (bLon - aLon) * DEG2RAD;
+      const h = Math.sin(dp / 2) ** 2 + Math.cos(p1) * Math.cos(p2) * Math.sin(dl / 2) ** 2;
+      return 2 * Math.asin(Math.sqrt(clamp(h, 0, 1))) * RAD2DEG;
+    }
+
+    function anomalyColor(z, out = new THREE.Color()) {
+      if (z >= 2.2) return out.set('#f43f5e');
+      if (z >= 1.5) return out.set('#ff7847');
+      if (z >= 0.8) return out.set('#ffd166');
+      if (z >= 0.0) return out.set('#7ee0a3');
+      return out.set('#38bdf8');
+    }
+
+    /* PyroSync scaleTension harmonic table (1991-2020 anomaly zScore -> chord + detune) */
+    function resolveHarmonicTension(zScore) {
+      const z = Math.max(0, Number(zScore) || 0);
+      if (z >= 2.2) {
+        return {
+          tier: 'Extreme Dissonant',
+          label: 'C3 F#3 Bb3 Db4',
+          freqs: [130.81, 185.00, 233.08, 277.18],
+          detuneCents: Math.min(60, Math.round(32 + (z - 2.2) * 22))
+        };
+      }
+      if (z >= 1.5) {
+        return {
+          tier: 'Tense (C7#11)',
+          label: 'C3 E3 F#3 Bb3',
+          freqs: [130.81, 164.81, 185.00, 233.08],
+          detuneCents: Math.round(18 + (z - 1.5) * 18)
+        };
+      }
+      if (z >= 0.9) {
+        return {
+          tier: 'Moderate (Cmaj9)',
+          label: 'C3 E3 G3 B3',
+          freqs: [130.81, 164.81, 196.00, 246.94],
+          detuneCents: Math.round(6 + (z - 0.9) * 14)
+        };
+      }
+      return {
+        tier: 'Consonant (0σ)',
+        label: 'C3 G3 C4 E4',
+        freqs: [130.81, 196.00, 261.63, 329.63],
+        detuneCents: 0
+      };
+    }
+
+    /* Bjorklund Euclidean rhythm generator from PyroSync */
+    function euclideanRhythm(pulses, steps = 16) {
+      const k = clamp(Math.round(pulses), 1, steps);
+      const pattern = [];
+      for (let i = 0; i < steps; i += 1) {
+        pattern.push(Math.floor((i * k) / steps) !== Math.floor(((i - 1) * k) / steps) ? 1 : 0);
+      }
+      return pattern;
+    }
+
+    /* ============================== 3D Scene Setup ============================== */
+    const canvas = $('scene-canvas');
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x040711);
+
+    const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.01, 120);
+    camera.position.set(0, 1.4, 3.4);
+
+    scene.add(new THREE.AmbientLight(0xdbeafe, 0.9));
+    const sun = new THREE.DirectionalLight(0xfff2d8, 1.35);
+    sun.position.set(5, 2.5, 3.5);
+    scene.add(sun);
+    const rim = new THREE.DirectionalLight(0x38bdf8, 0.55);
+    rim.position.set(-4, -2, -3);
+    scene.add(rim);
+
+    /* Starfield */
+    {
+      const n = 1400;
+      const pos = new Float32Array(n * 3);
+      for (let i = 0; i < n; i += 1) {
+        const th = Math.random() * Math.PI * 2;
+        const ph = Math.acos(2 * Math.random() - 1);
+        const rr = 28 + Math.random() * 24;
+        pos.set([rr * Math.sin(ph) * Math.cos(th), rr * Math.cos(ph), rr * Math.sin(ph) * Math.sin(th)], i * 3);
+      }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      scene.add(new THREE.Points(g, new THREE.PointsMaterial({ color: 0x93c5fd, size: 0.085, sizeAttenuation: true })));
+    }
+
+    /* Ocean sphere + atmospheric rim */
+    const globe = new THREE.Mesh(
+      new THREE.SphereGeometry(EARTH_R, 64, 64),
+      new THREE.MeshStandardMaterial({ color: 0x0b1d3a, roughness: 0.78, metalness: 0.1 })
+    );
+    scene.add(globe);
+
+    const atmo = new THREE.Mesh(
+      new THREE.SphereGeometry(1.055, 64, 64),
+      new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.11, side: THREE.BackSide })
+    );
+    scene.add(atmo);
+
+    /* 1.5° Natural Earth Land Dot Grid (from 3D Fire Flight) */
+    {
+      const bytes = Uint8Array.from(atob(MASK.b64), (c) => c.charCodeAt(0));
+      const pts = [];
+      for (let r = 0; r < MASK.rows; r += 1) {
+        for (let c = 0; c < MASK.cols; c += 1) {
+          const i = r * MASK.cols + c;
+          if (bytes[i >> 3] & (1 << (7 - (i & 7)))) {
+            const v = latLonToVec3(90 - (r + 0.5) * MASK.step, -180 + (c + 0.5) * MASK.step, 1.002);
+            pts.push(v.x, v.y, v.z);
+          }
+        }
+      }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pts), 3));
+      scene.add(new THREE.Points(g, new THREE.PointsMaterial({ color: 0x69b98a, size: 0.011 })));
+    }
+
+    /* NASA FIRMS Hotspot Particles + 3D Extruded Hex Columns */
+    let hotspotPoints = null;
+    {
+      const pos = new Float32Array(HOTSPOTS.length * 3);
+      const col = new Float32Array(HOTSPOTS.length * 3);
+      const cHot = new THREE.Color(0xff2d2d);
+      const cMid = new THREE.Color(0xff7847);
+      const cLow = new THREE.Color(0xffd166);
+
+      const hexGeo = new THREE.CylinderGeometry(0.011, 0.013, 1, 6);
+      const hexMat = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xff7847, emissiveIntensity: 0.45, roughness: 0.35 });
+      const hexInst = new THREE.InstancedMesh(hexGeo, hexMat, HOTSPOTS.length);
+      const upY = new THREE.Vector3(0, 1, 0);
+      const m4 = new THREE.Matrix4();
+      const q = new THREE.Quaternion();
+      const s = new THREE.Vector3();
+
+      HOTSPOTS.forEach((h, i) => {
+        const v = latLonToVec3(h[0], h[1], 1.005);
+        pos.set([v.x, v.y, v.z], i * 3);
+        const t = Math.min(1, h[2] / 2000);
+        const c = t > 0.5 ? cMid.clone().lerp(cHot, (t - 0.5) * 2) : cLow.clone().lerp(cMid, t * 2);
+        col.set([c.r, c.g, c.b], i * 3);
+
+        const colHeight = clamp(0.015 + Math.log1p(h[2]) * 0.011, 0.018, 0.11);
+        const normal = v.clone().normalize();
+        q.setFromUnitVectors(upY, normal);
+        const center = v.clone().addScaledVector(normal, colHeight * 0.5);
+        s.set(1, colHeight, 1);
+        m4.compose(center, q, s);
+        hexInst.setMatrixAt(i, m4);
+        hexInst.setColorAt(i, c);
+      });
+      hexInst.instanceMatrix.needsUpdate = true;
+      if (hexInst.instanceColor) hexInst.instanceColor.needsUpdate = true;
+      scene.add(hexInst);
+
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+      hotspotPoints = new THREE.Points(g, new THREE.PointsMaterial({ size: 0.022, vertexColors: true, transparent: true, opacity: 0.95 }));
+      scene.add(hotspotPoints);
+    }
+
+    /* Central Iowa MODIS H3 Patch Beacon & Extruded Prisms */
+    const iowaGroup = new THREE.Group();
+    scene.add(iowaGroup);
+    {
+      const ringGeo = new THREE.RingGeometry(0.038, 0.048, 6);
+      const ringMat = new THREE.MeshBasicMaterial({ color: 0x7ee0a3, side: THREE.DoubleSide, transparent: true, opacity: 0.85 });
+      const ring = new THREE.Mesh(ringGeo, ringMat);
+      const p = latLonToVec3(IOWA_WAYPOINT.lat, IOWA_WAYPOINT.lon, 1.012);
+      ring.position.copy(p);
+      ring.lookAt(p.clone().multiplyScalar(2));
+      iowaGroup.add(ring);
+    }
+
+    /* 3D Helical PyroSync Climate Spirals above the 6 Biomes */
+    const spiralGroup = new THREE.Group();
+    scene.add(spiralGroup);
+    const biomeTowers = [];
+
+    function generateFallbackBiomeRecords(biome, idx) {
+      const recs = [];
+      for (let m = 0; m < 309; m += 1) {
+        const year = 2001 + Math.floor(m / 12);
+        const month = (m % 12) + 1;
+        const seasonal = Math.sin(((month - 1) / 12) * Math.PI * 2 + idx * 0.9);
+        const trend = (m / 309) * 1.45;
+        const zScore = Number((seasonal * 0.75 + trend + Math.sin(m * 0.37 + idx) * 0.45).toFixed(2));
+        const ffwi = Number(clamp(22 + zScore * 11 + seasonal * 8, 6, 78).toFixed(1));
+        const vpdKpa = Number(clamp(1.1 + Math.max(0, zScore) * 0.85, 0.4, 5.2).toFixed(2));
+        const ws10m = Number(clamp(3.8 + Math.abs(seasonal) * 3.4 + (zScore > 1.5 ? 1.8 : 0), 2.0, 11.5).toFixed(1));
+        const eonetFires = (year >= 2015 && zScore > 1.25) ? Math.round((zScore - 1.0) * 6) : 0;
+        recs.push({
+          ym: `${year}-${String(month).padStart(2, '0')}`,
+          year,
+          month,
+          zScore,
+          ffwi,
+          vpdKpa,
+          ws10m,
+          eonetFires
+        });
+      }
+      return recs;
+    }
+
+    BIOMES.forEach((b, idx) => {
+      b.records = generateFallbackBiomeRecords(b, idx);
+    });
+
+    function rebuildSpiralTowers(activeMonthIdx = 282) {
+      while (spiralGroup.children.length) spiralGroup.remove(spiralGroup.children[0]);
+      biomeTowers.length = 0;
+      const upRef = new THREE.Vector3(0, 1, 0);
+      const col = new THREE.Color();
+
+      for (const biome of BIOMES) {
+        const basePos = latLonToVec3(biome.lat, biome.lon, 1.005);
+        const up = basePos.clone().normalize();
+        const east = new THREE.Vector3().crossVectors(upRef, up);
+        if (east.lengthSq() < 1e-5) east.set(1, 0, 0);
+        east.normalize();
+        const north = new THREE.Vector3().crossVectors(up, east).normalize();
+
+        // Central axis spine
+        const spineGeo = new THREE.BufferGeometry().setFromPoints([
+          basePos.clone(),
+          basePos.clone().addScaledVector(up, 0.34)
+        ]);
+        spiralGroup.add(new THREE.Line(spineGeo, new THREE.LineBasicMaterial({ color: biome.color || '#38bdf8', transparent: true, opacity: 0.45 })));
+
+        const n = biome.records.length;
+        const positions = new Float32Array(n * 3);
+        const colors = new Float32Array(n * 3);
+        const nodePts = [];
+
+        for (let i = 0; i < n; i += 1) {
+          const rec = biome.records[i];
+          const theta = ((rec.month - 1) / 12) * Math.PI * 2;
+          const h = 0.02 + (i / Math.max(1, n - 1)) * 0.30;
+          const rNorm = clamp(((rec.zScore || 0) + 1.5) / 4.8, 0.06, 1);
+          const rho = 0.018 + rNorm * 0.075;
+          const pt = basePos.clone()
+            .addScaledVector(up, h)
+            .addScaledVector(east, Math.cos(theta) * rho)
+            .addScaledVector(north, Math.sin(theta) * rho);
+          nodePts.push(pt);
+          positions.set([pt.x, pt.y, pt.z], i * 3);
+          anomalyColor(rec.zScore || 0, col);
+          colors.set([col.r, col.g, col.b], i * 3);
+        }
+
+        const lineGeo = new THREE.BufferGeometry();
+        lineGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        lineGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+        lineGeo.setDrawRange(0, Math.max(2, activeMonthIdx + 1));
+        const line = new THREE.Line(lineGeo, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.94 }));
+        spiralGroup.add(line);
+
+        const ringMesh = new THREE.Mesh(
+          new THREE.TorusGeometry(0.016, 0.003, 8, 20),
+          new THREE.MeshBasicMaterial({ color: 0xffd166, side: THREE.DoubleSide })
+        );
+        const clampedIdx = clamp(activeMonthIdx, 0, nodePts.length - 1);
+        ringMesh.position.copy(nodePts[clampedIdx]);
+        ringMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), up);
+        spiralGroup.add(ringMesh);
+
+        biomeTowers.push({ biome, basePos, up, lineGeo, nodePts, ringMesh });
+      }
+    }
+
+    function updateSpiralDrawRange(monthIdx) {
+      for (const t of biomeTowers) {
+        const idx = clamp(monthIdx, 0, t.nodePts.length - 1);
+        t.lineGeo.setDrawRange(0, Math.max(2, idx + 1));
+        t.ringMesh.position.copy(t.nodePts[idx]);
+        const z = t.biome.records[idx]?.zScore || 0;
+        t.ringMesh.material.color.copy(anomalyColor(z));
+      }
+      const sampleRec = BIOMES[0]?.records[clamp(monthIdx, 0, BIOMES[0].records.length - 1)];
+      if (sampleRec) {
+        $('hud-month-label').textContent = sampleRec.ym;
+      }
+    }
+
+    rebuildSpiralTowers(282);
+
+    /* Load full PyroSync fire_weather_data.json & Iowa H3 data asynchronously */
+    async function loadObservatoryDatasets() {
+      const dataUrls = ['../pyrosync/data/fire_weather_data.json', '../data/fire_weather_data.json'];
+      for (const url of dataUrls) {
+        try {
+          const res = await fetch(url);
+          if (!res.ok) continue;
+          const json = await res.json();
+          if (Array.isArray(json.biomes) && json.biomes.length) {
+            json.biomes.forEach((src) => {
+              const target = BIOMES.find((b) => b.id === src.id);
+              if (target && Array.isArray(src.records) && src.records.length) {
+                target.records = src.records;
+              }
+            });
+            const maxIdx = BIOMES[0].records.length - 1;
+            $('timeline-slider').max = String(maxIdx);
+            rebuildSpiralTowers(Number($('timeline-slider').value));
+            break;
+          }
+        } catch (_) {}
+      }
+    }
+    loadObservatoryDatasets();
+
+    /* Combined Spacecraft Mesh + Ribbon Trail */
+    const ship = new THREE.Group();
+    {
+      const hullMat = new THREE.MeshStandardMaterial({ color: 0xf1f5f9, metalness: 0.45, roughness: 0.3 });
+      const accentMat = new THREE.MeshStandardMaterial({ color: 0xff7847, emissive: 0x7c2d12, emissiveIntensity: 0.35 });
+      const canopyMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, emissive: 0x0284c7, emissiveIntensity: 0.7 });
+
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.021, 0.08, 12), hullMat);
+      body.geometry.rotateX(Math.PI / 2);
+      ship.add(body);
+
+      const nose = new THREE.Mesh(new THREE.ConeGeometry(0.016, 0.048, 12), accentMat);
+      nose.geometry.rotateX(Math.PI / 2);
+      nose.position.z = 0.064;
+      ship.add(nose);
+
+      const wing = new THREE.Mesh(new THREE.BoxGeometry(0.095, 0.003, 0.032), hullMat);
+      wing.position.set(0, 0, -0.01);
+      ship.add(wing);
+
+      const canopy = new THREE.Mesh(new THREE.SphereGeometry(0.009, 12, 10), canopyMat);
+      canopy.scale.set(0.85, 0.6, 1.5);
+      canopy.position.set(0, 0.012, 0.022);
+      ship.add(canopy);
+
+      for (const s of [-1, 1]) {
+        const fin = new THREE.Mesh(new THREE.BoxGeometry(0.004, 0.034, 0.028), accentMat);
+        fin.position.set(0.024 * s, -0.01, -0.032);
+        fin.rotation.z = -0.48 * s;
+        ship.add(fin);
+      }
+
+      const glow = new THREE.Mesh(
+        new THREE.SphereGeometry(0.01, 10, 10),
+        new THREE.MeshBasicMaterial({ color: 0x7ee0a3 })
+      );
+      glow.position.z = -0.046;
+      glow.name = 'engineGlow';
+      ship.add(glow);
+
+      ship.scale.setScalar(1.55);
+      scene.add(ship);
+    }
+
+    const TRAIL_N = 150;
+    const trailPos = new Float32Array(TRAIL_N * 3);
+    const trailGeo = new THREE.BufferGeometry();
+    trailGeo.setAttribute('position', new THREE.BufferAttribute(trailPos, 3));
+    scene.add(new THREE.Line(trailGeo, new THREE.LineBasicMaterial({ color: 0x7ee0a3, transparent: true, opacity: 0.58 })));
+    const trailPts = [];
+
+    /* Closed Catmull-Rom Tour Path across the 6 Fire Biomes + Central Iowa H3 */
+    const tourStops = [...BIOMES, IOWA_WAYPOINT].sort((a, b) => a.lon - b.lon);
+    const tourCurve = new THREE.CatmullRomCurve3(
+      tourStops.map((b) => latLonToVec3(b.lat, b.lon, 1.24)),
+      true,
+      'centripetal'
+    );
+    {
+      const ribbonPts = tourCurve.getPoints(260).map((p) => p.clone().setLength(1.235));
+      const g = new THREE.BufferGeometry().setFromPoints(ribbonPts);
+      scene.add(new THREE.Line(g, new THREE.LineBasicMaterial({ color: 0x33406e, transparent: true, opacity: 0.55 })));
+    }
+
+    /* ============================== Combined Web Audio Engine ============================== */
+    const soundState = {
+      ready: false,
+      violinOn: true,
+      harmonyOn: true,
+      pingsOn: true,
+      windOn: true,
+      narrationOn: true
+    };
+
+    let AC = null;
+    let masterComp = null;
+    let stereoPan = null;
+    // Layer 1: 3D Fire Flight Continuous Thermal Violin
+    let violinOscs = [];
+    let violinFilter = null;
+    let violinGain = null;
+    let vibratoGain = null;
+    // Layer 2: PyroSync Harmonic Tension Chord Pad
+    let chordOscs = [];
+    let chordFilter = null;
+    let chordGain = null;
+    // Layer 4: Atmospheric Jet Stream & Euclidean Wind
+    let jetFilter = null;
+    let jetGain = null;
+    let noiseBuffer = null;
+
+    function initCombinedAudio() {
+      if (AC) {
+        if (AC.state === 'suspended') AC.resume();
+        return;
+      }
+      AC = new (window.AudioContext || window.webkitAudioContext)();
+      masterComp = AC.createDynamicsCompressor();
+      masterComp.threshold.value = -16;
+      masterComp.ratio.value = 5.5;
+      masterComp.connect(AC.destination);
+
+      stereoPan = AC.createStereoPanner ? AC.createStereoPanner() : AC.createGain();
+      stereoPan.connect(masterComp);
+
+      // 1) Continuous Thermal Violin (2 detuned saws + vibrato LFO + lowpass filter)
+      violinFilter = AC.createBiquadFilter();
+      violinFilter.type = 'lowpass';
+      violinFilter.frequency.value = 680;
+      violinFilter.Q.value = 2.1;
+
+      violinGain = AC.createGain();
+      violinGain.gain.value = 0;
+
+      const vibOsc = AC.createOscillator();
+      vibOsc.frequency.value = 5.5;
+      vibratoGain = AC.createGain();
+      vibratoGain.gain.value = 11; // cents
+      vibOsc.connect(vibratoGain);
+      vibOsc.start();
+
+      for (const det of [-6, 5]) {
+        const o = AC.createOscillator();
+        o.type = 'sawtooth';
+        o.frequency.value = 110;
+        o.detune.value = det;
+        vibratoGain.connect(o.detune);
+        o.connect(violinFilter);
+        o.start();
+        violinOscs.push(o);
+      }
+      violinFilter.connect(violinGain);
+      violinGain.connect(stereoPan);
+
+      // 2) PyroSync 4-Voice Harmonic Tension Chord Pad (triangle/sine voices)
+      chordFilter = AC.createBiquadFilter();
+      chordFilter.type = 'lowpass';
+      chordFilter.frequency.value = 950;
+      chordFilter.Q.value = 1.1;
+
+      chordGain = AC.createGain();
+      chordGain.gain.value = 0;
+
+      const baseChord = [130.81, 196.00, 261.63, 329.63];
+      baseChord.forEach((freq, idx) => {
+        const o = AC.createOscillator();
+        o.type = idx % 2 === 0 ? 'triangle' : 'sine';
+        o.frequency.value = freq;
+        o.connect(chordFilter);
+        o.start();
+        chordOscs.push(o);
+      });
+      chordFilter.connect(chordGain);
+      chordGain.connect(stereoPan);
+
+      // 4) Solar Jet Stream & Euclidean Wind Noise Buffer
+      const len = AC.sampleRate * 2;
+      noiseBuffer = AC.createBuffer(1, len, AC.sampleRate);
+      const data = noiseBuffer.getChannelData(0);
+      for (let i = 0; i < len; i += 1) data[i] = Math.random() * 2 - 1;
+
+      const jetSource = AC.createBufferSource();
+      jetSource.buffer = noiseBuffer;
+      jetSource.loop = true;
+      jetFilter = AC.createBiquadFilter();
+      jetFilter.type = 'bandpass';
+      jetFilter.frequency.value = 480;
+      jetFilter.Q.value = 0.85;
+      jetGain = AC.createGain();
+      jetGain.gain.value = 0.008;
+      jetSource.connect(jetFilter);
+      jetFilter.connect(jetGain);
+      jetGain.connect(stereoPan);
+      jetSource.start();
+
+      soundState.ready = true;
+    }
+
+    /* Layer 3a: 3D Fire Flight Hotspot Bell Ping */
+    function triggerHotspotPing(frp, panVal = 0) {
+      if (!AC || !soundState.pingsOn) return;
+      const now = AC.currentTime;
+      const o = AC.createOscillator();
+      const g = AC.createGain();
+      const p = AC.createStereoPanner ? AC.createStereoPanner() : null;
+      o.type = 'sine';
+      const norm = Math.min(1, frp / 5000);
+      o.frequency.setValueAtTime(620 + norm * 880, now);
+      const peak = 0.045 + norm * 0.12;
+      g.gain.setValueAtTime(0.0001, now);
+      g.gain.linearRampToValueAtTime(peak, now + 0.014);
+      g.gain.exponentialRampToValueAtTime(0.0001, now + 0.52);
+
+      if (p) {
+        p.pan.setValueAtTime(clamp(panVal, -0.9, 0.9), now);
+        o.connect(g);
+        g.connect(p);
+        p.connect(masterComp);
+      } else {
+        o.connect(g);
+        g.connect(masterComp);
+      }
+      o.start(now);
+      o.stop(now + 0.56);
+    }
+
+    /* Layer 3b: Central Iowa MODIS H3 Hex Pluck */
+    const PENTA_HZ = [261.63, 293.66, 329.63, 392.00, 440.00, 523.25, 587.33, 659.25];
+    function triggerIowaHexPluck(tempNorm = 0.5) {
+      if (!AC || !soundState.pingsOn) return;
+      const now = AC.currentTime;
+      const idx = clamp(Math.floor(tempNorm * PENTA_HZ.length), 0, PENTA_HZ.length - 1);
+      const o = AC.createOscillator();
+      const g = AC.createGain();
+      o.type = 'triangle';
+      o.frequency.setValueAtTime(PENTA_HZ[idx], now);
+      g.gain.setValueAtTime(0.0001, now);
+      g.gain.linearRampToValueAtTime(0.06, now + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, now + 0.28);
+      o.connect(g);
+      g.connect(stereoPan);
+      o.start(now);
+      o.stop(now + 0.31);
+    }
+
+    /* Layer 4b: PyroSync Euclidean Wind-Ember Pulse */
+    function triggerEuclideanEmberTick(vpdKpa = 1.8) {
+      if (!AC || !soundState.windOn || !noiseBuffer) return;
+      const now = AC.currentTime;
+      const src = AC.createBufferSource();
+      src.buffer = noiseBuffer;
+      const filt = AC.createBiquadFilter();
+      filt.type = 'bandpass';
+      filt.frequency.setValueAtTime(clamp(900 + vpdKpa * 950, 800, 6200), now);
+      filt.Q.setValueAtTime(2.4, now);
+      const g = AC.createGain();
+      g.gain.setValueAtTime(0.0001, now);
+      g.gain.linearRampToValueAtTime(0.032, now + 0.005);
+      g.gain.exponentialRampToValueAtTime(0.0001, now + 0.055);
+      src.connect(filt);
+      filt.connect(g);
+      g.connect(stereoPan);
+      src.start(now);
+      src.stop(now + 0.065);
+    }
+
+    /* Reference Home Tone (0σ Consonant C-Major + 110 Hz Fundamental) */
+    function playHomeTone() {
+      initCombinedAudio();
+      if (!AC) return;
+      const now = AC.currentTime;
+      const homeFreqs = [110.0, 130.81, 196.00, 261.63, 329.63];
+      homeFreqs.forEach((freq, i) => {
+        const o = AC.createOscillator();
+        const g = AC.createGain();
+        o.type = i === 0 ? 'sawtooth' : 'triangle';
+        o.frequency.setValueAtTime(freq, now);
+        g.gain.setValueAtTime(0.0001, now);
+        g.gain.linearRampToValueAtTime(i === 0 ? 0.035 : 0.045, now + 0.04);
+        g.gain.exponentialRampToValueAtTime(0.0001, now + 1.15);
+        o.connect(g);
+        g.connect(masterComp);
+        o.start(now);
+        o.stop(now + 1.2);
+      });
+      announce('Home tone played: 110 Hertz fundamental with C major zero-sigma climatological baseline chord.', false);
+    }
+
+    /* ============================== Speech & Live Region ============================== */
+    function speak(text) {
+      if (!soundState.narrationOn || !('speechSynthesis' in window)) return;
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.rate = 1.04;
+      window.speechSynthesis.speak(u);
+    }
+
+    function announce(text, alsoSpeak = true) {
+      $('sr-live').textContent = text;
+      if (alsoSpeak) speak(text);
+    }
+
+    /* ============================== Flight & Footprint Simulation ============================== */
+    let flying = false;
+    let tourMode = true; // true = Catmull-Rom guided tour, false = manual/waypoint steer
+    let activeWaypoint = 'tour';
+    let u = 0;
+    let speedMul = 1;
+    const SPEEDS = [0.5, 1, 2, 3];
+    const LOOP_SECONDS = 82;
+    let camMode = 'chase'; // chase | cockpit | orbit
+    let camAngle = 0;
+    let monthIndex = 282;
+
+    const shipPos = tourCurve.getPointAt(0).clone();
+    const shipFwd = new THREE.Vector3(0, 0, 1);
+    let manualLat = 26.0;
+    let manualLon = -124.0;
+    let manualHeading = 0.35; // radians North of East
+    let manualAlt = 0.24;
+    const keys = new Set();
+
+    let lastRegionId = null;
+    let intensitySmooth = 0;
+    const pingCooldown = new Map();
+    let lastEuclidMs = 0;
+    let euclidStep = 0;
+    let lastIowaPluckMs = 0;
+
+    function scanBelowShip(lat, lon) {
+      let sum = 0;
+      let count = 0;
+      for (const h of HOTSPOTS) {
+        const d = angDist(lat, lon, h[0], h[1]);
+        if (d < 16) {
+          sum += h[2] * Math.exp(-(d * d) / 90);
+          if (d < 12) count += 1;
+        }
+      }
+
+      let bestBiome = BIOMES[0];
+      let bestDist = Infinity;
+      for (const b of BIOMES) {
+        const d = angDist(lat, lon, b.lat, b.lon);
+        if (d < bestDist) {
+          bestDist = d;
+          bestBiome = b;
+        }
+      }
+
+      const iowaDist = angDist(lat, lon, IOWA_WAYPOINT.lat, IOWA_WAYPOINT.lon);
+      const overIowa = iowaDist < 8.5;
+      const rec = bestBiome.records[clamp(monthIndex, 0, bestBiome.records.length - 1)] || {
+        ym: '2024-07',
+        zScore: 0.4,
+        ffwi: 28,
+        vpdKpa: 1.6,
+        ws10m: 4.5
+      };
+
+      return { sum, count, biome: bestBiome, biomeDist: bestDist, overIowa, iowaDist, rec };
+    }
+
+    const clock = new THREE.Clock();
+    const camTargetPos = new THREE.Vector3(0, 1.4, 3.4);
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const dt = Math.min(clock.getDelta(), 0.05);
+      const t = clock.elapsedTime;
+      const nowMs = performance.now();
+
+      // Advance ship position
+      let aheadPos;
+      if (tourMode && activeWaypoint === 'tour') {
+        if (flying) u = (u + (dt * speedMul) / LOOP_SECONDS) % 1;
+        const p = tourCurve.getPointAt(u);
+        if (p.length() < 1.17) p.setLength(1.17);
+        aheadPos = tourCurve.getPointAt((u + 0.012) % 1);
+        if (aheadPos.length() < 1.17) aheadPos.setLength(1.17);
+        shipPos.copy(p);
+      } else {
+        // Manual 6-DOF or Waypoint Orbit
+        if (keys.has('KeyA') || keys.has('ArrowLeft')) manualHeading += dt * 1.4;
+        if (keys.has('KeyD') || keys.has('ArrowRight')) manualHeading -= dt * 1.4;
+        if (keys.has('KeyW') || keys.has('ArrowUp')) manualAlt = clamp(manualAlt + dt * 0.14, 0.14, 0.65);
+        if (keys.has('KeyS') || keys.has('ArrowDown')) manualAlt = clamp(manualAlt - dt * 0.14, 0.14, 0.65);
+
+        if (activeWaypoint !== 'tour' && !keys.size) {
+          const target = activeWaypoint === 'iowa'
+            ? IOWA_WAYPOINT
+            : (BIOMES.find((b) => b.id === activeWaypoint) || BIOMES[0]);
+          const orbitAng = t * 0.45 * speedMul;
+          const targetLat = target.lat + Math.sin(orbitAng) * 5.2;
+          const targetLon = target.lon + Math.cos(orbitAng) * 6.8;
+          manualLat += (targetLat - manualLat) * Math.min(1, dt * 2.4);
+          manualLon += (targetLon - manualLon) * Math.min(1, dt * 2.4);
+          const nextLat = target.lat + Math.sin(orbitAng + 0.15) * 5.2;
+          const nextLon = target.lon + Math.cos(orbitAng + 0.15) * 6.8;
+          shipPos.copy(latLonToVec3(manualLat, manualLon, EARTH_R + manualAlt));
+          aheadPos = latLonToVec3(nextLat, nextLon, EARTH_R + manualAlt);
+        } else {
+          const stepDeg = (flying ? 12 : 4) * speedMul * dt;
+          manualLat = clamp(manualLat + Math.sin(manualHeading) * stepDeg, -78, 78);
+          manualLon = ((manualLon + Math.cos(manualHeading) * stepDeg + 540) % 360) - 180;
+          shipPos.copy(latLonToVec3(manualLat, manualLon, EARTH_R + manualAlt));
+          aheadPos = latLonToVec3(
+            clamp(manualLat + Math.sin(manualHeading) * 2.2, -82, 82),
+            manualLon + Math.cos(manualHeading) * 2.2,
+            EARTH_R + manualAlt
+          );
+        }
+      }
+
+      ship.position.copy(shipPos);
+      ship.lookAt(aheadPos);
+      shipFwd.subVectors(aheadPos, shipPos).normalize();
+
+      const glow = ship.getObjectByName('engineGlow');
+      if (glow) glow.scale.setScalar(flying ? 1 + Math.sin(t * 30) * 0.3 : 0.72);
+
+      // Update ribbon trail
+      trailPts.push(shipPos.clone());
+      if (trailPts.length > TRAIL_N) trailPts.shift();
+      for (let i = 0; i < TRAIL_N; i += 1) {
+        const pt = trailPts[Math.min(i, trailPts.length - 1)] || shipPos;
+        trailPos.set([pt.x, pt.y, pt.z], i * 3);
+      }
+      trailGeo.attributes.position.needsUpdate = true;
+      hotspotPoints.material.size = 0.02 + Math.sin(t * 2.6) * 0.0035;
+
+      // Update camera (Chase, Cockpit, or Orbit)
+      const radial = shipPos.clone().normalize();
+      if (camMode === 'cockpit') {
+        ship.visible = false;
+        const eye = shipPos.clone().addScaledVector(radial, 0.02);
+        const look = aheadPos.clone().addScaledVector(radial, -0.09);
+        camera.position.copy(eye);
+        camera.up.copy(radial);
+        camera.lookAt(look);
+      } else if (camMode === 'orbit') {
+        ship.visible = true;
+        camAngle += dt * 0.06;
+        camTargetPos.lerp(new THREE.Vector3(Math.sin(camAngle) * 3.25, 1.15, Math.cos(camAngle) * 3.25), 0.04);
+        camera.position.copy(camTargetPos);
+        camera.up.set(0, 1, 0);
+        camera.lookAt(0, 0, 0);
+      } else {
+        ship.visible = true;
+        const desired = shipPos.clone().addScaledVector(shipFwd, -0.48).addScaledVector(radial, 0.28);
+        camTargetPos.lerp(desired, 0.06);
+        camera.position.copy(camTargetPos);
+        camera.up.lerp(radial, 0.08);
+        camera.lookAt(shipPos.clone().addScaledVector(shipFwd, 0.65));
+      }
+
+      // Scan Earth footprint beneath the spacecraft
+      const ll = vecToLatLon(shipPos);
+      const scan = scanBelowShip(ll.lat, ll.lon);
+      intensitySmooth += (scan.sum - intensitySmooth) * 0.065;
+      const fireNorm = clamp(intensitySmooth / 2600, 0, 1);
+      const inBiome = scan.biomeDist < 17;
+      const proxBiome = clamp(1 - scan.biomeDist / 26, 0.1, 1);
+      const harmonyInfo = resolveHarmonicTension((scan.rec.zScore || 0) * proxBiome);
+      const panVal = clamp(ll.lon / 155, -0.85, 0.85);
+
+      // Update Combined Audio Layers
+      if (AC && soundState.ready) {
+        if (stereoPan && stereoPan.pan) {
+          stereoPan.pan.setTargetAtTime(panVal, AC.currentTime, 0.08);
+        }
+
+        // Layer 1: 3D Fire Flight Continuous Violin
+        const violinFreq = 110 * Math.pow(2, fireNorm * 2.1);
+        for (const o of violinOscs) {
+          o.frequency.setTargetAtTime(violinFreq, AC.currentTime, 0.08);
+        }
+        violinFilter.frequency.setTargetAtTime(500 + fireNorm * 2600, AC.currentTime, 0.1);
+        const targetViolinGain = (flying && soundState.violinOn) ? (0.022 + fireNorm * 0.115) : 0;
+        violinGain.gain.setTargetAtTime(targetViolinGain, AC.currentTime, 0.12);
+
+        // Layer 2: PyroSync Harmonic Tension Chord Pad
+        harmonyInfo.freqs.forEach((f, idx) => {
+          const osc = chordOscs[idx];
+          if (osc) {
+            osc.frequency.setTargetAtTime(f, AC.currentTime, 0.14);
+            osc.detune.setTargetAtTime((idx % 2 === 0 ? 1 : -1) * harmonyInfo.detuneCents, AC.currentTime, 0.14);
+          }
+        });
+        const vpdCutoff = clamp(420 + (scan.rec.vpdKpa || 1.5) * 950 + fireNorm * 1400, 380, 6800);
+        chordFilter.frequency.setTargetAtTime(vpdCutoff, AC.currentTime, 0.14);
+        const targetChordGain = (flying && soundState.harmonyOn) ? (0.018 + proxBiome * 0.045) : 0;
+        chordGain.gain.setTargetAtTime(targetChordGain, AC.currentTime, 0.15);
+
+        // Layer 3: Hotspot Proximity Bell Pings + Iowa H3 Hex Plucks
+        if (flying && soundState.pingsOn) {
+          HOTSPOTS.forEach((h, i) => {
+            if (h[2] < 280) return;
+            if (angDist(ll.lat, ll.lon, h[0], h[1]) < 5.5) {
+              const last = pingCooldown.get(i) || -1e9;
+              if (t - last > 4) {
+                pingCooldown.set(i, t);
+                triggerHotspotPing(h[2], panVal);
+              }
+            }
+          });
+          if (scan.overIowa && nowMs - lastIowaPluckMs > 320) {
+            lastIowaPluckMs = nowMs;
+            const waveTemp = 0.5 + 0.45 * Math.sin(t * 2.1 + ll.lat * 0.4);
+            triggerIowaHexPluck(waveTemp);
+          }
+        }
+
+        // Layer 4: Euclidean Wind-Ember Pulses & Jet Stream
+        const targetJet = (flying && soundState.windOn) ? (0.007 + speedMul * 0.005 + fireNorm * 0.01) : 0;
+        jetGain.gain.setTargetAtTime(targetJet, AC.currentTime, 0.18);
+
+        const stepIntervalMs = clamp(240 - speedMul * 35, 110, 260);
+        if (flying && soundState.windOn && nowMs - lastEuclidMs >= stepIntervalMs) {
+          lastEuclidMs = nowMs;
+          const pulses = clamp(Math.round((scan.rec.ws10m || 4) * 1.3), 2, 13);
+          const pat = euclideanRhythm(pulses, 16);
+          if (pat[euclidStep % 16]) {
+            triggerEuclideanEmberTick(scan.rec.vpdKpa || 1.8);
+          }
+          euclidStep = (euclidStep + 1) % 16;
+        }
+      }
+
+      // Update HUD Readouts & Level Bars
+      const pct = Math.round(fireNorm * 100);
+      $('hud-fire-meter').style.inlineSize = `${pct}%`;
+      $('fire-progressbar').setAttribute('aria-valuenow', String(pct));
+      $('hud-frp-readout').textContent = `${Math.round(intensitySmooth)} MW weighted · ${scan.count} fires near`;
+
+      const regionTitle = scan.overIowa
+        ? IOWA_WAYPOINT.name
+        : (inBiome ? scan.biome.name : 'In Planetary Transit');
+      $('hud-region').textContent = regionTitle;
+      $('hud-region-sub').textContent = scan.overIowa
+        ? '7,443 MODIS Terra H3 hexagons below · LST & NDVI active'
+        : (inBiome
+          ? `${scan.biome.count} major hotspots · Peak FRP ${scan.biome.maxFrp} MW · ${scan.rec.ym}`
+          : `Cruising between fire regions · ${HOTSPOTS.length} major FIRMS hotspots mapped`);
+
+      $('hud-coords').textContent = `${Math.abs(ll.lat).toFixed(1)}°${ll.lat >= 0 ? 'N' : 'S'}, ${Math.abs(ll.lon).toFixed(1)}°${ll.lon >= 0 ? 'E' : 'W'}`;
+      const altKm = Math.round(ll.altRatio * 6371);
+      $('hud-alt-spd').textContent = `${altKm.toLocaleString()} km · ${speedMul}×`;
+
+      const zSign = (scan.rec.zScore || 0) >= 0 ? '+' : '';
+      $('hud-sigma').textContent = `${zSign}${(scan.rec.zScore || 0).toFixed(2)}σ · ${harmonyInfo.tier.split(' ')[0]}`;
+      const panTag = Math.abs(panVal) < 0.08 ? 'C' : (panVal < 0 ? `L${Math.round(Math.abs(panVal) * 100)}` : `R${Math.round(panVal * 100)}`);
+      $('hud-hex-pan').textContent = `Pan ${panTag} · FFWI ${scan.rec.ffwi}`;
+      $('hud-chord-badge').textContent = harmonyInfo.label;
+
+      const vHz = Math.round(110 * Math.pow(2, fireNorm * 2.1));
+      $('readout-violin').textContent = `${vHz} Hz · Cutoff ${Math.round(500 + fireNorm * 2600)} Hz`;
+      $('bar-violin').style.inlineSize = `${soundState.violinOn ? Math.max(12, pct) : 0}%`;
+
+      $('readout-harmony').textContent = `${harmonyInfo.tier} · Detune ${harmonyInfo.detuneCents}¢`;
+      $('bar-harmony').style.inlineSize = `${soundState.harmonyOn ? Math.round(proxBiome * 100) : 0}%`;
+
+      $('readout-pings').textContent = scan.overIowa ? 'Iowa H3 pentatonic plucks active' : `${scan.count} hotspots within reach`;
+      $('bar-pings').style.inlineSize = `${soundState.pingsOn ? Math.min(100, scan.count * 8 + (scan.overIowa ? 65 : 10)) : 0}%`;
+
+      $('readout-wind').textContent = `Wind ${scan.rec.ws10m} m/s · VPD ${scan.rec.vpdKpa} kPa`;
+      $('bar-wind').style.inlineSize = `${soundState.windOn ? Math.min(100, Math.round((scan.rec.ws10m || 4) * 9)) : 0}%`;
+
+      // Spoken Narration when entering a region or Iowa H3 study area
+      const currentRegionKey = scan.overIowa ? 'iowa' : (inBiome ? scan.biome.id : null);
+      if (flying && currentRegionKey && currentRegionKey !== lastRegionId) {
+        lastRegionId = currentRegionKey;
+        if (currentRegionKey === 'iowa') {
+          announce('Entering Central Iowa MODIS H 3 hexagon grid. 7,443 cells mapping daytime land surface temperature and vegetation index.');
+        } else {
+          const zDesc = `${(scan.rec.zScore || 0) >= 0 ? 'plus ' : 'minus '}${Math.abs(scan.rec.zScore || 0).toFixed(1)} sigma`;
+          announce(`Now flying over ${scan.biome.name}. ${scan.biome.count} major hotspots below, strongest fire power ${scan.biome.maxFrp} megawatts. Climate departure ${zDesc}, ${harmonyInfo.tier}.`);
+        }
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    /* ============================== UI Controls & Keyboard Shortcuts ============================== */
+    function setFlying(next) {
+      flying = next;
+      const btn = $('btn-fly');
+      btn.setAttribute('aria-pressed', String(flying));
+      btn.textContent = flying ? '⏸ Pause Flight' : '▶ Resume Flight';
+      if (AC && AC.state === 'suspended') AC.resume();
+      if (!flying && 'speechSynthesis' in window) window.speechSynthesis.cancel();
+    }
+
+    function startExperience() {
+      initCombinedAudio();
+      const dlg = $('launchDialog');
+      if (dlg && dlg.open) dlg.close();
+      setFlying(true);
+      announce(
+        `Combined Spaceship Flyby started. Touring Earth's fire regions with 3D Fire Flight thermal violin and PyroSync harmonic tension chords. First region ahead: ${tourStops[0].name}.`
+      );
+    }
+
+    $('btn-dialog-start').addEventListener('click', startExperience);
+    $('btn-fly').addEventListener('click', () => {
+      if (!AC) {
+        startExperience();
+        return;
+      }
+      setFlying(!flying);
+    });
+
+    $('btn-pilot-mode').addEventListener('click', () => {
+      tourMode = !tourMode;
+      if (tourMode) activeWaypoint = 'tour';
+      $('btn-pilot-mode').setAttribute('aria-pressed', String(tourMode));
+      $('btn-pilot-mode').textContent = tourMode ? '🛰️ Guided Tour' : '🕹️ Free Steer (WASD)';
+      $('hud-mode-tag').textContent = tourMode ? 'TOUR' : 'MANUAL';
+    });
+
+    $('btn-narrate').addEventListener('click', () => {
+      soundState.narrationOn = !soundState.narrationOn;
+      $('btn-narrate').setAttribute('aria-pressed', String(soundState.narrationOn));
+      if (!soundState.narrationOn && 'speechSynthesis' in window) window.speechSynthesis.cancel();
+    });
+
+    $('btn-where').addEventListener('click', () => {
+      initCombinedAudio();
+      const ll = vecToLatLon(shipPos);
+      const scan = scanBelowShip(ll.lat, ll.lon);
+      const harmony = resolveHarmonicTension(scan.rec.zScore || 0);
+      const locName = scan.overIowa ? IOWA_WAYPOINT.name : (scan.biomeDist < 18 ? scan.biome.name : `open transit near ${scan.biome.name}`);
+      announce(
+        `Position ${Math.abs(ll.lat).toFixed(0)} degrees ${ll.lat >= 0 ? 'North' : 'South'}, ${Math.abs(ll.lon).toFixed(0)} degrees ${ll.lon >= 0 ? 'East' : 'West'}, over ${locName}. ${scan.count} hotspots in range. Month ${scan.rec.ym}, anomaly ${(scan.rec.zScore || 0).toFixed(1)} sigma, ${harmony.tier}.`
+      );
+    });
+
+    $('btn-home-tone').addEventListener('click', playHomeTone);
+
+    const CAM_MODES = ['chase', 'cockpit', 'orbit'];
+    const CAM_NAMES = { chase: '🎥 Cam: Chase', cockpit: '🎥 Cam: Cockpit', orbit: '🎥 Cam: Orbit' };
+    $('btn-cam').addEventListener('click', () => {
+      camMode = CAM_MODES[(CAM_MODES.indexOf(camMode) + 1) % CAM_MODES.length];
+      $('btn-cam').textContent = CAM_NAMES[camMode];
+      $('btn-cam').setAttribute('aria-pressed', String(camMode !== 'chase'));
+    });
+
+    $('btn-speed').addEventListener('click', () => {
+      speedMul = SPEEDS[(SPEEDS.indexOf(speedMul) + 1) % SPEEDS.length];
+      $('btn-speed').textContent = `⚡ Speed: ${speedMul}×`;
+    });
+
+    $('timeline-slider').addEventListener('input', (e) => {
+      monthIndex = clamp(Number(e.target.value), 0, 308);
+      updateSpiralDrawRange(monthIndex);
+    });
+
+    // Waypoint chips
+    document.querySelectorAll('.chip-btn[data-waypoint]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        activeWaypoint = btn.dataset.waypoint;
+        tourMode = activeWaypoint === 'tour';
+        $('btn-pilot-mode').setAttribute('aria-pressed', String(tourMode));
+        $('btn-pilot-mode').textContent = tourMode ? '🛰️ Guided Tour' : `🛰️ Orbit: ${btn.textContent.trim()}`;
+        $('hud-mode-tag').textContent = activeWaypoint.toUpperCase();
+        document.querySelectorAll('.chip-btn[data-waypoint]').forEach((b) => {
+          b.setAttribute('aria-pressed', String(b === btn));
+        });
+      });
+    });
+
+    // Soundscape layer toggles
+    function bindLayerToggle(btnId, stateKey) {
+      const btn = $(btnId);
+      btn.addEventListener('click', () => {
+        soundState[stateKey] = !soundState[stateKey];
+        btn.setAttribute('aria-pressed', String(soundState[stateKey]));
+        btn.textContent = soundState[stateKey] ? 'Active' : 'Muted';
+      });
+    }
+    bindLayerToggle('toggle-violin', 'violinOn');
+    bindLayerToggle('toggle-harmony', 'harmonyOn');
+    bindLayerToggle('toggle-pings', 'pingsOn');
+    bindLayerToggle('toggle-wind', 'windOn');
+
+    $('preset-select').addEventListener('change', (e) => {
+      const val = e.target.value;
+      const setLayer = (btnId, key, on) => {
+        soundState[key] = on;
+        $(btnId).setAttribute('aria-pressed', String(on));
+        $(btnId).textContent = on ? 'Active' : 'Muted';
+      };
+      if (val === 'fireflight') {
+        setLayer('toggle-violin', 'violinOn', true);
+        setLayer('toggle-harmony', 'harmonyOn', false);
+        setLayer('toggle-pings', 'pingsOn', true);
+        setLayer('toggle-wind', 'windOn', true);
+      } else if (val === 'pyrosync') {
+        setLayer('toggle-violin', 'violinOn', false);
+        setLayer('toggle-harmony', 'harmonyOn', true);
+        setLayer('toggle-pings', 'pingsOn', true);
+        setLayer('toggle-wind', 'windOn', true);
+      } else {
+        setLayer('toggle-violin', 'violinOn', true);
+        setLayer('toggle-harmony', 'harmonyOn', true);
+        setLayer('toggle-pings', 'pingsOn', true);
+        setLayer('toggle-wind', 'windOn', true);
+      }
+    });
+
+    window.addEventListener('keydown', (e) => {
+      const tag = e.target?.tagName;
+      if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+      if (e.code === 'Space' && tag !== 'BUTTON') {
+        e.preventDefault();
+        $('btn-fly').click();
+      } else if (e.key === 'n' || e.key === 'N') {
+        $('btn-narrate').click();
+      } else if (e.key === 'i' || e.key === 'I') {
+        $('btn-where').click();
+      } else if (e.key === 'r' || e.key === 'R') {
+        playHomeTone();
+      } else if (e.key === 'c' || e.key === 'C') {
+        $('btn-cam').click();
+      } else if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
+        if (tourMode) {
+          tourMode = false;
+          activeWaypoint = 'manual';
+          const ll = vecToLatLon(shipPos);
+          manualLat = ll.lat;
+          manualLon = ll.lon;
+          $('btn-pilot-mode').setAttribute('aria-pressed', 'false');
+          $('btn-pilot-mode').textContent = '🕹️ Free Steer (WASD)';
+          $('hud-mode-tag').textContent = 'MANUAL';
+        }
+        keys.add(e.code);
+      }
+    });
+
+    window.addEventListener('keyup', (e) => {
+      keys.delete(e.code);
+    });
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // Show accessible modal dialog on load
+    const dlg = $('launchDialog');
+    if (dlg && typeof dlg.showModal === 'function') {
+      dlg.showModal();
+    }
+
+    animate();
+  </script>
+</body>
+</html>

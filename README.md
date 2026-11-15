@@ -10,9 +10,11 @@ An interactive **audio-visual NASA wildfire, meteorology, and Earth-data sonific
 
 - **[PyroSync (`pyrosync/`)](pyrosync/README.md)** — Live Demo: `https://dmuldrew.github.io/spatial_sequencers/pyrosync/`
   - **26-Year Wildfire Spiral (`/#spiral`)**, **Central Iowa MODIS Hex Map (`/#iowa-map`)**, and **Orbital Flyby (3D) (`/#flyby`)**.
+- **[Combined Spaceship Flyby (`spaceship-flyby/`)](spaceship-flyby/README.md)** — Live Demo: `https://dmuldrew.github.io/spatial_sequencers/spaceship-flyby/`
+  - Separate website choice uniting **3D Fire Flight** (continuous detuned sawtooth thermal violin, stereo hotspot proximity bells, and spoken region narration) with **PyroSync Observatory** (1991–2020 harmonic tension `σ` chords, Euclidean wind-ember pulses, 26-year 3D climate spirals, and Central Iowa MODIS H3 hex plucks).
 - **[Space Jukebox (`space-jukebox/`)](space-jukebox/README.md)** — Live Demo: `https://dmuldrew.github.io/spatial_sequencers/space-jukebox/fly.html`
   - **3D Fire Flight** (`fly.html`) — a spaceship tours NASA FIRMS fire regions on a 3D globe; Web Audio sonification + Speech Synthesis narration designed for blind and low-vision listeners.
-- **Hub Landing Page (`site/`)** — Multi-project entry page deployed to the root of GitHub Pages.
+- **Centralized Navigation Hub (`site/`)** — Multi-project entry page deployed to the root of GitHub Pages (`/` locally on port 3000 or 8080).
 
 ---
 

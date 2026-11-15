@@ -46,11 +46,13 @@ jobs:
       - name: Assemble GitHub Pages site
         run: |
           rm -rf ./site-dist
-          mkdir -p ./site-dist/pyrosync ./site-dist/space-jukebox
+          mkdir -p ./site-dist/pyrosync ./site-dist/space-jukebox ./site-dist/spaceship-flyby ./site-dist/hub
           cp ./site/index.html ./site-dist/index.html
+          cp ./site/index.html ./site-dist/hub/index.html
           touch ./site-dist/.nojekyll
           cp -R ./pyrosync/dist/. ./site-dist/pyrosync/
           cp -R ./space-jukebox/. ./site-dist/space-jukebox/
+          cp -R ./spaceship-flyby/. ./site-dist/spaceship-flyby/
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
