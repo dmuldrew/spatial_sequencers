@@ -4,6 +4,8 @@
 
 An interactive **audio-visual NASA wildfire, meteorology, and Earth-data sonification repository** built for the **2026 NASA International Space Apps Challenge** (Seattle), pairing the **[PyroSync Fire-Weather Observatory](pyrosync/)** (`d3-audio`, D3.js v7, Three.js, Tone.js, H3) with the accessible **[Space Jukebox](space-jukebox/)** prototype.
 
+**Our challenge:** [The Earth Information Jukebox](https://www.spaceappschallenge.org/2026/challenges/the-earth-information-jukebox/) — translate NASA Earth Information Center visuals into sound, so Earth data can be *heard*, not just seen, including by blind and low-vision audiences. That is the challenge this submission answers. The same fire data also touches *Dancing with the SARs* and *Harmonization of MODIS and VIIRS Hot Spots* (summaries at the bottom of this README), but the Jukebox is the primary challenge.
+
 ---
 
 ## Sub-projects at a Glance
@@ -193,7 +195,9 @@ The third home page tab (**Orbital Flyby (3D)** / `/#flyby`) launches a controll
 
 ## 2026 NASA Space Apps Challenge Summaries
 
-### 1. [The Earth Information Jukebox](https://www.spaceappschallenge.org/2026/challenges/the-earth-information-jukebox/)
+*The team's submission answers **#1, The Earth Information Jukebox**. The other two are included because the project's fire data and sonification approach also speak to them.*
+
+### 1. [The Earth Information Jukebox](https://www.spaceappschallenge.org/2026/challenges/the-earth-information-jukebox/) — **our challenge**
 
 - **Subjects:** Arts & Multimedia, Earth Science, Software
 - **Difficulty:** Beginner (Youth) / Intermediate
