@@ -37,11 +37,12 @@ copy_vendor_from_dir() {
   cp "$nm/d3/dist/d3.min.js" "$STAGE_DIR/vendor/d3.min.js"
   cp "$nm/tone/build/Tone.js" "$STAGE_DIR/vendor/Tone.js"
   cp "$nm/d3-audio/dist/d3-audio.js" "$STAGE_DIR/vendor/d3-audio.js"
+  cp "$nm/three/build/three.module.min.js" "$STAGE_DIR/vendor/three.module.min.js"
   cp "$nm/topojson-client/dist/topojson-client.min.js" "$STAGE_DIR/vendor/topojson-client.min.js"
   cp "$nm/world-atlas/countries-110m.json" "$STAGE_DIR/vendor/countries-110m.json"
 }
 
-if [[ -d "$ROOT_DIR/node_modules/d3-audio" ]]; then
+if [[ -d "$ROOT_DIR/node_modules/d3-audio" && -f "$ROOT_DIR/node_modules/three/build/three.module.min.js" ]]; then
   echo "Copying vendor libraries from local node_modules/..."
   copy_vendor_from_dir "$ROOT_DIR/node_modules"
 elif command -v npm >/dev/null 2>&1 && npm --version >/dev/null 2>&1; then
@@ -60,6 +61,7 @@ elif command -v docker >/dev/null 2>&1; then
   docker cp "$CID:/app/node_modules/d3/dist/d3.min.js" "$STAGE_DIR/vendor/d3.min.js"
   docker cp "$CID:/app/node_modules/tone/build/Tone.js" "$STAGE_DIR/vendor/Tone.js"
   docker cp "$CID:/app/node_modules/d3-audio/dist/d3-audio.js" "$STAGE_DIR/vendor/d3-audio.js"
+  docker cp "$CID:/app/node_modules/three/build/three.module.min.js" "$STAGE_DIR/vendor/three.module.min.js"
   docker cp "$CID:/app/node_modules/topojson-client/dist/topojson-client.min.js" "$STAGE_DIR/vendor/topojson-client.min.js"
   docker cp "$CID:/app/node_modules/world-atlas/countries-110m.json" "$STAGE_DIR/vendor/countries-110m.json"
   docker rm -f "$CID" >/dev/null
@@ -77,11 +79,15 @@ REQUIRED_FILES=(
   "index.html"
   "styles.css"
   "js/app.js"
+  "js/flyby.js"
   "js/enable-audio.js"
   "data/fire_weather_data.json"
+  "midwest/map.html"
+  "midwest/data/midwest.json"
   "vendor/d3.min.js"
   "vendor/Tone.js"
   "vendor/d3-audio.js"
+  "vendor/three.module.min.js"
   "vendor/topojson-client.min.js"
   "vendor/countries-110m.json"
 )

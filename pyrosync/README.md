@@ -210,5 +210,9 @@ The map's input definitions, appearance, zoom policy, and sonification extension
 point live in `public/midwest/js/domain/`. The July snapshot and its source
 provenance are in `public/midwest/data/midwest.json`. The existing PyroSync
 spiral handles its own audio. To regenerate the map snapshot from the source
-GeoTIFF bands, run `python3 scripts/prepare_midwest.py /path/to/geotiffs` with
-Rasterio, NumPy, and H3 v4 installed.
+GeoTIFF bands, install [`raster_h3`](https://github.com/dmuldrew/raster_h3)
+(Python package or `raster-h3-cli`) and run `python3 scripts/prepare_midwest.py /path/to/geotiffs`.
+
+## Orbital Flyby (3D)
+
+Available on the third home page tab (**Orbital Flyby (3D)** / `/#flyby`), `public/js/flyby.js` renders a controllable Three.js spacecraft flying over the 3D Earth surface, combining global wildfire hotspots, regional H3 MODIS hex columns, the 2001–2026 fire-weather spiral HUD, and Tone.js spatial/telemetry sonification.

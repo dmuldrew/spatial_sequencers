@@ -1,10 +1,16 @@
-# Build and deploy PyroSync static bundle (pyrosync/public/ + vendor/ + .nojekyll) to GitHub Pages
-name: Deploy PyroSync to GitHub Pages
+name: Deploy GitHub Pages
 
 on:
   push:
-    branches: ["main"]
+    branches:
+      - main
   workflow_dispatch:
+    inputs:
+      branch:
+        description: "Branch, tag, or SHA to build and deploy"
+        required: false
+        default: "main"
+        type: string
 
 permissions:
   contents: read
@@ -12,7 +18,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: "pages"
+  group: pages
   cancel-in-progress: false
 
 jobs:
@@ -22,33 +28,38 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch || github.ref }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "20"
 
-      - name: Build static bundle (public + vendor + .nojekyll)
-        run: ./pyrosync/scripts/deploy-gh-pages.sh --build-only
+      - name: Build static PyroSync bundle
+        run: |
+          chmod +x ./pyrosync/scripts/deploy-gh-pages.sh
+          ./pyrosync/scripts/deploy-gh-pages.sh --build-only
 
-      - name: Assemble site (landing page + both projects)
+      - name: Assemble GitHub Pages site
         run: |
           rm -rf ./site-dist
           mkdir -p ./site-dist/pyrosync ./site-dist/space-jukebox
           cp ./site/index.html ./site-dist/index.html
+          touch ./site-dist/.nojekyll
           cp -R ./pyrosync/dist/. ./site-dist/pyrosync/
-          cp ./space-jukebox/index.html ./site-dist/space-jukebox/index.html
-          cp ./space-jukebox/fly.html ./site-dist/space-jukebox/fly.html
-      - name: Setup Pages
+          cp -R ./space-jukebox/. ./site-dist/space-jukebox/
+
+      - name: Configure Pages
         uses: actions/configure-pages@v5
 
-      - name: Upload artifact
+      - name: Upload GitHub Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: './site-dist'
+          path: ./site-dist
 
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v5
+        uses: actions/deploy-pages@v4
