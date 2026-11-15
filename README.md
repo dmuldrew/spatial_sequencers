@@ -156,7 +156,8 @@ spatial_sequencers/
     ├── scripts/
     │   ├── deploy-gh-pages.sh      # Stages public/ + vendor/ + .nojekyll
     │   ├── fetch_nasa_data.py      # Fetches & joins NASA EONET, FIRMS MODIS, and POWER data
-    │   └── prepare_midwest.py      # Builds Midwest MODIS H3 snapshot using raster_h3
+    │   ├── prepare_midwest.py      # Builds Midwest MODIS H3 snapshot using raster_h3
+    │   └── prepare_global_fire.py  # FIRMS → multi-resolution global H3 Parquet, PMTiles, flyby LOD JSON
     └── public/
         ├── index.html              # Tabbed UI: Spiral, Central Iowa Hex Map, Orbital Flyby (3D)
         ├── styles.css              # Color-scheme styles, tabs, flyby HUD, reduced motion
@@ -186,6 +187,22 @@ Available on the second home page tab (**Central Iowa MODIS Hex Map** / `/#iowa-
   ```bash
   python3 pyrosync/scripts/prepare_midwest.py /path/to/geotiffs
   ```
+
+### Global fire H3 grid (multi-resolution, for PMTiles and the flyby)
+
+`scripts/prepare_global_fire.py` bins NASA FIRMS active-fire CSVs (MODIS C6.1 or VIIRS) into H3 resolutions 0–5 in one pass. Each resolution is indexed directly from the detection coordinates, not rolled up from finer cells. It writes:
+
+- `public/data/global-fire/global_fire_h3.parquet`: all resolutions, one row per cell (`detections`, `frp_sum`, `frp_max`, `area_km2`, `density` = detections per km² per year, and more).
+- `public/data/global-fire/global_fire.pmtiles`: the same table as a PMTiles v3 pyramid, written by [`raster_h3`](https://github.com/dmuldrew/raster_h3) (`parquet_to_pmtiles` or `raster-h3-cli parquet-to-pmtiles`).
+- `public/data/global-fire/lod-r{2,3,4}.json` + `manifest.json`: small level-of-detail extracts for the orbital flyby, with suggested altitude bands and one shared log-density colour range so colours stay stable when levels swap.
+
+```bash
+pip install duckdb h3 pandas            # plus raster_h3, or put raster-h3-cli on PATH
+python3 pyrosync/scripts/prepare_global_fire.py /path/to/firms/*.csv --vegetation-only
+# --skip-pmtiles stops after Parquet + LOD JSON; --snap-degrees 0 bins every detection exactly
+```
+
+Colour by `density`, not `detections`: counts grow about 7× per coarser resolution. Known gap: raster_h3 places each resolution at a single zoom (res 0→z0, 1→z2, 2→z4, 3→z5, 4→z7, 5→z8), so zooms 1, 3 and 6 contain no tiles.
 
 The third home page tab (**Orbital Flyby (3D)** / `/#flyby`) launches a controllable Three.js spacecraft over a 3D Earth textured by NASA FIRMS wildfire hotspots and extruded Iowa MODIS H3 columns, paired with a synced 2001–2026 fire-weather spiral HUD and Tone.js spatial sonification.
 

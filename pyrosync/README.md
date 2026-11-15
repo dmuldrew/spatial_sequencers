@@ -213,6 +213,22 @@ spiral handles its own audio. To regenerate the map snapshot from the source
 GeoTIFF bands, install [`raster_h3`](https://github.com/dmuldrew/raster_h3)
 (Python package or `raster-h3-cli`) and run `python3 scripts/prepare_midwest.py /path/to/geotiffs`.
 
+### Global fire H3 grid (multi-resolution, for PMTiles and the flyby)
+
+`scripts/prepare_global_fire.py` bins NASA FIRMS active-fire CSVs (MODIS C6.1 or VIIRS) into H3 resolutions 0–5 in one pass. Each resolution is indexed directly from the detection coordinates, not rolled up from finer cells. It writes:
+
+- `public/data/global-fire/global_fire_h3.parquet`: all resolutions, one row per cell (`detections`, `frp_sum`, `frp_max`, `area_km2`, `density` = detections per km² per year, and more).
+- `public/data/global-fire/global_fire.pmtiles`: the same table as a PMTiles v3 pyramid, written by [`raster_h3`](https://github.com/dmuldrew/raster_h3) (`parquet_to_pmtiles` or `raster-h3-cli parquet-to-pmtiles`).
+- `public/data/global-fire/lod-r{2,3,4}.json` + `manifest.json`: small level-of-detail extracts for the orbital flyby, with suggested altitude bands and one shared log-density colour range so colours stay stable when levels swap.
+
+```bash
+pip install duckdb h3 pandas            # plus raster_h3, or put raster-h3-cli on PATH
+python3 scripts/prepare_global_fire.py /path/to/firms/*.csv --vegetation-only
+# --skip-pmtiles stops after Parquet + LOD JSON; --snap-degrees 0 bins every detection exactly
+```
+
+Colour by `density`, not `detections`: counts grow about 7× per coarser resolution. Known gap: raster_h3 places each resolution at a single zoom (res 0→z0, 1→z2, 2→z4, 3→z5, 4→z7, 5→z8), so zooms 1, 3 and 6 contain no tiles.
+
 ## Orbital Flyby (3D)
 
 Available on the third home page tab (**Orbital Flyby (3D)** / `/#flyby`), `public/js/flyby.js` renders a controllable Three.js spacecraft flying over the 3D Earth surface, combining global wildfire hotspots, regional H3 MODIS hex columns, the 2001–2026 fire-weather spiral HUD, and Tone.js spatial/telemetry sonification.

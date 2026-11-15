@@ -1,0 +1,424 @@
+"""Bin NASA FIRMS active-fire detections into a multi-resolution global H3 grid.
+
+Outputs, from one pass over the input CSVs:
+
+1. ``global_fire_h3.parquet``: every requested H3 resolution (default 0-5) in one
+   table, one row per cell, keyed by ``h3_index``.
+2. ``global_fire.pmtiles``: the same table as a PMTiles v3 vector pyramid, written by
+   raster_h3 (https://github.com/dmuldrew/raster_h3). Each resolution lands at its
+   matching Web Mercator zoom (res 0 -> z0, 1 -> z2, 2 -> z4, 3 -> z5, 4 -> z7, 5 -> z8).
+3. ``lod-r{N}.json`` + ``manifest.json``: small level-of-detail extracts (default
+   res 2-4) for the Three.js orbital flyby, which swaps levels by altitude.
+
+Every resolution is indexed directly from the detection coordinates, never rolled up
+from finer cells, because H3 children do not tile their parent exactly.
+
+Colour should use ``density`` (detections per km^2 per year), not raw counts: counts
+grow about 7x per coarser resolution, density does not. ``manifest.json`` carries one
+shared colour range for all levels so the colours do not jump when levels swap.
+
+Input: FIRMS archive or NRT CSVs (MODIS C6.1 or VIIRS), e.g. the yearly
+``modis_<year>_<country>.csv`` files or an archive download request. Unzip them first.
+Required columns: latitude, longitude, acq_date, confidence, frp. ``type`` is used
+when present (archive files only) to keep presumed vegetation fires (type 0).
+
+Usage:
+    python3 scripts/prepare_global_fire.py data/firms/*.csv
+    python3 scripts/prepare_global_fire.py data/firms/*.csv --resolutions 0-5 \
+        --lod-resolutions 2,3,4 --min-confidence 30 --vegetation-only
+
+Dependencies: duckdb, h3 (v4), pandas; plus the raster_h3 Python package or the
+``raster-h3-cli`` binary for the PMTiles step (skip it with ``--skip-pmtiles``).
+"""
+import argparse
+import json
+import math
+import shutil
+import subprocess
+import time
+from pathlib import Path
+
+PROJECT = Path(__file__).resolve().parents[1]
+DEFAULT_OUT = PROJECT / 'public/data/global-fire'
+
+# Suggested flyby altitude bands (km above the surface) for each LOD resolution.
+# Coarse cells from high orbit, finer cells as the craft descends.
+LOD_ALTITUDE_KM = {
+    1: (6000, None),
+    2: (3000, None),
+    3: (1000, 3000),
+    4: (0, 1000),
+    5: (0, 400),
+}
+
+
+def parse_resolutions(text):
+    """'0-5' or '2,3,4' -> sorted unique list of ints in 0..15."""
+    values = set()
+    for part in str(text).split(','):
+        part = part.strip()
+        if not part:
+            continue
+        if '-' in part:
+            lo, hi = (int(v) for v in part.split('-', 1))
+            values.update(range(lo, hi + 1))
+        else:
+            values.add(int(part))
+    if not values or min(values) < 0 or max(values) > 15:
+        raise argparse.ArgumentTypeError(f'Invalid H3 resolution list: {text!r}')
+    return sorted(values)
+
+
+def confidence_sql(column_type):
+    """MODIS confidence is 0-100; VIIRS uses l/n/h. Map both onto 0-100."""
+    if column_type.upper().startswith(('VARCHAR', 'STRING', 'TEXT')):
+        return ("COALESCE(TRY_CAST(confidence AS INTEGER), "
+                "CASE lower(confidence) WHEN 'h' THEN 90 WHEN 'high' THEN 90 "
+                "WHEN 'n' THEN 60 WHEN 'nominal' THEN 60 "
+                "WHEN 'l' THEN 20 WHEN 'low' THEN 20 END)")
+    return 'CAST(confidence AS INTEGER)'
+
+
+def load_bins(con, paths, min_confidence, vegetation_only, snap_degrees, high_confidence):
+    """Read and filter detections, then pre-aggregate them onto a fine lat/lon grid.
+
+    Snapping to ``snap_degrees`` (default 0.01 deg, about the 1 km MODIS footprint)
+    collapses repeat detections at the same pixel so H3 indexing runs once per
+    location instead of once per detection. All statistics kept per bin are
+    additive (count, sum) or extremal (min, max), so the later H3 aggregation is
+    exact with respect to the snapped coordinates.
+
+    The cost is that detections near a cell edge can land in the neighbouring cell:
+    on test data, 0.01 deg moved about 0.4% / 1.1% / 2.9% of detections at
+    resolutions 3 / 4 / 5, which is inside the MODIS footprint (1 km at nadir,
+    several km off-nadir). Use ``--snap-degrees 0`` for exact per-detection binning
+    at the cost of indexing every detection.
+    """
+    source = f"read_csv({[str(p) for p in paths]!r}, union_by_name = true, header = true)"
+    con.execute(f'CREATE VIEW raw AS SELECT * FROM {source}')
+    columns = {row[0].lower(): row[1] for row in con.execute('DESCRIBE raw').fetchall()}
+    missing = {'latitude', 'longitude', 'acq_date', 'confidence', 'frp'} - columns.keys()
+    if missing:
+        raise ValueError(f'Input CSVs are missing required columns: {sorted(missing)}')
+
+    filters = [
+        'latitude BETWEEN -90 AND 90',
+        'longitude BETWEEN -180 AND 180',
+        f'conf >= {int(min_confidence)}',
+    ]
+    if vegetation_only:
+        if 'type' in columns:
+            # Rows from files without a type column (NRT) are kept.
+            filters.append('(fire_type IS NULL OR fire_type = 0)')
+        else:
+            print('note: no `type` column (NRT files); --vegetation-only has no effect')
+
+    type_expr = 'TRY_CAST(type AS INTEGER)' if 'type' in columns else 'NULL::INTEGER'
+
+    if snap_degrees > 0:
+        inv = 1.0 / snap_degrees
+        lat_expr = f'(floor(latitude * {inv}) + 0.5) / {inv}'
+        lon_expr = f'(floor(longitude * {inv}) + 0.5) / {inv}'
+    else:
+        lat_expr, lon_expr = 'latitude', 'longitude'
+
+    con.execute(f'''
+        CREATE TABLE bins AS
+        WITH detections AS (
+            SELECT CAST(latitude AS DOUBLE) AS latitude,
+                   CAST(longitude AS DOUBLE) AS longitude,
+                   CAST(acq_date AS DATE) AS acq_date,
+                   {confidence_sql(columns['confidence'])} AS conf,
+                   TRY_CAST(frp AS DOUBLE) AS frp,
+                   {type_expr} AS fire_type
+            FROM raw
+        ),
+        grouped AS (
+        SELECT {lat_expr} AS lat, {lon_expr} AS lon,
+               count(*) AS detections,
+               count(*) FILTER (WHERE conf >= {int(high_confidence)}) AS high_conf_detections,
+               COALESCE(sum(frp), 0) AS frp_sum,
+               max(frp) AS frp_max,
+               min(acq_date) AS first_date,
+               max(acq_date) AS last_date
+        FROM detections
+        WHERE {' AND '.join(filters)}
+        GROUP BY 1, 2
+        )
+        SELECT row_number() OVER (ORDER BY lat, lon) - 1 AS bin_id, * FROM grouped
+    ''')
+    n_bins, n_detections, first, last = con.execute(
+        'SELECT count(*), COALESCE(sum(detections), 0), min(first_date), max(last_date) FROM bins'
+    ).fetchone()
+    if not n_detections:
+        raise ValueError('No detections passed the filters.')
+    return n_bins, n_detections, first, last
+
+
+def index_bins(con, resolutions):
+    """Index every bin centre at every resolution with h3-py and register the result."""
+    import pandas as pd
+    from h3.api import basic_int as h3i
+
+    data = con.execute('SELECT bin_id, lat, lon FROM bins ORDER BY bin_id').fetchnumpy()
+    lats = data['lat'].tolist()
+    lons = data['lon'].tolist()
+    frame = {'bin_id': data['bin_id']}
+    for res in resolutions:
+        cells = [h3i.latlng_to_cell(a, b, res) for a, b in zip(lats, lons)]
+        # H3 indices fit in 63 bits, so they are safe as signed BIGINT.
+        frame[f'r{res}'] = pd.array(cells, dtype='int64')
+    con.register('bin_cells_df', pd.DataFrame(frame))
+    con.execute('CREATE TABLE bin_cells AS SELECT * FROM bin_cells_df')
+    con.unregister('bin_cells_df')
+
+
+def aggregate_cells(con, resolutions, years, min_detections, fine_from):
+    """One row per (resolution, cell), plus cell area and per-area densities."""
+    from h3.api import basic_int as h3i
+    import pandas as pd
+
+    parts = []
+    for res in resolutions:
+        threshold = min_detections if res >= fine_from else 1
+        parts.append(f'''
+            SELECT c.r{res} AS h3_index, {res} AS resolution,
+                   sum(b.detections) AS detections,
+                   sum(b.high_conf_detections) AS high_conf_detections,
+                   sum(b.frp_sum) AS frp_sum,
+                   max(b.frp_max) AS frp_max,
+                   year(min(b.first_date)) AS first_year,
+                   year(max(b.last_date)) AS last_year
+            FROM bins b JOIN bin_cells c USING (bin_id)
+            GROUP BY c.r{res}
+            HAVING sum(b.detections) >= {int(threshold)}
+        ''')
+    con.execute('CREATE TABLE cells_raw AS ' + ' UNION ALL '.join(parts))
+
+    ids = con.execute('SELECT DISTINCT h3_index FROM cells_raw').fetchnumpy()['h3_index'].tolist()
+    areas = pd.DataFrame({
+        'h3_index': pd.array(ids, dtype='int64'),
+        'area_km2': [h3i.cell_area(i, 'km^2') for i in ids],
+    })
+    con.register('areas_df', areas)
+    con.execute(f'''
+        CREATE TABLE cells AS
+        SELECT r.h3_index,
+               CAST(r.resolution AS TINYINT) AS resolution,
+               CAST(r.detections AS BIGINT) AS detections,
+               CAST(r.high_conf_detections AS BIGINT) AS high_conf_detections,
+               round(r.frp_sum, 2) AS frp_sum,
+               round(r.frp_max, 2) AS frp_max,
+               CAST(r.first_year AS SMALLINT) AS first_year,
+               CAST(r.last_year AS SMALLINT) AS last_year,
+               round(a.area_km2, 3) AS area_km2,
+               r.detections / a.area_km2 / {years} AS density,
+               r.frp_sum / a.area_km2 / {years} AS frp_density
+        FROM cells_raw r JOIN areas_df a USING (h3_index)
+        ORDER BY r.resolution, r.h3_index
+    ''')
+    con.unregister('areas_df')
+    return con.execute(
+        'SELECT resolution, count(*), sum(detections) FROM cells GROUP BY 1 ORDER BY 1'
+    ).fetchall()
+
+
+def write_parquet(con, path):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix('.tmp.parquet')
+    # h3_index first: raster_h3 auto-detects it by name, and the DuckDB COPY route
+    # takes the first column as the cell.
+    con.execute(f"COPY cells TO '{tmp}' (FORMAT parquet, COMPRESSION zstd)")
+    tmp.replace(path)
+
+
+def write_pmtiles(parquet_path, pmtiles_path, cli_bin=None):
+    """Transcode the multi-resolution Parquet to PMTiles with raster_h3."""
+    pmtiles_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        import raster_h3
+        if hasattr(raster_h3, 'parquet_to_pmtiles'):
+            return raster_h3.parquet_to_pmtiles(parquet_path, pmtiles_path, h3_column='h3_index')
+    except ImportError:
+        pass
+    exe = cli_bin or shutil.which('raster-h3-cli')
+    if not exe:
+        raise RuntimeError(
+            'PMTiles step needs the raster_h3 Python package or the `raster-h3-cli` binary '
+            '(https://github.com/dmuldrew/raster_h3). Re-run with --skip-pmtiles to stop at Parquet.'
+        )
+    subprocess.run(
+        [exe, 'parquet-to-pmtiles', str(parquet_path), '-o', str(pmtiles_path),
+         '--h3-column', 'h3_index'],
+        check=True,
+    )
+    return None
+
+
+def quantile(sorted_values, fraction):
+    if not sorted_values:
+        return None
+    pos = (len(sorted_values) - 1) * fraction
+    lo, hi = math.floor(pos), math.ceil(pos)
+    return sorted_values[lo] + (sorted_values[hi] - sorted_values[lo]) * (pos - lo)
+
+
+def write_lod(con, out_dir, lod_resolutions, period_label, years, meta):
+    """Compact per-resolution JSON for the flyby plus a manifest with a shared colour range."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    present = {row[0] for row in con.execute('SELECT DISTINCT resolution FROM cells').fetchall()}
+    levels = [res for res in lod_resolutions if res in present]
+
+    # One colour range for all levels, on log10(density): densities span orders of
+    # magnitude, and sharing the range keeps colours stable when levels swap.
+    placeholders = ','.join(str(r) for r in levels) or '-1'
+    log_density = sorted(
+        row[0] for row in con.execute(
+            f'SELECT log10(density) FROM cells WHERE resolution IN ({placeholders}) AND density > 0'
+        ).fetchall()
+    )
+    color_range = {
+        'field': 'density',
+        'scale': 'log10',
+        'min': round(quantile(log_density, 0.05), 4) if log_density else None,
+        'max': round(quantile(log_density, 0.95), 4) if log_density else None,
+    }
+
+    files = []
+    for res in levels:
+        rows = con.execute(f'''
+            SELECT h3_index, detections, density, frp_max
+            FROM cells WHERE resolution = {res} ORDER BY h3_index
+        ''').fetchall()
+        name = f'lod-r{res}.json'
+        payload = {
+            'schemaVersion': 1,
+            'resolution': res,
+            'periodLabel': period_label,
+            'fields': ['id', 'detections', 'density', 'frpMax'],
+            'cells': [
+                [format(cell, 'x'), detections, float(f'{density:.4g}'),
+                 None if frp_max is None else round(frp_max, 1)]
+                for cell, detections, density, frp_max in rows
+            ],
+        }
+        tmp = out_dir / (name + '.tmp')
+        tmp.write_text(json.dumps(payload, separators=(',', ':')) + '\n')
+        tmp.replace(out_dir / name)
+        lo, hi = LOD_ALTITUDE_KM.get(res, (None, None))
+        files.append({
+            'resolution': res,
+            'file': name,
+            'cells': len(rows),
+            'altitudeKm': {'min': lo, 'max': hi},
+        })
+
+    manifest = {
+        'schemaVersion': 1,
+        'periodLabel': period_label,
+        'years': years,
+        'densityUnits': 'detections per km² per year',
+        'colorRange': color_range,
+        'levels': files,
+        **meta,
+    }
+    (out_dir / 'manifest.json').write_text(
+        json.dumps(manifest, ensure_ascii=False, indent=2) + '\n'
+    )
+    return files
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument('csv', nargs='+', type=Path, help='FIRMS CSV files (MODIS or VIIRS)')
+    parser.add_argument('--resolutions', type=parse_resolutions, default=parse_resolutions('0-5'),
+                        help='H3 resolutions for Parquet/PMTiles (default 0-5)')
+    parser.add_argument('--lod-resolutions', type=parse_resolutions,
+                        default=parse_resolutions('2,3,4'),
+                        help='Resolutions to extract as flyby JSON (default 2,3,4)')
+    parser.add_argument('--min-confidence', type=int, default=30,
+                        help='Drop detections below this confidence, 0-100 (default 30)')
+    parser.add_argument('--high-confidence', type=int, default=80,
+                        help='Confidence counted in high_conf_detections (default 80)')
+    parser.add_argument('--vegetation-only', action='store_true',
+                        help='Keep only presumed vegetation fires (archive `type` = 0)')
+    parser.add_argument('--snap-degrees', type=float, default=0.01,
+                        help='Pre-aggregation grid in degrees; 0 disables (default 0.01)')
+    parser.add_argument('--min-detections', type=int, default=2,
+                        help='Minimum detections for cells at --fine-from and finer (default 2)')
+    parser.add_argument('--fine-from', type=int, default=4,
+                        help='First resolution the --min-detections filter applies to (default 4)')
+    parser.add_argument('--out-dir', type=Path, default=DEFAULT_OUT,
+                        help=f'Output directory (default {DEFAULT_OUT.relative_to(PROJECT)})')
+    parser.add_argument('--skip-pmtiles', action='store_true', help='Stop after Parquet + LOD JSON')
+    parser.add_argument('--cli-bin', default=None, help='Path to raster-h3-cli')
+    parser.add_argument('--threads', type=int, default=None, help='DuckDB threads')
+    args = parser.parse_args()
+
+    import duckdb
+
+    resolutions = sorted(set(args.resolutions) | set(args.lod_resolutions))
+    for path in args.csv:
+        if not path.is_file():
+            parser.error(f'Not a file: {path}')
+
+    started = time.perf_counter()
+    con = duckdb.connect()
+    if args.threads:
+        con.execute(f'SET threads = {int(args.threads)}')
+
+    n_bins, n_detections, first, last = load_bins(
+        con, args.csv, args.min_confidence, args.vegetation_only,
+        args.snap_degrees, args.high_confidence,
+    )
+    years = max((last - first).days + 1, 1) / 365.25
+    period_label = f'{first.isoformat()} – {last.isoformat()}'
+    print(f'{n_detections:,} detections -> {n_bins:,} snapped locations ({period_label}) '
+          f'[{time.perf_counter() - started:.1f}s]')
+
+    index_bins(con, resolutions)
+    print(f'indexed at resolutions {resolutions} [{time.perf_counter() - started:.1f}s]')
+
+    summary = aggregate_cells(con, resolutions, years, args.min_detections, args.fine_from)
+    for res, cells, detections in summary:
+        print(f'  res {res:>2}: {cells:>10,} cells, {int(detections):>12,} detections')
+
+    parquet_path = args.out_dir / 'global_fire_h3.parquet'
+    write_parquet(con, parquet_path)
+    print(f'wrote {parquet_path} ({parquet_path.stat().st_size / 1e6:.1f} MB) '
+          f'[{time.perf_counter() - started:.1f}s]')
+
+    meta = {
+        'description': 'NASA FIRMS active-fire detections binned to H3 at each resolution '
+                       'directly from detection coordinates.',
+        'source': {
+            'provider': 'NASA FIRMS',
+            'files': sorted(p.name for p in args.csv),
+            'filters': {
+                'minConfidence': args.min_confidence,
+                'vegetationOnly': args.vegetation_only,
+                'snapDegrees': args.snap_degrees,
+                'minDetections': {'value': args.min_detections, 'fromResolution': args.fine_from},
+            },
+            'processor': 'https://github.com/dmuldrew/raster_h3',
+        },
+        'resolutions': [row[0] for row in summary],
+    }
+
+    if not args.skip_pmtiles:
+        pmtiles_path = args.out_dir / 'global_fire.pmtiles'
+        write_pmtiles(parquet_path, pmtiles_path, args.cli_bin)
+        print(f'wrote {pmtiles_path} ({pmtiles_path.stat().st_size / 1e6:.1f} MB) '
+              f'[{time.perf_counter() - started:.1f}s]')
+        meta['pmtiles'] = pmtiles_path.name
+
+    levels = write_lod(con, args.out_dir, args.lod_resolutions, period_label, round(years, 3), meta)
+    for level in levels:
+        print(f'  lod-r{level["resolution"]}.json: {level["cells"]:,} cells')
+    print(f'done in {time.perf_counter() - started:.1f}s')
+
+
+if __name__ == '__main__':
+    main()
