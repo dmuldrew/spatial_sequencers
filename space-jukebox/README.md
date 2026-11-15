@@ -18,7 +18,7 @@ From the repo root:
 
     npm run preview
 
-then open http://localhost:8080/space-jukebox/ — or just open
+then open http://localhost:8123/space-jukebox/ — or just open
 `fly.html` in a browser. It is a single self-contained file; the
 3D library is vendored with the repo, with a CDN fallback for when
 the file is opened straight from disk.
