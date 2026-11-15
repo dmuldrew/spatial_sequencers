@@ -15,6 +15,7 @@ Both files converted to mono PCM WAV, onset-trimmed, shortened and level-adjuste
 Melody: “The Rakes of Mallow,” traditional Irish tune, O’Neill’s Music of
 Ireland (1903), no. 1814. ABC transcription by Bob Safranek:
 https://abcnotation.com/tunePage?a=trillian.mit.edu%2F~jc%2Fmusic%2Fbook%2FONeills%2F_1850%2FX%2F1814_bs%2F0000
-The eight-bar opening is arranged in 4/4 at 122 BPM with a root–fifth vamp.
-The tune is played from the instrument samples above.
+The eight-bar opening is arranged in 4/4 at 122 BPM. The guitar sample plays
+the melody. The synthesized chords use d3-audio's scaleTension:
+https://github.com/dmuldrew/d3-audio
 Fire pops are synthesized locally with a 1.5-second decay.

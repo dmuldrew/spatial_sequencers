@@ -19,8 +19,7 @@ import { MapAudio } from './infrastructure/map-audio.js';
 const element = id => document.getElementById(id);
 const frame = window.frameElement;
 const downloadPrompt = element('download-prompt');
-// Keep the map silent and its Sound control hidden until the instrument blend is distinguishable.
-const MAP_AUDIO_ENABLED = false;
+const MAP_AUDIO_ENABLED = true;
 const mapAudio = MAP_AUDIO_ENABLED ? new MapAudio() : null;
 let mapPointer = null;
 let studyBounds = areaBounds();
@@ -412,7 +411,7 @@ function bindAudioControls() {
       button.setAttribute('aria-pressed', 'true');
       status.textContent = '';
       void mapAudio.loadMusic().catch(() => {
-        if (mapAudio.enabled) status.textContent = 'Music samples unavailable. Hotspot pops are active.';
+        if (mapAudio.enabled) status.textContent = 'Map music unavailable. Hotspot sounds are active.';
       });
     } catch {
       status.textContent = 'Sound unavailable. Try again.';

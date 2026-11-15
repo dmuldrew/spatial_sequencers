@@ -1,64 +1,29 @@
-const BEAT = 60 / 122;
-const BEATS_PER_BAR = 4;
+import { createVampScale, renderVamp, TENSION_PRESETS } from '../domain/folk-vamp.js';
+
 const LEVEL = 0.5;
 
-// "The Rakes of Mallow", O'Neill no. 1814, with the opening eight bars
-// expanded from 2/4 to 4/4. Pitches are semitones from C4.
-const F_SHARP = 6, G = 7, A = 9, B = 11, C = 12, D = 14;
-const halfBeat = (...pitches) => pitches.map(pitch => [pitch, 0.5]);
-const MELODY = [
-  [G, B, G, B],
-  [G, B, ...halfBeat(C, B, A, G)],
-  [F_SHARP, A, F_SHARP, A],
-  [F_SHARP, A, ...halfBeat(D, C, B, A)],
-  [G, B, G, B],
-  [G, B, D, B],
-  halfBeat(C, B, A, G, F_SHARP, G, A, C),
-  [B, G, G], // Rest on the last beat.
-];
-const BASS = [G, G, D, D, G, G, C, G].map(pitch => pitch % 12);
-const INSTRUMENTS = [
-  { name: 'guitar', sampleHz: 262.5, attack: 0.004, gate: 0.96, level: 0.72 },
-  { name: 'trumpet', sampleHz: 259.412, attack: 0.008, gate: 0.88, level: 0.9 },
-];
-
-async function renderVamp(context, instrument) {
-  const response = await fetch(new URL(`../../audio/${instrument.name}.wav`, import.meta.url));
-  if (!response.ok) throw new Error(`Could not load ${instrument.name}`);
+async function loadGuitar(context) {
+  const response = await fetch(new URL('../../audio/guitar.wav', import.meta.url));
+  if (!response.ok) throw new Error('Could not load guitar sample');
   const sample = await context.decodeAudioData(await response.arrayBuffer());
-  const sampleRate = context.sampleRate;
-  const length = Math.round(MELODY.length * BEATS_PER_BAR * BEAT * sampleRate);
-  const track = new OfflineAudioContext(1, length, sampleRate);
+  return { pcm: sample.getChannelData(0), sampleRate: sample.sampleRate };
+}
 
-  function note(pitch, position, beats, level) {
-    const source = track.createBufferSource();
-    const envelope = track.createGain();
-    const start = position * BEAT;
-    const end = start + beats * BEAT * instrument.gate;
-    source.buffer = sample;
-    source.playbackRate.value = (261.626 / instrument.sampleHz) * 2 ** (pitch / 12);
-    envelope.gain.setValueAtTime(0, start);
-    envelope.gain.linearRampToValueAtTime(level * instrument.level, start + instrument.attack);
-    envelope.gain.setValueAtTime(level * instrument.level, end - 0.035);
-    envelope.gain.linearRampToValueAtTime(0, end);
-    source.connect(envelope).connect(track.destination);
-    source.start(start);
-    source.stop(end);
-  }
-
-  for (const [bar, melody] of MELODY.entries()) {
-    const start = bar * BEATS_PER_BAR;
-    let position = start;
-    for (const entry of melody) {
-      const [pitch, beats] = Array.isArray(entry) ? entry : [entry, 1];
-      note(pitch, position, beats, position % 2 === 0 ? 0.9 : 0.76);
-      position += beats;
-    }
-    // A quiet root–fifth vamp underneath the same melody on both instruments.
-    note(BASS[bar] - 12, start, 0.7, 0.22);
-    note((BASS[bar] + 7) % 12 - 12, start + 2, 0.55, 0.18);
-  }
-  return track.startRendering();
+function loadD3Audio() {
+  if (globalThis.d3Audio?.scaleTension) return Promise.resolve(globalThis.d3Audio);
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = new URL('../../../vendor/d3-audio.js', import.meta.url);
+    script.onload = () => {
+      if (globalThis.d3Audio?.scaleTension) resolve(globalThis.d3Audio);
+      else reject(new Error('d3-audio did not provide scaleTension'));
+    };
+    script.onerror = () => {
+      script.remove();
+      reject(new Error('Could not load d3-audio'));
+    };
+    document.head.append(script);
+  });
 }
 
 export class MapAudio {
@@ -79,7 +44,7 @@ export class MapAudio {
         compressor.threshold.value = -18;
         compressor.ratio.value = 12;
         this.master.connect(compressor).connect(this.context.destination);
-        this.mix = INSTRUMENTS.map(() => {
+        this.mix = TENSION_PRESETS.map(() => {
           const gain = this.context.createGain();
           gain.gain.value = 0;
           gain.connect(this.master);
@@ -96,9 +61,18 @@ export class MapAudio {
   }
 
   loadMusic() {
-    this.musicPromise ??= Promise.all(INSTRUMENTS.map(instrument => renderVamp(this.context, instrument)))
-      .then(buffers => {
-        this.buffers = buffers;
+    this.musicPromise ??= Promise.all([loadGuitar(this.context), loadD3Audio()])
+      .then(([guitar, d3Audio]) => {
+        const sampleRate = this.context.sampleRate;
+        this.tension = createVampScale(d3Audio);
+        const states = TENSION_PRESETS.map(heat => this.tension(heat));
+        this.tiers = states.map(state => state.tier);
+        this.buffers = states.map(state => {
+          const pcm = renderVamp(guitar, sampleRate, state, d3Audio);
+          const buffer = this.context.createBuffer(1, pcm.length, sampleRate);
+          buffer.copyToChannel(pcm, 0);
+          return buffer;
+        });
         this.updateHover();
       }).catch(error => {
         this.musicPromise = null;
@@ -107,9 +81,9 @@ export class MapAudio {
     return this.musicPromise;
   }
 
-  hover(blend) {
-    if (this.blend?.heat === blend?.heat) return;
-    this.blend = blend;
+  hover(heat) {
+    if (this.heat === heat) return;
+    this.heat = heat;
     this.updateHover();
   }
 
@@ -117,9 +91,12 @@ export class MapAudio {
     clearTimeout(this.leaveTimer);
     if (!this.enabled || !this.buffers || this.context.state !== 'running') return;
     const now = this.context.currentTime;
-    const gains = this.blend ? [this.blend.guitar, this.blend.trumpet] : [0, 0];
-    this.mix.forEach(({ gain }, index) => gain.setTargetAtTime(gains[index], now, 0.025));
-    if (!this.blend) {
+    const hovering = Number.isFinite(this.heat);
+    const tier = hovering ? this.tension(this.heat).tier : null;
+    this.mix.forEach(({ gain }, index) => {
+      gain.setTargetAtTime(this.tiers[index] === tier ? 1 : 0, now, 0.025);
+    });
+    if (!hovering) {
       this.leaveTimer = setTimeout(() => this.stopMusic(), 180);
       return;
     }

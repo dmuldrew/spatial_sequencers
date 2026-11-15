@@ -202,8 +202,7 @@ and VIIRS detections. Adding VIIRS and reconciling detections across the two
 sensors are future work.
 
 For the [Earth Information Jukebox challenge](#1-the-earth-information-jukebox),
-the goal is to turn map data into music in real time. Map audio is currently
-disabled.
+the goal is to turn map data into music in real time. Select **Sound** to listen.
 
 - Focus the map and use the arrow keys to pan.
 - Select **Replay** or scrub the **Fire timeline (UTC)** to see when hotspots
