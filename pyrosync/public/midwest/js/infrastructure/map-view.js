@@ -62,6 +62,9 @@ export class MapView {
   }
 
   updateLimits(resolutionMeters, reset = false, preserveScale = false) {
+    // Dashboard tabs hide the iframe. Keep its zoom until it has a size again.
+    const container = this.map.getContainer();
+    if (!container.clientWidth || !container.clientHeight) return;
     const position = this.getZoomPercent();
     const previousZoom = this.map.getZoom();
     this.map.invalidateSize({ pan: false });
