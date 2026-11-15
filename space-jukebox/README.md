@@ -44,6 +44,8 @@ power (FRP), embedded from PyroSync's bundled data.
   FRP. The loudest moment on the planet: Australia, FRP 5083.
 - **Narration:** entering a region speaks its name, hotspot count,
   and strongest FRP. Toggle with the Narration button or the N key.
+- **On the map:** hotspot dots are sized by FRP as well as coloured —
+  the biggest, reddest dots are the strongest fires.
 
 ## Controls
 
@@ -70,7 +72,9 @@ left trigger slows down, A pauses/resumes, Y narration, X mute,
 B camera, bumpers set tour speed, and Start switches pilot mode.
 Everything sonified keeps working in manual flight, because the
 sound has always been driven by where the ship is, not by the
-tour path.
+tour path. Switching to manual also flattens the globe into a
+flat (equirectangular) map for the flight; switching back
+restores the sphere.
 
 ## Technical notes
 
