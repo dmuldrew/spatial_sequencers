@@ -163,6 +163,8 @@ export function createFlybyController(bridge) {
     lastPingMs: 0,
     // Fire history sonification
     lastHistoryCellKey: null,
+    lastTrendMs: 0,
+    lastSeasonMonth: 0,
     nextCrackleMs: 0,
     lastScan: null,
     lastHudMs: 0
@@ -661,7 +663,11 @@ export function createFlybyController(bridge) {
         lng: col('lng'),
         detections: col('detections'),
         density: col('density'),
-        frpMax: col('frp_max')
+        frpMax: col('frp_max'),
+        // Optional (older extracts lack them): trend and fire season.
+        trend: col('trend_log2') || null,
+        peakMonth: col('peak_month') || null,
+        peakShare: col('peak_share') || null
       };
     }
     const payload = await fetch(url).then((r) => (r.ok ? r.json() : null));
@@ -673,7 +679,10 @@ export function createFlybyController(bridge) {
       lng: new Float32Array(n),
       detections: Float64Array.from(rows, (r) => r[1]),
       density: Float64Array.from(rows, (r) => r[2]),
-      frpMax: Float64Array.from(rows, (r) => (r[3] == null ? NaN : r[3]))
+      frpMax: Float64Array.from(rows, (r) => (r[3] == null ? NaN : r[3])),
+      trend: rows.length && rows[0].length > 4 ? Float64Array.from(rows, (r) => (r[4] == null ? NaN : r[4])) : null,
+      peakMonth: rows.length && rows[0].length > 5 ? Uint8Array.from(rows, (r) => r[5] || 0) : null,
+      peakShare: rows.length && rows[0].length > 6 ? Float64Array.from(rows, (r) => (r[6] == null ? NaN : r[6])) : null
     };
     out.ids.forEach((id, i) => {
       [out.lat[i], out.lng[i]] = h3.cellToLatLng(id);
@@ -702,7 +711,14 @@ export function createFlybyController(bridge) {
     const quat = new THREE.Quaternion();
     for (let idx = 0; idx < n; idx += 1) {
       const density = data.density[idx];
-      cells.set(data.ids[idx], [data.detections[idx], density, data.frpMax[idx]]);
+      cells.set(data.ids[idx], [
+        data.detections[idx],
+        density,
+        data.frpMax[idx],
+        data.trend ? data.trend[idx] : NaN,
+        data.peakMonth ? data.peakMonth[idx] : 0,
+        data.peakShare ? data.peakShare[idx] : NaN
+      ]);
       const t = density > 0 ? (Math.log10(density) - lo) / (hi - lo || 1) : 0;
       // Same absolute heights at every level, so swapping levels does not jump.
       const height = 0.012 + clamp(t, 0, 1) * 0.11;
@@ -786,6 +802,19 @@ export function createFlybyController(bridge) {
     if (t < 0.5) return 'moderate';
     if (t < 0.75) return 'high';
     return 'very high';
+  }
+
+  const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July',
+    'August', 'September', 'October', 'November', 'December'];
+
+  // Percent change in mean yearly detections, late window vs early window.
+  function fireTrendPercent(trendLog2) {
+    return Number.isFinite(trendLog2) ? Math.round((Math.pow(2, trendLog2) - 1) * 100) : null;
+  }
+
+  function fireTrendWindows() {
+    const t = historyMeta?.trend;
+    return t?.early && t?.late ? { early: `${t.early[0]}–${t.early[1]}`, late: `${t.late[0]}–${t.late[1]}` } : null;
   }
 
   function fireHistoryYears() {
@@ -1075,6 +1104,20 @@ export function createFlybyController(bridge) {
         volume: -16,
         envelope: { attack: 0.001, decay: 0.012, sustain: 0, release: 0.006 }
       }).connect(audioBus.crackleFilter);
+      // Trend: a short, quiet chord from d3-audio's tension scale. Rising fire activity
+      // sounds tense / dissonant, steady or falling sounds consonant.
+      audioBus.trendPad = new Tone.PolySynth(Tone.AMSynth, {
+        volume: -24,
+        envelope: { attack: 0.06, decay: 0.3, sustain: 0.25, release: 0.9 }
+      }).connect(audioBus.historyOut);
+      // Season: a bell whose pitch steps through 12 semitones with the peak fire month.
+      audioBus.seasonBell = new Tone.FMSynth({
+        harmonicity: 3.01,
+        modulationIndex: 9,
+        volume: -18,
+        envelope: { attack: 0.002, decay: 0.9, sustain: 0, release: 0.6 },
+        modulationEnvelope: { attack: 0.002, decay: 0.4, sustain: 0, release: 0.3 }
+      }).connect(audioBus.historyOut);
       audioBus.cellPluck = new Tone.PluckSynth({
         attackNoise: 0.6,
         dampening: 3200,
@@ -1200,6 +1243,7 @@ export function createFlybyController(bridge) {
           audioBus.cellPluck.triggerAttackRelease(note, 0.4);
         } catch (_) {}
       }
+      playFireTrendAndSeason(nowMs, historyCell);
     }
 
     // Crackle: random (Poisson-like) clicks, 1.5 to ~32 per second with density.
@@ -1209,6 +1253,33 @@ export function createFlybyController(bridge) {
       try {
         audioBus.crackle.triggerAttackRelease(0.01, undefined, 0.12 + t * 0.5);
       } catch (_) {}
+    }
+  }
+
+  // Trend chord and season bell, on cell entry. The chord is throttled so fast low-altitude
+  // flight does not smear it; the bell only rings when the peak month changes, so it
+  // marks fire-season boundaries (e.g. crossing the African savanna belts north to south).
+  function playFireTrendAndSeason(nowMs, cell) {
+    if (Number.isFinite(cell.trend) && audioBus.trendPad && nowMs - (sim.lastTrendMs || 0) >= 1100) {
+      sim.lastTrendMs = nowMs;
+      // Rising activity maps onto the tension domain [0, 3]: doubling (+1) is already tense.
+      const tension = bridge.tensionScale(clamp(cell.trend * 2, 0, 3));
+      const gain = 0.18 + clamp(Math.abs(cell.trend), 0, 1.5) * 0.25;
+      try {
+        audioBus.trendPad.set({ detune: tension.detuneCents || 0 });
+        audioBus.trendPad.triggerAttackRelease(tension.chord, 0.5, undefined, gain);
+      } catch (_) {}
+    }
+    if (cell.peakMonth >= 1 && audioBus.seasonBell && cell.peakMonth !== sim.lastSeasonMonth) {
+      const previous = sim.lastSeasonMonth;
+      sim.lastSeasonMonth = cell.peakMonth;
+      if (previous) {
+        const midi = 72 + (cell.peakMonth - 1); // January = C5 ... December = B5
+        const strength = Number.isFinite(cell.peakShare) ? clamp(cell.peakShare * 2.2, 0.25, 0.9) : 0.5;
+        try {
+          audioBus.seasonBell.triggerAttackRelease(440 * Math.pow(2, (midi - 69) / 12), 0.6, undefined, strength);
+        } catch (_) {}
+      }
     }
   }
 
@@ -1225,6 +1296,17 @@ export function createFlybyController(bridge) {
         const t = fireHistoryNorm(cell.density);
         const years = fireHistoryYears().replace('–', ' to ');
         text = `${cell.detections.toLocaleString()} fires detected here from ${years}. ${fireHistoryDensityWord(t)} fire density.`;
+        const pct = fireTrendPercent(cell.trend);
+        const win = fireTrendWindows();
+        if (pct !== null && win) {
+          text += Math.abs(pct) < 5
+            ? ` Fire activity about the same in ${win.late} as in ${win.early}.`
+            : ` Fire activity ${pct > 0 ? 'up' : 'down'} ${Math.abs(pct)} percent from ${win.early} to ${win.late}.`;
+        }
+        if (cell.peakMonth >= 1) {
+          const share = Number.isFinite(cell.peakShare) ? Math.round(cell.peakShare * 100) : null;
+          text += ` Fire season peaks in ${MONTH_NAMES[cell.peakMonth - 1]}${share === null ? '' : `, with ${share} percent of fires`}.`;
+        }
       } else {
         text = 'No fires recorded here in the fire history.';
       }
@@ -1495,7 +1577,17 @@ export function createFlybyController(bridge) {
     if (window.h3 && activeHistoryLevel && historyGroup?.visible) {
       const id = window.h3.latLngToCell(geo.lat, geo.lon, activeHistoryLevel.res);
       const row = activeHistoryLevel.cells.get(id);
-      if (row) historyCell = { id, res: activeHistoryLevel.res, detections: row[0], density: row[1] };
+      if (row) {
+        historyCell = {
+          id,
+          res: activeHistoryLevel.res,
+          detections: row[0],
+          density: row[1],
+          trend: row[3],
+          peakMonth: row[4],
+          peakShare: row[5]
+        };
+      }
     }
 
     const activeRec = nearestTower
@@ -1553,9 +1645,12 @@ export function createFlybyController(bridge) {
       } else if (scan.fireBin && scan.distToFire < 8.5 && fireGroup?.visible !== false) {
         dom.hudHex.textContent = `${scan.fireBin.count} hotspots · ${Math.round(scan.fireBin.totalFrp)} MW FRP`;
       } else if (scan.historyCell) {
-        const { res, detections, density } = scan.historyCell;
+        const { res, detections, density, trend, peakMonth } = scan.historyCell;
         const per1000 = (density * 1000).toPrecision(2);
-        dom.hudHex.textContent = `${fireHistoryYears()} r${res}: ${detections.toLocaleString()} fires · ${per1000}/1000 km²/yr`;
+        const pct = fireTrendPercent(trend);
+        const trendTag = pct === null ? '' : ` · ${pct >= 0 ? '↑' : '↓'}${Math.abs(pct)}%`;
+        const peakTag = peakMonth >= 1 ? ` · peak ${MONTH_NAMES[peakMonth - 1].slice(0, 3)}` : '';
+        dom.hudHex.textContent = `${fireHistoryYears()} r${res}: ${detections.toLocaleString()} fires · ${per1000}/1000 km²/yr${trendTag}${peakTag}`;
       } else if (scan.currentH3Res3) {
         dom.hudHex.textContent = `H3 r3 ${scan.currentH3Res3}`;
       }
