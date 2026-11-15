@@ -103,7 +103,10 @@ function parseModisCsvSample(csvText, limit = 300) {
 }
 
 const server = http.createServer(async (req, res) => {
-  const reqPath = decodeURI((req.url || '/').split('?')[0]);
+  const rawPath = decodeURI((req.url || '/').split('?')[0]);
+  const reqPath = rawPath
+    .replace(/^\/hub\/(pyrosync|spaceship-flyby|space-jukebox)(?=\/|$)/, '/$1')
+    .replace(/^\/pyrosync(?=\/|$)/, '') || '/';
 
   if (reqPath === '/api/health') {
     return sendJson(res, 200, { status: 'ok', service: 'pyrosync-spatial-sequencers' });

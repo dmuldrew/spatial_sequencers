@@ -84,6 +84,8 @@ REQUIRED_FILES=(
   "data/fire_weather_data.json"
   "midwest/map.html"
   "midwest/data/midwest.json"
+  "spaceship-flyby/index.html"
+  "hub/index.html"
   "vendor/d3.min.js"
   "vendor/Tone.js"
   "vendor/d3-audio.js"

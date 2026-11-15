@@ -822,6 +822,55 @@ table.data-table tbody tr.is-current-row td {
 }
 
 /* Primary Page Visualization Tabs */
+.website-choice-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+  margin-bottom: 0.85rem;
+  padding: 0.45rem 0.75rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+}
+
+.website-choice-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--muted);
+  margin-right: 0.25rem;
+}
+
+.website-choice-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-block-size: 2rem;
+  padding: 0.28rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-elevated);
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.website-choice-pill:hover {
+  border-color: var(--cyan);
+}
+
+.website-choice-pill[aria-current="page"] {
+  background: rgba(56, 189, 248, 0.16);
+  border-color: var(--cyan);
+  color: var(--cyan);
+}
+
+.website-choice-pill.is-highlight {
+  border-color: rgba(245, 158, 11, 0.65);
+  color: var(--amber);
+}
+
 .page-tabs {
   display: flex;
   flex-wrap: wrap;
