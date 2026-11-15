@@ -1,16 +1,10 @@
-# Build and deploy PyroSync static bundle (public/ + vendor/ + .nojekyll) to GitHub Pages
+# Build and deploy PyroSync static bundle (pyrosync/public/ + vendor/ + .nojekyll) to GitHub Pages
 name: Deploy PyroSync to GitHub Pages
 
 on:
   push:
     branches: ["main"]
   workflow_dispatch:
-    inputs:
-      branch:
-        description: "Branch, tag, or commit SHA to build and deploy"
-        required: false
-        default: "main"
-        type: string
 
 permissions:
   contents: read
@@ -28,10 +22,8 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout target ref
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.branch || github.ref }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -39,18 +31,23 @@ jobs:
           node-version: "22"
 
       - name: Build static bundle (public + vendor + .nojekyll)
-        run: |
-          chmod +x scripts/deploy-gh-pages.sh
-          ./scripts/deploy-gh-pages.sh --build-only
-          echo "Deployed source ref: ${{ inputs.branch || github.ref }} ($(git rev-parse --short HEAD))" >> "$GITHUB_STEP_SUMMARY"
+        run: ./pyrosync/scripts/deploy-gh-pages.sh --build-only
 
+      - name: Assemble site (landing page + both projects)
+        run: |
+          rm -rf ./site-dist
+          mkdir -p ./site-dist/pyrosync ./site-dist/space-jukebox
+          cp ./site/index.html ./site-dist/index.html
+          cp -R ./pyrosync/dist/. ./site-dist/pyrosync/
+          cp ./space-jukebox/index.html ./site-dist/space-jukebox/index.html
+          cp ./space-jukebox/fly.html ./site-dist/space-jukebox/fly.html
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: './dist'
+          path: './site-dist'
 
       - name: Deploy to GitHub Pages
         id: deployment
