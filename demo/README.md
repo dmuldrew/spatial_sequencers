@@ -12,8 +12,10 @@ to 7 slides — public link, no login required.
 - **`shot-list.md`** — the plan for the 30-second video version: six timed
   shots, what should be on screen and audible in each, recording steps, and
   the end card text.
-- **`img/`** — stills from the real Space Jukebox flight (globe, flat-map
-  Manual Pilot, the Australia pass) and the team icon, used by the deck.
+- **`img/`** — a looping ~5-second GIF of every sub-project (PyroSync's
+  spiral, the Space Jukebox flight, the Midwest timeline, the Combined
+  Flyby), captured from the real apps, plus stills from the flight and the
+  team icon.
 
 Live project: <https://dmuldrew.github.io/spatial_sequencers/> ·
 Original repo: <https://github.com/dmuldrew/spatial_sequencers>
