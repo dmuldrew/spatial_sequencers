@@ -4,7 +4,7 @@
 //   /                -> site/index.html          (project hub)
 //   /pyrosync/       -> pyrosync/public/         (PyroSync app; /pyrosync/vendor/*
 //                                                  is served from pyrosync/node_modules)
-//   /space-jukebox/  -> space-jukebox/           (Space Jukebox player + 3D flight)
+//   /space-jukebox/  -> space-jukebox/fly.html   (Space Jukebox 3D flight)
 //
 // Usage:  npm run preview [-- <port>] [-- --no-open]   (default port 8080)
 //         or directly: node preview.js [port] [--no-open]
@@ -106,8 +106,11 @@ const server = http.createServer((req, res) => {
   if (urlPath === "/pyrosync" || urlPath.startsWith("/pyrosync/")) {
     return serveFromDir(res, path.join(ROOT, "pyrosync", "public"), urlPath.slice("/pyrosync".length) || "/");
   }
-  if (urlPath === "/space-jukebox" || urlPath.startsWith("/space-jukebox/")) {
-    return serveFromDir(res, path.join(ROOT, "space-jukebox"), urlPath.slice("/space-jukebox".length) || "/");
+  if (urlPath === "/space-jukebox" || urlPath === "/space-jukebox/") {
+    return sendFile(res, path.join(ROOT, "space-jukebox", "fly.html"));
+  }
+  if (urlPath.startsWith("/space-jukebox/")) {
+    return serveFromDir(res, path.join(ROOT, "space-jukebox"), urlPath.slice("/space-jukebox".length));
   }
   res.writeHead(404, { "Content-Type": "text/plain" });
   res.end("404 Not Found\n\nThis preview serves:\n  /\n  /pyrosync/\n  /space-jukebox/\n");
@@ -118,8 +121,7 @@ server.listen(PORT, () => {
   console.log("Spatial Sequencers — local preview");
   console.log(`  Hub:           ${base}/`);
   console.log(`  PyroSync:      ${base}/pyrosync/`);
-  console.log(`  Space Jukebox: ${base}/space-jukebox/`);
-  console.log(`  3D flight:     ${base}/space-jukebox/fly.html`);
+  console.log(`  Space Jukebox: ${base}/space-jukebox/  (3D flight)`);
   const d3 = path.join(ROOT, "pyrosync", "node_modules", "d3");
   if (!fs.existsSync(d3)) {
     console.log("\n  NOTE: PyroSync vendor libraries are missing (install did not complete).");
