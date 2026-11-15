@@ -669,13 +669,9 @@ button {
 
 /* Narrative & Reference Section */
 .reference-section {
-  margin-top: .75rem;
-  padding-top: .75rem;
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
   border-top: 1px solid var(--border);
-}
-
-.reference-section summary {
-  cursor: pointer;
 }
 
 .cards-grid {
@@ -813,7 +809,6 @@ table.data-table tbody tr.is-current-row td {
 @media (forced-colors: active) {
   .panel,
   .btn,
-  .page-tab,
   .stage-canvas,
   .hud-corner,
   .flyby-viewport,
