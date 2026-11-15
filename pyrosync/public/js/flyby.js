@@ -20,48 +20,84 @@ const FIRE_HISTORY_STOPS = ['#4c0519', '#b91c1c', '#f97316', '#facc15', '#fef9c3
 // the context sentence explains why fire is common there.
 const TOUR_STOPS = [
   {
-    id: 'california', name: 'Northern California', lat: 41.83, lon: -123.67,
-    context: "This is the Klamath Mountains of northern California. A Mediterranean climate brings wet winters that grow vegetation and long, dry summers that cure it. Lightning and people start fires in late summer, and fire seasons here have grown larger and hotter in recent decades."
+    id: 'california', name: "Northern California's Klamath Mountains", lat: 41.83, lon: -123.67,
+    // UC Berkeley / PNAS 2022: Indigenous burning shaped Klamath forests for a millennium.
+    context: [
+      'Karuk and Yurok cultural burning kept these forests open for at least a thousand years.',
+      'A century of fire suppression let them grow dense, and with a warming climate, fires here now burn larger.'
+    ]
   },
   {
-    id: 'brazil', name: "Brazil's Cerrado", lat: -6.23, lon: -45.14,
-    context: "Below is Maranhão, in Brazil's Cerrado savanna on the edge of the Amazon. Farmers and ranchers use fire to clear land and renew pasture during the dry season, from July to October, and escaped fires spread through the dry grasses."
+    id: 'brazil', name: "Maranhão, in Brazil's Cerrado", lat: -6.23, lon: -45.14,
+    // MATOPIBA studies: Maranhão and Tocantins lead Cerrado burned area; fires track fresh clearing.
+    context: [
+      'Maranhão sits on the Cerrado\'s soy and cattle frontier, where it and Tocantins burn the most of any states in the biome.',
+      'Most fires here follow freshly cleared land, set in the dry season from July to October.'
+    ]
   },
   {
     id: 'northern-savanna', name: "Africa's northern savanna", lat: 5.57, lon: 28.29,
-    context: "This is the northern African savanna belt, near the borders of South Sudan, the Central African Republic and Congo. The dry season runs from November to March. Grasses dry out, and people burn to clear fields, refresh grazing land and hunt. The fires are mostly small, but extremely numerous."
+    // Andela et al., Science 2017: savanna burned area fell as cropland and livestock fragmented grassland.
+    context: [
+      'Each dry season, from November to March, people burn these grasslands to clear fields and renew grazing.',
+      'Across Africa\'s northern savannas, burned area has fallen as farms and herds break up the grass that carries fire.'
+    ]
   },
   {
     id: 'angola', name: "Angola's miombo woodlands", lat: -9.42, lon: 17.97,
-    context: "Welcome to Angola's miombo woodlands and savannas, the most fire-dense region on Earth in the satellite record. The Southern Hemisphere dry season, from May to October, cures the grass that grew in the rains, and fire is used routinely for farming, grazing and hunting."
+    // Catarino et al. 2022: ~30% of Angola burns each year (MODIS 2001-2019); Africa ~70% of global burned area.
+    context: [
+      'Africa holds about 70 percent of the world\'s burned area, and roughly 30 percent of Angola burns every year.',
+      'These are mostly small savanna and farm fires, not forest clearing.'
+    ]
   },
   {
-    id: 'yakutia', name: 'Yakutia, Siberia', lat: 62.32, lon: 127.33,
-    context: "This is Yakutia, in eastern Siberia: a vast larch forest growing on permafrost. Lightning and people start fires during the short summer, and record heat in recent years, such as 2021, drove some of the largest fire seasons ever seen here."
+    id: 'yakutia', name: 'Yakutia, in eastern Siberia', lat: 62.32, lon: 127.33,
+    // NASA Earth Observatory: 2021 was Sakha's record burn year in the MODIS era (~9.4 million ha).
+    context: [
+      'Larch forests on carbon-rich permafrost start burning soon after the snow melts.',
+      'In 2021, Yakutia burned more than nine million hectares, its largest fire year in the satellite record.'
+    ]
   },
   {
     id: 'laos', name: 'Northern Laos', lat: 19.72, lon: 102.31,
-    context: "We are over northern Laos, in mainland Southeast Asia's burning season. In the dry months of February to April, farmers burn crop stubble and clear hillside plots for shifting cultivation, and smoke haze settles over the region."
+    // Lao air-quality reporting: shifting-cultivation burning; March-April haze; Jan-Apr burn ban (2025-26).
+    context: [
+      'Farmers burn hillside plots for shifting cultivation, and smoke haze peaks in March and April.',
+      'Laos now bans outdoor burning from January to April to cut the haze.'
+    ]
   },
   {
-    id: 'kalimantan', name: 'Central Kalimantan, Borneo', lat: -2.79, lon: 113.85,
-    context: "This is Central Kalimantan on Borneo, where drained tropical peatlands can smoulder for weeks. Fires are worst in El Niño drought years, such as 2006, 2015 and 2019, when the peat dries out and smoke spreads across Southeast Asia."
+    id: 'kalimantan', name: 'Central Kalimantan, on Borneo', lat: -2.79, lon: 113.85,
+    // Mongabay / CIFOR: failed Mega Rice Project drained peat; 2015 El Nino fires; canal blocking by the peat agency.
+    context: [
+      'The failed Mega Rice Project of the 1990s drained a million hectares of peat swamp here.',
+      'In El Niño droughts like 2015 the dry peat smoulders for weeks; canals are now being blocked to rewet it.'
+    ]
   },
   {
     id: 'north-australia', name: "Northern Australia's savannas", lat: -13.39, lon: 132.2,
-    context: "Finally, northern Australia's tropical savannas. Land managers, including Indigenous ranger programs, burn early in the dry season, around May, to break up the fuel and prevent the large, hot fires that otherwise sweep through late in the year."
+    // WALFA studies: early dry-season burning cut late-season fires and emissions by ~38%.
+    context: [
+      'Rangers, many of them Indigenous, burn early in the dry season, when fires are cool and patchy.',
+      'Projects like West Arnhem Land have cut late-season fires and emissions by more than a third.'
+    ]
   }
 ];
 
 const TOUR_INTRO = [
-  'Welcome aboard PyroSat-1. This guided tour flies to the world\'s fire hotspots.',
-  'The glowing hexagons below map twenty-five years of NASA satellite fire detections. Yellow and white hexagons have the most fire; dark red ones, the least.',
-  'The tall orange towers are fires detected in the past seven days.',
-  'Listen to the ground. The crackle speeds up over dense fire, and each new hexagon plucks a note: higher notes mean more fire.',
-  'A short chord tells the trend. Tense, clashing chords mean fire activity has risen since the 2000s; calm chords mean it has held steady or fallen.',
-  'A bell rings when we cross into a region with a different fire season. Higher bells mean later in the year.',
-  'Press F at any time to hear the fire history beneath the ship.'
+  'Welcome aboard PyroSat-1. We are touring the world\'s fire hotspots.',
+  'The hexagons show 25 years of satellite fire detections: yellow means the most fire, dark red the least. Orange towers are a recent week\'s most intense fires.',
+  'Listen: crackle and higher notes mean more fire, a tense chord means fire is rising, and a bell marks a new fire season.',
+  'Press F at any time for the fire history below.'
 ];
+
+// Tour flight: a great-circle transit that arcs up for a wider view, then a constant
+// circle around each hotspot. Scene units: 1 unit = 265 km.
+const TOUR_ORBIT_ALT = 2.7;      // about 715 km
+const TOUR_ORBIT_RADIUS = 1.1;   // about 290 km, so the featured hexagon stays in view
+const TOUR_ORBIT_SPEED = 0.8;    // units per second along the circle (about 9 s per lap)
+const TOUR_TRANSIT_SPEED = 5.5;  // ground-track units per second
 
 // Chase camera aims below the ship so it sits in the upper third of the screen
 // (about 40% of the way up from centre with the 56-degree field of view) and more
@@ -1404,32 +1440,24 @@ export function createFlybyController(bridge) {
     if (!level || !window.h3) return [];
     const row = level.cells.get(window.h3.latLngToCell(stop.lat, stop.lon, level.res));
     if (!row) return [];
-    const [detections, density, , trend, peakMonth] = row;
-    const years = fireHistoryYears().replace('–', ' to ');
-    const lines = [];
-    let first = `Satellites detected ${Math.round(detections).toLocaleString()} fires in the hexagon below from ${years}`;
-    first += peakMonth >= 1 ? `, peaking in ${MONTH_NAMES[peakMonth - 1]}.` : '.';
-    lines.push(first);
-    lines.push(`That is ${fireHistoryDensityWord(fireHistoryNorm(density))} fire density, about ${Math.round(density * 1000).toLocaleString()} fires per thousand square kilometres each year.`);
+    const [detections, , , trend, peakMonth] = row;
+    const startYear = (fireHistoryYears().match(/\d{4}/) || ['2001'])[0];
+    let line = `The hexagon at the centre of our circle logged ${Math.round(detections).toLocaleString()} fires since ${startYear}`;
+    if (peakMonth >= 1) line += `, peaking in ${MONTH_NAMES[peakMonth - 1]}`;
     const pct = fireTrendPercent(trend);
-    const win = fireTrendWindows();
-    if (pct !== null && win) {
-      const early = win.early.replace('–', ' to ');
-      const late = win.late.replace('–', ' to ');
-      if (Math.abs(pct) < 10) {
-        lines.push(`Fire activity in ${late} was about the same as in ${early}, so listen for a calm trend chord.`);
-      } else if (pct > 0) {
-        lines.push(`Detections in ${late} were ${pct} percent higher than in ${early}, which is why the trend chord sounds tense.`);
-      } else {
-        lines.push(`Detections in ${late} were ${Math.abs(pct)} percent lower than in ${early}, so the trend chord stays calm.`);
-      }
+    if (pct !== null && fireTrendWindows()) {
+      if (Math.abs(pct) < 10) line += ', with a steady trend, so the chord is calm.';
+      else if (pct > 0) line += `, up ${pct} percent in the last decade, hence the tense chord.`;
+      else line += `, down ${Math.abs(pct)} percent in the last decade, so the chord stays calm.`;
+    } else {
+      line += '.';
     }
-    return lines;
+    return [line];
   }
 
   function startTour({ intro = true, resume = false } = {}) {
     stopNarration();
-    sim.tour.phase = 'transit';
+    beginTourLeg(tourStop());
     sim.tour.started = true;
     const lines = [];
     const state = bridge.getState();
@@ -1442,24 +1470,122 @@ export function createFlybyController(bridge) {
     narrate(lines);
   }
 
-  // Called every frame while the tour is active: arrival, narration and departure.
-  function updateTour() {
+  // East/north unit vectors on the sphere at unit direction `dir`.
+  function surfaceFrame(dir) {
+    const east = new THREE.Vector3().crossVectors(UP_Y, dir);
+    if (east.lengthSq() < 1e-8) east.set(1, 0, 0);
+    east.normalize();
+    const north = new THREE.Vector3().crossVectors(dir, east).normalize();
+    return { east, north };
+  }
+
+  // Unit direction of the point at bearing `theta` on the circle around `stop`.
+  function tourCircleDir(stop, theta) {
+    const c = latLonAltToVec3(stop.lat, stop.lon, 1, new THREE.Vector3()).normalize();
+    const { east, north } = surfaceFrame(c);
+    const a = TOUR_ORBIT_RADIUS / EARTH_R;
+    return c.multiplyScalar(Math.cos(a))
+      .addScaledVector(east, Math.cos(theta) * Math.sin(a))
+      .addScaledVector(north, Math.sin(theta) * Math.sin(a))
+      .normalize();
+  }
+
+  // Great-circle leg from the ship to the circle around `stop`, entering the circle on the
+  // side facing the ship, with an altitude arc that peaks higher on longer legs.
+  function beginTourLeg(stop) {
+    const from = sim.craftPos.clone().normalize();
+    const c = latLonAltToVec3(stop.lat, stop.lon, 1, new THREE.Vector3()).normalize();
+    const { east, north } = surfaceFrame(c);
+    const theta = Math.atan2(from.dot(north), from.dot(east)) || 0;
+    const to = tourCircleDir(stop, theta);
+    const arc = Math.acos(clamp(from.dot(to), -1, 1));
+    const ground = arc * EARTH_R;
+    const slow = bridge.getState().prefersReducedMotion ? 1.6 : 1;
+    const fromAlt = sim.craftPos.length() - EARTH_R;
+    sim.tour.phase = 'transit';
+    sim.tour.leg = {
+      from,
+      to,
+      arc,
+      t: 0,
+      duration: Math.max(4, (ground / TOUR_TRANSIT_SPEED) * slow),
+      fromAlt,
+      // About 1,600-2,900 km at the top of longer legs, for a wider frame of reference.
+      peakAlt: clamp(3 + ground * 0.18, TOUR_ORBIT_ALT, 11),
+      theta
+    };
+  }
+
+  function slerpUnit(a, b, arc, t, out) {
+    if (arc < 1e-5) return out.copy(b);
+    const s0 = Math.sin((1 - t) * arc) / Math.sin(arc);
+    const s1 = Math.sin(t * arc) / Math.sin(arc);
+    return out.copy(a).multiplyScalar(s0).addScaledVector(b, s1).normalize();
+  }
+
+  function arriveAtStop(stop) {
+    sim.tour.phase = 'arrived';
+    sim.tour.theta = sim.tour.leg?.theta || 0;
+    sim.tour.arrivedAt = performance.now();
+    narrate([`Now over ${stop.name}.`, ...stop.context, () => tourDataLines(stop)], () => {
+      sim.tour.phase = 'dwell';
+      // Wall-clock: a short pause after the narration, and at least ~12 s of circling.
+      sim.tour.dwellUntil = Math.max(performance.now() + 4000, sim.tour.arrivedAt + 12000);
+    });
+  }
+
+  // Scripted tour flight, replacing the steering physics while the tour is active.
+  function stepTourFlight(dt) {
     const stop = tourStop();
-    const stopDir = latLonAltToVec3(stop.lat, stop.lon, 1, tmpV3).normalize();
-    const groundDist = Math.acos(clamp(sim.craftPos.clone().normalize().dot(stopDir), -1, 1)) * EARTH_R;
-    if (sim.tour.phase === 'transit' && groundDist < 2.6) {
-      sim.tour.phase = 'arrived';
-      narrate([`Now over ${stop.name}.`, stop.context, () => tourDataLines(stop)], () => {
-        sim.tour.phase = 'dwell';
-        // Wall-clock, so the pause is the same at any frame rate.
-        sim.tour.dwellUntil = performance.now() + 4000;
-      });
-    } else if (sim.tour.phase === 'dwell' && performance.now() >= sim.tour.dwellUntil) {
-      sim.tour.index = (sim.tour.index + 1) % TOUR_STOPS.length;
-      sim.tour.phase = 'transit';
-      narrate([`Next stop: ${tourStop().name}.`]);
+    if (!sim.tour.leg) beginTourLeg(stop);
+    const prev = sim.craftPos.clone();
+    const radial = new THREE.Vector3();
+    let speed;
+
+    if (sim.tour.phase === 'transit') {
+      const leg = sim.tour.leg;
+      leg.t += dt;
+      const s = clamp(leg.t / leg.duration, 0, 1);
+      const e = s * s * (3 - 2 * s); // ease in and out
+      slerpUnit(leg.from, leg.to, leg.arc, e, radial);
+      const base = leg.fromAlt + (TOUR_ORBIT_ALT - leg.fromAlt) * e;
+      const bump = Math.max(0, leg.peakAlt - Math.max(leg.fromAlt, TOUR_ORBIT_ALT));
+      sim.craftPos.copy(radial).multiplyScalar(EARTH_R + base + bump * Math.sin(Math.PI * e));
+      speed = (leg.arc * EARTH_R) / leg.duration;
+      if (s >= 1) arriveAtStop(stop);
+    } else {
+      if (sim.tour.phase === 'dwell' && performance.now() >= sim.tour.dwellUntil) {
+        sim.tour.index = (sim.tour.index + 1) % TOUR_STOPS.length;
+        beginTourLeg(tourStop());
+        narrate([`Next stop: ${tourStop().name}.`]);
+        return stepTourFlight(dt);
+      }
+      // Constant-altitude, constant-speed circle around the hotspot.
+      sim.tour.theta += (TOUR_ORBIT_SPEED / TOUR_ORBIT_RADIUS) * dt;
+      radial.copy(tourCircleDir(stop, sim.tour.theta));
+      sim.craftPos.copy(radial).multiplyScalar(EARTH_R + TOUR_ORBIT_ALT);
+      speed = TOUR_ORBIT_SPEED;
     }
-    return { stop, groundDist };
+
+    // Orientation: nose along the path, wings level with the ground (a slight inward
+    // bank while circling), eased so direction changes never snap.
+    const fwd = sim.craftPos.clone().sub(prev);
+    fwd.addScaledVector(radial, -fwd.dot(radial));
+    if (fwd.lengthSq() < 1e-10) fwd.copy(FWD_Z).applyQuaternion(sim.craftQuat);
+    fwd.normalize();
+    const up = radial.clone();
+    if (sim.tour.phase !== 'transit') {
+      const center = latLonAltToVec3(stop.lat, stop.lon, 1, new THREE.Vector3()).normalize();
+      const inward = center.addScaledVector(radial, -center.dot(radial));
+      if (inward.lengthSq() > 1e-10) up.addScaledVector(inward.normalize(), 0.14).normalize();
+    }
+    const right = new THREE.Vector3().crossVectors(fwd, up).normalize();
+    up.crossVectors(right, fwd).normalize();
+    tmpM4.makeBasis(right, up, fwd.clone().negate());
+    tmpQ.setFromRotationMatrix(tmpM4);
+    sim.craftQuat.slerp(tmpQ, Math.min(1, dt * 4)).normalize();
+    sim.craftSpeed = speed;
+    sim.angVel.set(0, 0, 0);
   }
 
   // C major pentatonic over two octaves: low density plays low, dense fire belts play high.
@@ -1579,6 +1705,12 @@ export function createFlybyController(bridge) {
       setAutopilot(false);
     }
 
+    if (tourActive()) {
+      stepTourFlight(dt);
+      syncCraftVisuals(dt);
+      return;
+    }
+
     const forward = FWD_Z.clone().applyQuaternion(sim.craftQuat).normalize();
     const up = UP_Y.clone().applyQuaternion(sim.craftQuat).normalize();
     const right = RIGHT_X.clone().applyQuaternion(sim.craftQuat).normalize();
@@ -1591,14 +1723,7 @@ export function createFlybyController(bridge) {
       let desiredAlt = 8.2;
       let orbitR = 3.2;
 
-      if (sim.targetId === 'tour') {
-        const { stop, groundDist } = updateTour();
-        tLat = stop.lat;
-        tLon = stop.lon;
-        // High transit over long legs, then descend to about 700 km to circle the hotspot.
-        desiredAlt = sim.tour.phase === 'transit' && groundDist > 9 ? 6.5 : 2.7;
-        orbitR = 1.7;
-      } else if (sim.targetId === 'iowa') {
+      if (sim.targetId === 'iowa') {
         tLat = 42.0;
         tLon = -93.5;
         desiredAlt = 2.6;
@@ -1648,10 +1773,7 @@ export function createFlybyController(bridge) {
       tmpQ.setFromEuler(new THREE.Euler(pitchCmd * dt, yawCmd * dt, rollCmd * dt, 'YXZ'));
       sim.craftQuat.multiply(tmpQ).normalize();
 
-      let cruiseSpeed = sim.targetId === 'iowa' ? 2.1 : (bridge.getState().prefersReducedMotion ? 1.8 : 3.5);
-      if (sim.targetId === 'tour') {
-        cruiseSpeed = sim.tour.phase === 'transit' ? (bridge.getState().prefersReducedMotion ? 2.2 : 3.8) : 1.9;
-      }
+      const cruiseSpeed = sim.targetId === 'iowa' ? 2.1 : (bridge.getState().prefersReducedMotion ? 1.8 : 3.5);
       sim.craftSpeed += (cruiseSpeed - sim.craftSpeed) * Math.min(1, dt * 2.2);
     } else {
       // Manual 6-DOF flight controls
@@ -1725,6 +1847,10 @@ export function createFlybyController(bridge) {
       sim.craftQuat.premultiply(nudge).normalize();
     }
 
+    syncCraftVisuals(dt);
+  }
+
+  function syncCraftVisuals(dt) {
     if (craftGroup) {
       craftGroup.position.copy(sim.craftPos);
       craftGroup.quaternion.copy(sim.craftQuat);
@@ -1771,7 +1897,9 @@ export function createFlybyController(bridge) {
     }
 
     // Default: Chase Cam
-    const chaseOffset = fwd.clone().multiplyScalar(-3.35).addScaledVector(up, 1.05);
+    // Pull back as the ship climbs, so high transits frame more of the planet.
+    const pullBack = 1 + Math.max(0, sim.craftPos.length() - EARTH_R - 3) * 0.22;
+    const chaseOffset = fwd.clone().multiplyScalar(-3.35 * pullBack).addScaledVector(up, 1.05 * pullBack);
     const desiredCamPos = sim.craftPos.clone().add(chaseOffset);
     // Keep camera above planet surface too
     if (desiredCamPos.length() < EARTH_R + 0.85) {
@@ -1785,7 +1913,10 @@ export function createFlybyController(bridge) {
     let desiredLook;
     if (downAxis.lengthSq() > 1e-6) {
       downAxis.normalize();
-      const lookDir = toCraft.clone().applyAxisAngle(downAxis, -CHASE_LOOK_DOWN_RAD);
+      // Tilt a little further down on high transits so more of the planet fills the view.
+      const altUnits = sim.craftPos.length() - EARTH_R;
+      const lookDown = CHASE_LOOK_DOWN_RAD + clamp((altUnits - 3) * 0.015, 0, 0.09);
+      const lookDir = toCraft.clone().applyAxisAngle(downAxis, -lookDown);
       desiredLook = desiredCamPos.clone().addScaledVector(lookDir, craftDist + 6.5);
     } else {
       desiredLook = sim.craftPos.clone().addScaledVector(fwd, 6.5).addScaledVector(radialOut, -0.8);
