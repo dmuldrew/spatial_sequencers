@@ -1,9 +1,10 @@
+import { DATASET_SOURCE } from '../domain/inputs.js';
 import { validateDataset } from './data-source.js';
 import { BlockCache, blocksInView, cacheWindow } from './block-cache.js';
 import { DownloadGate, PREVIEW_BYTES } from './download-gate.js';
 import { enableDynamicBlocks, fetchRemoteBlock, planRemoteBlock } from './dynamic-blocks.js';
 
-const MANIFEST = new URL('../../data/manifest.json', import.meta.url);
+const MANIFEST = DATASET_SOURCE.manifest;
 
 async function readJSON(response, limit) {
   if (!response.ok) {
@@ -42,10 +43,12 @@ export async function loadManifest(signal) {
     || !manifest.blocks || !Object.keys(manifest.blocks).length) {
     throw new Error('Invalid map block manifest.');
   }
-  for (const key of ['A1', 'A2']) {
-    const breaks = manifest.colorBreaks?.[key];
-    if (!Array.isArray(breaks) || breaks.length !== 2 || !breaks.every(Number.isFinite)
-      || breaks[0] > breaks[1]) throw new Error('Invalid map color breaks.');
+  if (manifest.colorBreaks) {
+    for (const key of ['A1', 'A2']) {
+      const breaks = manifest.colorBreaks[key];
+      if (!Array.isArray(breaks) || breaks.length !== 2 || !breaks.every(Number.isFinite)
+        || breaks[0] > breaks[1]) throw new Error('Invalid map color breaks.');
+    }
   }
   for (const tile of Object.values(manifest.blocks)) {
     if (!validBounds(tile.bounds) || !Number.isSafeInteger(tile.bytes) || tile.bytes <= 0
@@ -55,7 +58,7 @@ export async function loadManifest(signal) {
       throw new Error('Invalid map block URL.');
     }
   }
-  return enableDynamicBlocks(manifest, signal);
+  return DATASET_SOURCE.useModisWorker ? enableDynamicBlocks(manifest, signal) : manifest;
 }
 
 export class BlockSource {
@@ -66,8 +69,8 @@ export class BlockSource {
     this.prompt = prompt;
   }
 
-  restore() {
-    return this.cache.restore();
+  restore(reuse = true) {
+    return this.cache.restore(reuse);
   }
 
   cancel() {
@@ -112,13 +115,14 @@ export class BlockSource {
         const cells = await this.fetchBlock(id, signal, cost);
         signal.throwIfAborted();
         await this.cache.replace(targets, new Map([[id, cells]]), true);
+        if (!signal.aborted) this.status('', false);
       } catch {
         if (signal.aborted) break;
       }
     }
   }
 
-  async update(bounds, retry = false) {
+  async update(bounds, retry = false, fillCache = false) {
     if (this.manifest.unavailable) return;
     const required = blocksInView(this.manifest.blocks, bounds);
     const key = required.join(',');
@@ -137,7 +141,7 @@ export class BlockSource {
     }
     const visible = required.filter(id => !this.cache.blocks.has(id));
     const neighbors = target.filter(id => !required.includes(id) && !this.cache.blocks.has(id));
-    const staged = [...visible, ...neighbors].some(id => this.manifest.blocks[id].dynamic);
+    const staged = !fillCache && [...visible, ...neighbors].some(id => this.manifest.blocks[id].dynamic);
     const missing = staged ? visible : [...visible, ...neighbors];
     const bytes = missing.reduce((sum, id) => sum + (this.manifest.blocks[id].dynamic ? 150_000 : this.manifest.blocks[id].bytes), 0);
     const gate = new DownloadGate(bytes, details => this.prompt(details));

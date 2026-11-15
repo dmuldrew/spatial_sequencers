@@ -33,19 +33,16 @@
 
       <div class="row map-tools">
         <label>
-          Map view
+          Color palette
           <select id="palette">
-            <option value="fire-timeline" selected>Vegetation (NDVI)</option>
-            <option value="continuous">Temperature + NDVI</option>
-            <option value="classified">Temperature + NDVI (3 × 3)</option>
+            <option value="green-brown">Green–brown</option>
+            <option value="blue-orange">Blue–orange</option>
           </select>
         </label>
         <label class="zoom">
           Zoom <output id="zoomLabel" for="zoom"></output>
           <input id="zoom" type="range" min="0" max="100" value="0" step="0.1">
         </label>
-        <button id="fit" type="button">Reset view</button>
-        <label class="check"><input id="roam" type="checkbox" disabled> Move study area</label>
       </div>
 
       <section id="download-prompt" aria-labelledby="download-title" hidden>
@@ -57,18 +54,18 @@
         </div>
       </section>
 
-      <section class="timeline" aria-label="Fire timeline">
+      <section class="timeline" aria-labelledby="timeline-label">
         <div class="row">
+          <label id="timeline-label" for="fire-progress">Fire timeline (UTC)</label>
           <button id="fire-replay" type="button" disabled>Replay</button>
-          <label for="fire-progress" class="visually-hidden">Fire timeline (UTC)</label>
           <time id="fire-clock"></time>
           <button id="map-audio-toggle" type="button" aria-pressed="false" hidden>Sound</button>
         </div>
         <input id="fire-progress" type="range" min="0" max="0" step="1" value="0" disabled>
       </section>
 
-      <div id="map" tabindex="0" aria-describedby="map-navigation" aria-label="MODIS vegetation and fire hotspot map"></div>
-      <span id="map-navigation" class="visually-hidden" role="status">With Move study area on, focus the map and use the arrow keys to move one screen.</span>
+      <div id="map" tabindex="0" aria-describedby="map-navigation" aria-label="Hexagonal data map with MODIS fire hotspots"></div>
+      <span id="map-navigation" class="visually-hidden" role="status">Focus the map and use the arrow keys to move one screen.</span>
 
       <div class="row map-layers" role="group" aria-label="Map layers">
         <label class="check"><input id="fire-toggle" type="checkbox" checked disabled> Hotspots</label>
@@ -76,22 +73,15 @@
         <label class="check"><input id="perimeter-layer" type="checkbox" checked> Incident perimeters</label>
         <label class="check"><input id="terrain-layer" type="checkbox"> Terrain</label>
       </div>
-      <div id="ndvi-key" class="row map-key" aria-label="Vegetation color legend">
-        <strong>NDVI</strong>
-        <span id="ndvi-low"></span>
-        <span id="ndvi-ramp" aria-hidden="true"></span>
-        <span id="ndvi-high"></span>
-        <span>Gray = no data</span>
-      </div>
-      <div id="bivariate-key" class="row map-key" aria-label="Temperature and vegetation color legend" hidden>
+      <div class="row map-key" aria-label="Map color legend">
         <div class="color-matrix" aria-hidden="true">
-          <span>↑ NDVI</span>
+          <span id="a2-axis"></span>
           <div id="color-swatches"></div>
-          <span>Temperature →</span>
+          <span id="a1-axis"></span>
         </div>
         <div>
-          <div><strong>Temperature</strong> <span id="a1-range"></span></div>
-          <div><strong>NDVI</strong> <span id="a2-range"></span></div>
+          <div><strong id="a1-label"></strong> <span id="a1-range"></span></div>
+          <div><strong id="a2-label"></strong> <span id="a2-range"></span></div>
           <div>Gray = no data</div>
         </div>
       </div>
@@ -108,7 +98,7 @@
         <p id="provenance"></p>
         <p id="weather-state"></p>
         <p id="perimeter-state"></p>
-        <p>With Move study area on, focus the map and use the arrow keys to move one screen.</p>
+        <p>Focus the map and use the arrow keys to move one screen.</p>
         <p id="map-audio-hint" hidden>Hover with Sound on: cooler areas play guitar and warmer areas play trumpet. Replay sounds a pop for each new hotspot. <a href="./audio/CREDITS.txt">Audio credits</a></p>
         <div class="row">
           <label>

@@ -1,9 +1,7 @@
 import { INPUTS, coarsestResolution } from './domain/inputs.js';
 import { STUDY_AREA, areaBounds } from './domain/study-area.js';
 import { DEFAULT_SELECTION, observationWindow, sameCenter } from './domain/map-selection.js';
-import {
-  appearanceFor, CLASSIFIED, colorFor, datasetBreaks, FIRE_TIMELINE, ndviAppearance, observedRanges,
-} from './domain/appearance.js';
+import { appearanceFor, colorFor, datasetBreaks, observedRanges } from './domain/appearance.js';
 import { preferredH3Resolution } from './domain/zoom-policy.js';
 import { loadDatasetFile } from './infrastructure/data-source.js';
 import { BlockSource, loadManifest } from './infrastructure/block-source.js';
@@ -35,14 +33,13 @@ const PAN_HINT = element('map-navigation').textContent;
 let loadError = null;
 let aggregates = new Map();
 let ranges = observedRanges(aggregates.values());
-let breaks = datasetBreaks([]);
-let palette = FIRE_TIMELINE;
+let breaks = null;
+let palette = element('palette').value;
 let activeResolution = coarsestResolution();
 let h3Resolution = preferredH3Resolution(activeResolution, h3);
 let requestVersion = 0;
 let renderFrame = null;
 let blockSource = null;
-let roaming = false;
 let blockStatus = '';
 let manifestGate = null;
 
@@ -137,27 +134,21 @@ function cellPopup(cell) {
 }
 
 function render() {
-  const mapBounds = roaming ? blockSource.manifest.coverage : studyBounds;
+  const mapBounds = blockSource?.manifest.coverage ?? studyBounds;
   const cells = visibleGrid(view.getBounds(), mapBounds, h3Resolution, aggregates, h3);
   renderFireLayer();
-  const ndviOnly = palette === FIRE_TIMELINE;
   updateHoverMusic();
-  view.render(cells, cell => ndviOnly ? ndviAppearance(cell.A2, ranges.A2)
-    : appearanceFor(cell, ranges, palette, breaks), cellPopup);
-  if (ndviOnly) {
-    renderNdviLegend(ranges.A2);
-  } else {
-    for (const [key, input] of Object.entries(INPUTS)) {
-      const bounds = breaks[key];
-      element(`${key.toLowerCase()}-range`).textContent = palette !== CLASSIFIED
-        ? formatRange(ranges[key], input.units)
-        : bounds ? `Breaks at ${bounds.map(value => value.toFixed(3)).join(' and ')} ${input.units}`
-          : 'No paired observations';
-    }
+  view.render(cells, cell => appearanceFor(cell, ranges, palette, breaks), cellPopup);
+  for (const [key, input] of Object.entries(INPUTS)) {
+    const cutoffs = breaks?.[key];
+    element(`${key.toLowerCase()}-range`).textContent = palette === 'blue-orange'
+      ? cutoffs ? `classes split at ${cutoffs.map(value => formatValue(value, input.units)).join(' and ')}`
+        : 'No paired observations'
+      : formatRange(ranges[key], input.units);
   }
   element('zoom').value = view.getZoomPercent();
   element('zoomLabel').textContent = `${view.widthMiles().toFixed(1)} miles across`;
-  const hasData = cells.some(cell => Number.isFinite(cell.A2) && (ndviOnly || Number.isFinite(cell.A1)));
+  const hasData = cells.some(cell => Number.isFinite(cell.A2));
   const status = loadError || blockStatus || (loadingBlocks ? 'Loading map data…'
     : hasData ? '' : 'No observations for this view.');
   if (element('status').textContent !== status) element('status').textContent = status;
@@ -191,6 +182,9 @@ function renderFireLayer({ playback = false, previousMinute = -1 } = {}) {
 function setAggregates(cells) {
   aggregates = cells;
   ranges = observedRanges(cells.values());
+  const manifest = blockSource?.manifest;
+  const preparedBreaks = manifest && !manifest.date ? manifest.colorBreaks : null;
+  breaks = preparedBreaks ?? datasetBreaks(cells.values());
 }
 
 function installDataset(next) {
@@ -199,7 +193,6 @@ function installDataset(next) {
   setAggregates(next.cells
     ? new Map(next.cells.map(cell => [cell.id, cell]))
     : aggregateSamples(next.samples, h3Resolution, studyBounds, h3));
-  breaks = datasetBreaks(aggregates.values());
   loadError = null;
   updateDatasetLabels(next);
   view.updateLimits(activeResolution, true);
@@ -232,17 +225,13 @@ async function loadLocal(file) {
   }
 }
 
-function setRoaming(enabled, reset = true) {
-  roaming = enabled;
-  element('roam').checked = enabled;
+function updateMapBounds() {
   const defaultCenter = sameCenter(selection, DEFAULT_SELECTION);
   element('region-name').textContent = defaultCenter
-    ? (enabled ? 'Iowa and surrounding areas' : STUDY_AREA.name)
+    ? (blockSource ? 'Iowa and surrounding areas' : STUDY_AREA.name)
     : `${selection.latitude.toFixed(4)}°, ${selection.longitude.toFixed(4)}°`;
-  view.setPanBounds(enabled ? blockSource.manifest.coverage : studyBounds, enabled);
+  view.setPanBounds(blockSource?.manifest.coverage ?? studyBounds, Boolean(blockSource));
   resetPanHint();
-  scheduleRender();
-  if (!enabled && reset) view.reset();
 }
 
 function clearBlockSource() {
@@ -252,13 +241,12 @@ function clearBlockSource() {
   fireController?.abort();
   fireKey = '';
   clearTimeout(contextTimer);
-  element('roam').disabled = true;
   element('fire-toggle').disabled = true;
   player.clear();
   loadingBlocks = false;
   document.body.classList.remove('map-updating');
   element('block-retry').hidden = true;
-  setRoaming(false);
+  updateMapBounds();
 }
 
 function resetPanHint() {
@@ -268,7 +256,7 @@ function resetPanHint() {
 }
 
 function moveWithArrows(event) {
-  if (!roaming || event.target !== element('map') || event.altKey || event.ctrlKey
+  if (!blockSource || event.target !== element('map') || event.altKey || event.ctrlKey
     || event.metaKey || event.shiftKey) return;
   const direction = {
     ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1],
@@ -295,8 +283,9 @@ function showDownloadPrompt(details) {
   element('download-message').textContent = `${progress} ${state}`;
 }
 
-async function loadSelection(next = selection, centerChanged = false) {
+async function loadSelection(next = selection, fromForm = false) {
   const version = ++requestVersion;
+  const recenter = !sameCenter(next, selection) || (fromForm && next.date === selection.date);
   blockSource?.stop();
   manifestGate?.cancel();
   showDownloadPrompt(null);
@@ -319,8 +308,8 @@ async function loadSelection(next = selection, centerChanged = false) {
         unavailable: !manifest.dynamic, cacheKey: `${manifest.cacheKey}:${compositeStart}` };
     }
     if (!defaultCenter || compositeStart !== DEFAULT_SELECTION.date) {
-      manifest.periodLabel = `${compositeStart} to ${compositeEnd} (MODIS composites)`;
-      manifest.description = 'Terra MODIS land surface temperature and NDVI, from the archive for this composite window.';
+      manifest.periodLabel = `${compositeStart} to ${compositeEnd} (satellite composites)`;
+      manifest.description = Object.values(INPUTS).map(input => `${input.product} ${input.label}`).join(' · ');
     }
     await gate.beforeCommit();
     const source = new BlockSource(manifest, (status, canRetry, loading = false) => {
@@ -328,12 +317,11 @@ async function loadSelection(next = selection, centerChanged = false) {
       loadingBlocks = loading;
       document.body.classList.toggle('map-updating', loading);
       setAggregates(source.cache.cells());
-      if (manifest.date) breaks = datasetBreaks(aggregates.values());
       blockStatus = status;
       element('block-retry').hidden = !canRetry;
       scheduleRender();
     }, showDownloadPrompt);
-    await source.restore();
+    await source.restore(!fromForm);
     if (version !== requestVersion) return;
     showDownloadPrompt(null);
     blockSource?.stop();
@@ -344,22 +332,24 @@ async function loadSelection(next = selection, centerChanged = false) {
     activeResolution = coarsestResolution(manifest.inputs);
     h3Resolution = manifest.h3Resolution;
     setAggregates(source.cache.cells());
-    breaks = manifest.date ? datasetBreaks(aggregates.values()) : manifest.colorBreaks;
     loadError = null;
     blockStatus = manifest.unavailable ? 'This region or composite needs the Docker map data service.' : '';
     element('block-retry').hidden = true;
-    element('roam').disabled = false;
     element('fire-toggle').disabled = false;
     updateDatasetLabels(manifest);
     const opening = firstBundledView;
     firstBundledView = false;
-    setRoaming(opening || roaming, false);
-    view.updateLimits(activeResolution, false, !centerChanged && !opening);
-    if (centerChanged || opening) view.reset([selection.latitude, selection.longitude]);
+    updateMapBounds();
+    view.updateLimits(activeResolution, false, !recenter && !opening);
+    if (recenter || opening) view.reset([selection.latitude, selection.longitude]);
     manifestGate = null;
     element('selection-state').textContent = '';
+    const focused = document.activeElement;
+    if (fromForm && (focused === document.body || element('study-selection').contains(focused))) {
+      element('map').focus({ preventScroll: true });
+    }
     refreshContext();
-    source.update(view.getBounds());
+    source.update(view.getBounds(), false, fromForm);
     scheduleRender();
   } catch (error) {
     if (version === requestVersion) {
@@ -455,8 +445,6 @@ function bindControls() {
     scheduleRender();
   });
   element('zoom').addEventListener('input', event => view.setZoomPercent(Number(event.target.value)));
-  element('fit').addEventListener('click', () => view.reset(roaming
-    ? [selection.latitude, selection.longitude] : undefined));
   element('fire-toggle').addEventListener('change', event => {
     if (!event.target.checked) player.pause();
     renderFireLayer();
@@ -474,16 +462,11 @@ function bindControls() {
       longitude: Number(element('study-longitude').value),
       date: date.value,
     };
-    const centerChanged = !sameCenter(next, selection);
-    if (centerChanged || next.date !== selection.date || !blockSource) void loadSelection(next, centerChanged);
+    void loadSelection(next, true);
   });
   for (const id of ['wind-layer', 'perimeter-layer', 'terrain-layer']) {
     element(id).addEventListener('change', () => fireContext.update(view.getBounds(), selection.date));
   }
-  element('roam').addEventListener('change', event => {
-    setRoaming(event.target.checked);
-    if (roaming) element('map').focus({ preventScroll: true });
-  });
   element('map').addEventListener('keydown', moveWithArrows);
   element('download-allow').addEventListener('click', () => {
     (manifestGate ?? blockSource)?.allow();
@@ -515,35 +498,22 @@ if (frame) {
   }).observe(document.body);
 }
 
-function renderNdviLegend(range) {
-  const ramp = element('ndvi-ramp');
-  ramp.hidden = !range;
-  element('ndvi-low').textContent = range ? formatValue(range.min) : 'No observations';
-  element('ndvi-high').textContent = range ? formatValue(range.max) : '';
-  if (!range) return;
-  const colors = [0, 0.25, 0.5, 0.75, 1].map(fraction =>
-    ndviAppearance(range.min + fraction * (range.max - range.min), range).color);
-  ramp.style.backgroundImage = `linear-gradient(to right, ${colors.join(', ')})`;
-}
-
 function renderColorLegend() {
-  const ndviOnly = palette === FIRE_TIMELINE;
-  element('bivariate-key').hidden = ndviOnly;
-  element('ndvi-key').hidden = !ndviOnly;
-  element('map').setAttribute('aria-label', ndviOnly
-    ? 'MODIS vegetation and fire hotspot map' : 'MODIS temperature and vegetation map');
-  if (ndviOnly) return;
   const swatches = [];
-  for (const vegetation of [1, 0.5, 0]) {
-    for (const temperature of [0, 0.5, 1]) {
+  for (const secondary of [1, 0.5, 0]) {
+    for (const primary of [0, 0.5, 1]) {
       const swatch = document.createElement('span');
-      swatch.style.backgroundColor = colorFor(temperature, vegetation, palette).color;
+      swatch.style.backgroundColor = colorFor(primary, secondary, palette);
       swatches.push(swatch);
     }
   }
   element('color-swatches').replaceChildren(...swatches);
 }
 
+element('a1-label').textContent = INPUTS.A1.legendLabel;
+element('a2-label').textContent = INPUTS.A2.legendLabel;
+element('a1-axis').textContent = `${INPUTS.A1.legendLabel} →`;
+element('a2-axis').textContent = `↑ ${INPUTS.A2.legendLabel}`;
 renderColorLegend();
 element('region-name').textContent = STUDY_AREA.name;
 view.updateLimits(activeResolution, true);

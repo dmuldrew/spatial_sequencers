@@ -62,9 +62,10 @@ export class BlockCache {
     this.blocks = new Map();
   }
 
-  async restore() {
+  async restore(reuse = true) {
     try {
       this.database = await archiveDatabase();
+      if (!reuse) return;
       const saved = await transaction(this.database, 'readonly', store => store.getAll());
       for (const entry of saved) {
         if (entry.key === this.manifest.cacheKey && Object.hasOwn(this.manifest.blocks, entry.id)

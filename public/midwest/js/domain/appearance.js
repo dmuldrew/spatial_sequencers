@@ -1,7 +1,5 @@
 /** User-defined appearance algorithm. No map, DOM, or dataset dependencies. */
 export const APPEARANCE = Object.freeze({
-  greenHue: 120,
-  brownHue: 30,
   minimumSaturation: 0.05,
   maximumSaturation: 0.95,
   lightnessPercent: 35,
@@ -9,30 +7,13 @@ export const APPEARANCE = Object.freeze({
   missingColor: '#aeb6b5',
 });
 
-export const CLASSIFIED = 'classified';
-export const FIRE_TIMELINE = 'fire-timeline';
-
-export function ndviAppearance(value, range) {
-  const amount = normalize(value, range);
-  return {
-    color: amount === null ? APPEARANCE.missingColor : `hsl(141, 52%, ${90 - amount * 64}%)`,
-    missing: amount === null,
-  };
-}
-
-// Rows run from low to high NDVI. Columns run from cool to warm.
-const CLASS_COLORS = [
+const GREEN_BROWN = [120, 30];
+// Original palette: rows go from low to high A2, columns from low to high A1.
+const BLUE_ORANGE = [
   ['#ede9e3', '#e9b997', '#c44f0b'],
   ['#a7c8db', '#c7b7ab', '#bb7654'],
   ['#15628e', '#5486a0', '#6c677d'],
 ];
-
-function quantile(sorted, fraction) {
-  const position = (sorted.length - 1) * fraction;
-  const lower = Math.floor(position);
-  const upper = Math.ceil(position);
-  return sorted[lower] + (sorted[upper] - sorted[lower]) * (position - lower);
-}
 
 export function normalize(value, range) {
   if (!Number.isFinite(value) || !range) return null;
@@ -57,6 +38,13 @@ export function observedRanges(cells) {
   return ranges;
 }
 
+function quantile(sorted, fraction) {
+  const position = (sorted.length - 1) * fraction;
+  const lower = Math.floor(position);
+  const upper = Math.ceil(position);
+  return sorted[lower] + (sorted[upper] - sorted[lower]) * (position - lower);
+}
+
 export function datasetBreaks(cells) {
   const paired = [...cells].filter(cell => Number.isFinite(cell.A1) && Number.isFinite(cell.A2));
   return Object.fromEntries(['A1', 'A2'].map(key => {
@@ -71,41 +59,35 @@ function classIndex(value, breaks) {
   return value < low ? 0 : value > high ? 2 : 1;
 }
 
-export function appearanceFor(cell, ranges, mode, breaks) {
-  if (mode === CLASSIFIED) {
-    const temperature = classIndex(cell.A1, breaks.A1);
-    const vegetation = classIndex(cell.A2, breaks.A2);
-    if (temperature === null || vegetation === null) {
+export function appearanceFor(cell, ranges, palette, breaks) {
+  const secondary = normalize(cell.A2, ranges.A2);
+  if (secondary !== null && !Number.isFinite(cell.A1)) {
+    return { color: `hsl(141, 52%, ${90 - secondary * 64}%)`, missing: false };
+  }
+  if (palette === 'blue-orange') {
+    const primaryClass = classIndex(cell.A1, breaks?.A1);
+    const secondaryClass = classIndex(cell.A2, breaks?.A2);
+    if (primaryClass === null || secondaryClass === null) {
       return { color: APPEARANCE.missingColor, missing: true };
     }
-    return {
-      color: CLASS_COLORS[vegetation][temperature],
-      temperatureClass: temperature,
-      vegetationClass: vegetation,
-      missing: false,
-    };
+    return { color: BLUE_ORANGE[secondaryClass][primaryClass], missing: false };
   }
-  const A1 = normalize(cell.A1, ranges.A1);
-  const A2 = normalize(cell.A2, ranges.A2);
-  if (A1 === null || A2 === null) {
-    return { color: APPEARANCE.missingColor, A1, A2, missing: true };
+  const primary = normalize(cell.A1, ranges.A1);
+  if (primary === null || secondary === null) {
+    return { color: APPEARANCE.missingColor, missing: true };
   }
-  return { ...colorFor(A1, A2), A1, A2, missing: false };
+  return { color: colorFor(primary, secondary, palette), missing: false };
 }
 
-export function colorFor(temperature, vegetation, mode) {
-  if (mode === CLASSIFIED) {
-    return { color: CLASS_COLORS[Math.round(vegetation * 2)][Math.round(temperature * 2)] };
+export function colorFor(primary, secondary, palette) {
+  if (palette === 'blue-orange') {
+    return BLUE_ORANGE[Math.round(secondary * 2)][Math.round(primary * 2)];
   }
-  const hue = APPEARANCE.greenHue
-    + temperature * (APPEARANCE.brownHue - APPEARANCE.greenHue);
+  const [cool, warm] = GREEN_BROWN;
+  const hue = cool + primary * (warm - cool);
   const saturation = APPEARANCE.minimumSaturation
-    + vegetation * (APPEARANCE.maximumSaturation - APPEARANCE.minimumSaturation);
+    + secondary * (APPEARANCE.maximumSaturation - APPEARANCE.minimumSaturation);
   const lightness = APPEARANCE.mutedLightnessPercent
-    + vegetation * (APPEARANCE.lightnessPercent - APPEARANCE.mutedLightnessPercent);
-  return {
-    color: `hsl(${hue}, ${saturation * 100}%, ${lightness}%)`,
-    hue,
-    saturation,
-  };
+    + secondary * (APPEARANCE.lightnessPercent - APPEARANCE.mutedLightnessPercent);
+  return `hsl(${hue}, ${saturation * 100}%, ${lightness}%)`;
 }

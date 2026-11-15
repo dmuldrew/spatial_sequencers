@@ -48,11 +48,9 @@ export class MapView {
   }
 
   setPanBounds(bounds, roaming) {
-    const changed = this.roaming !== roaming;
     this.roaming = roaming;
     const limit = L.latLngBounds([bounds.south, bounds.west], [bounds.north, bounds.east]);
     this.map.setMaxBounds(limit);
-    if (changed) this.updateLimits(this.resolutionMeters, false, true);
   }
 
   moveByView(x, y) {
@@ -64,7 +62,6 @@ export class MapView {
   }
 
   updateLimits(resolutionMeters, reset = false, preserveScale = false) {
-    this.resolutionMeters = resolutionMeters;
     const position = this.getZoomPercent();
     const previousZoom = this.map.getZoom();
     this.map.invalidateSize({ pan: false });

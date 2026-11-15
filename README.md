@@ -190,85 +190,16 @@ spatial_sequencers/
 
 ## Central Iowa MODIS hexagon map
 
-The map below the PyroSync spiral covers a 180 × 120 mile study area centered
-on 42°N, 93.5°W. The July 11–26, 2024 Terra MODIS snapshot also covers nearby
-areas for roaming. Use `/#iowa-map` to jump to the map or `/midwest/map.html` to open it directly.
+The map at `/midwest/map.html` shows **MOD11A2 daytime land surface temperature**
+and **MOD13Q1 vegetation index (NDVI)** on a hexagonal grid, with
+**NASA FIRMS MODIS fire hotspots** overlaid.
+Cells with only NDVI use the vegetation color scale in either palette.
 
-- **MOD11A2 daytime land surface temperature** (°C) is averaged from two
-  quality-filtered 8-day composites. **MOD13Q1 NDVI** comes from one
-  quality-filtered 16-day composite.
-- **Green–brown (continuous):** Temperature controls hue. Higher NDVI
-  increases saturation from 5% to 95% and darkens the fill. The continuous
-  colors use the current cache's observed ranges, with more contrast
-  near the middle. The vegetation view uses the same NDVI scale.
-- **Blue–orange (3 × 3):** Cool, greener cells are blue and warm, less green
-  cells are orange. Each measurement uses thirds of the paired dataset.
-  Breaks stay fixed while panning and zooming.
-- Gray cells are missing the measurements used in the selected view. Click
-  a hexagon for its temperature and NDVI. The closest zoom depends on the
-  coarser source, and the hex overlay is fixed at 50% opacity.
+- Focus the map and use the arrow keys to pan.
+- Select **Replay** or scrub the **Fire timeline (UTC)** to see when hotspots
+  were detected.
+- Enter latitude, longitude, and a start date, then select **Update map** to
+  jump to a new location. The static map contains only the bundled observations.
 
-The map's input definitions, appearance, zoom policy, and sonification extension
-point live in `public/midwest/js/domain/`. The data manifest and prepared blocks
-live under `public/midwest/data/`. The PyroSync spiral handles its own audio.
-
-The map opens in a 60-mile view near Sioux City with **Vegetation (NDVI)**
-selected and the timeline at the end of the observation period. Select **Replay**
-to start from the beginning, or scrub to an exact UTC minute. Red dots appear at
-their recorded detection times in every map view, and panning or changing the
-color view keeps the current time.
-
-Enter latitude, longitude, and a UTC start date, then select **Update map**. A new
-center repositions the map. A date-only change keeps the current view and loads a
-new timeline of up to 16 days. MODIS temperature and NDVI use the satellite composite
-window containing that date. Dynamic composite requests need the Docker service.
-For timed fire detections beyond the bundled July 2024 U.S. FIRMS archive, pass
-`FIRMS_MAP_KEY` to Docker Compose through the shell environment or a local
-Compose environment file.
-
-Select a hotspot for detection-time wind and nearby mapped access and water.
-ERA5 weather, global hillshade, and OpenStreetMap provide coverage outside the
-U.S. The perimeter overlay uses NIFC for the contiguous U.S. For future regional
-perimeters, prefer the local fire agency's timestamped boundaries and show
-coverage gaps explicitly. For regions without a perimeter provider, keep the
-FIRMS hotspot layer available.
-
-The MOD13Q1 vegetation composite and color scale stay fixed during playback.
-Select another map view for the temperature comparisons. Red markers show presumed
-vegetation fire detections from the [NASA FIRMS 2024 US MODIS archive](https://firms.modaps.eosdis.nasa.gov/data/country/modis_2024_United_States.csv)
-for July 11–26, 2024 (UTC). Click a marker to see its date, satellite, fire
-radiative power and confidence. Turn roaming off for the 180-mile overview.
-
-With **Move study area** enabled, focus the map and press an arrow key to move
-one visible screen. Docker Compose runs the MODIS data worker for on-demand
-blocks in the contiguous US. GitHub Pages and standalone static hosting use
-the prepared area (about 450 × 290 miles around Iowa). The map shows an
-updating cursor and completion label while visible blocks change. The browser keeps one 3 × 3 block window
-in IndexedDB, with an in-memory fallback. Crossing the cache boundary reuses
-overlapping blocks and loads the missing row or column over HTTP. A canceled
-or failed request leaves the previous cache intact. Imported JSON opens in
-the original study area and uses its own dataset rather than the archive cache.
-
-The app asks for approval when a request is projected to run longer than ten
-seconds, reaches ten seconds in progress, or exceeds 200 MB. While the prompt
-is open, at most 1 MB of new preview blocks can download. Continue applies
-the update and allows the rest of the transfer. Cancel stops the request.
-
-To regenerate the snapshot from the source GeoTIFF bands, install Rasterio,
-NumPy, H3 v4, and the platform wheel from the
-[raster_h3 v0.7.0 release](https://github.com/dmuldrew/raster_h3/releases/tag/v0.7.0).
-Run `python3 scripts/prepare_midwest.py /path/to/geotiffs`. The supplied rasters
-must cover the wider region shown in the manifest. The script crops and
-quality-filters the source bands, reprojects the MODIS sinusoidal grids to CONUS
-Albers (EPSG:5070) using nearest-neighbor sampling at the source pixel spacing,
-and uses `raster_h3` to compute pixel-center sums and counts. The script joins
-the two inputs by H3 ID and writes the block files and manifest. Use
-`--output /path/to/snapshot.json` to generate a single central Iowa JSON file
-for manual import.
-
-
-For a new block, the worker finds the date-matched tiles in Microsoft
-Planetary Computer, estimates the required bytes, and reads only the relevant
-COG ranges. It quality-filters and aggregates them with `raster_h3`. The
-Compose volume retains source ranges and prepared blocks. Small adjacent
-blocks can warm the cache in the background.
+Developers can change the two inputs in [the dataset configuration](public/midwest/js/domain/inputs.js)
+and supply matching prepared observations.
