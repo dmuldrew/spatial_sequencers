@@ -19,8 +19,9 @@ From the repo root:
     npm run preview
 
 then open http://localhost:8080/space-jukebox/ — or just open
-`fly.html` in a browser. It is a single self-contained file; only
-the 3D library loads from a CDN.
+`fly.html` in a browser. It is a single self-contained file; the
+3D library is vendored with the repo, with a CDN fallback for when
+the file is opened straight from disk.
 
 Live demo: https://dmuldrew.github.io/spatial_sequencers/space-jukebox/fly.html
 
@@ -46,19 +47,31 @@ power (FRP), embedded from PyroSync's bundled data.
 
 ## Controls
 
-Space play/pause · N narration · C chase/orbit camera · ↑/↓ speed.
+Space play/pause · S whereabouts · N narration · M mute · C
+chase/orbit camera · ↑/↓ speed. Shortcuts stand down while a button
+has focus, so Space still activates the control you are on.
+
 The HUD shows the current region, a fire-intensity meter, and the
 ship's coordinates; a screen-reader live region announces each
-region as it is reached.
+region as it is reached, and **S** speaks the current region, its
+hotspot count and the live fire intensity on demand.
 
 ## Technical notes
 
-- Single HTML file; Three.js (CDN) for the globe, the Web Audio
-  API for synthesis, Speech Synthesis for narration. No build
-  step, no backend, no runtime data fetches.
+- Single HTML file; Three.js for the globe, the Web Audio API for
+  synthesis, Speech Synthesis for narration. No build step, no
+  backend, no runtime data fetches. The 3D library is imported from
+  the copy vendored with the repo (the same file PyroSync loads),
+  so the flight works offline; the CDN is only a fallback for
+  opening `fly.html` from disk.
 - The globe's land is a dot grid rasterized at build time from
   Natural Earth country borders (1.5° cells, ~8,300 dots) — no
   texture images.
 - The ship follows a closed Catmull-Rom spline through the six
-  region centers at fixed altitude; fire intensity is computed
-  per frame from the embedded hotspot array.
+  region centers, projected onto one constant-altitude shell so it
+  flies exactly along the drawn path. Fire intensity and the ping
+  proximity test share a single dot-product pass over the hotspot
+  array, with far hotspots rejected before any trig.
+- Continuous tone and pings duck under narration, the flight is
+  silent while paused, and `prefers-reduced-motion` stills the
+  hotspot pulse and the orbit camera.
