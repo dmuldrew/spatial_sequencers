@@ -28,8 +28,8 @@ Live demo: https://dmuldrew.github.io/spatial_sequencers/space-jukebox/fly.html
 ## The flight
 
 Six fire regions, west to east, ~80 seconds per loop: California
-& W. US, Boreal N. America, Amazon & Cerrado, Sahel & N. Savanna,
-Mediterranean Basin, Australian Outback. The dataset is the main
+& W. US, Boreal N. America, Amazon & Cerrado, Mediterranean Basin,
+Sahel & N. Savanna, Australian Outback. The dataset is the main
 project's: 330 NASA FIRMS (MODIS) hotspots with fire radiative
 power (FRP), embedded from PyroSync's bundled data.
 
@@ -51,10 +51,26 @@ Space play/pause · S whereabouts · N narration · M mute · C
 chase/orbit camera · ↑/↓ speed. Shortcuts stand down while a button
 has focus, so Space still activates the control you are on.
 
-The HUD shows the current region, a fire-intensity meter, and the
-ship's coordinates; a screen-reader live region announces each
-region as it is reached, and **S** speaks the current region, its
-hotspot count and the live fire intensity on demand.
+The HUD shows the current region, a fire-intensity meter, the
+ship's coordinates, and tour progress (which stop you are at, and
+the next one); a screen-reader live region announces each region
+as it is reached, and **S** speaks the current region, its hotspot
+count and the live fire intensity on demand. Hotspot pings are
+panned left/right toward the side the fire is on.
+
+## Manual pilot
+
+The tour is auto-piloted, but you can take the controls: the
+**Pilot** button (or the G key) switches to manual flight, and
+switching back resumes the tour from wherever you left it. Mode
+changes are announced aloud. Steer with the arrow keys or WASD
+(↑/↓ set speed) — or plug in an **Xbox controller**: left stick
+steers, pushing it forward (or the right trigger) speeds up, the
+left trigger slows down, A pauses/resumes, Y narration, X mute,
+B camera, bumpers set tour speed, and Start switches pilot mode.
+Everything sonified keeps working in manual flight, because the
+sound has always been driven by where the ship is, not by the
+tour path.
 
 ## Technical notes
 
