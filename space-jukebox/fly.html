@@ -63,7 +63,7 @@
   <p class="sub" id="hudPos" style="margin-top:8px"></p>
   <div id="tourDots"></div>
   <p class="sub" id="hudNext" style="margin-top:6px"></p>
-  <p class="sub" style="margin-top:6px; opacity:.75">Hotspot dots are sized by fire power (FRP) — bigger and redder burns stronger.</p>
+  <p class="sub" style="margin-top:6px; opacity:.75">A bar of light rises from every hotspot — taller and redder burns stronger.</p>
 </div>
 <p class="sr" aria-live="polite" id="liveRegion"></p>
 
@@ -332,10 +332,43 @@ function buildHotspots(project, sizeMul){
   g.setAttribute("aPhase", new THREE.BufferAttribute(pha, 1));
   return new THREE.Points(g, hotspotMaterial());
 }
+/* intensity as light: a glowing bar extruded from every hotspot,
+   height on the same log scale as the dot sizes — the stronger the
+   fire, the taller its column of light                              */
+const beamMats = [];
+function buildBeams(flat){
+  const geo = new THREE.BoxGeometry(1, 1, 1);
+  geo.translate(0, 0.5, 0); /* base at the surface, grows along +Y */
+  const mat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.4,
+    blending: THREE.AdditiveBlending, depthWrite: false });
+  beamMats.push(mat);
+  const mesh = new THREE.InstancedMesh(geo, mat, HOTSPOTS.length);
+  mesh.frustumCulled = false;
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
+  const cHot = new THREE.Color(0xff2d2d), cMid = new THREE.Color(0xff7847), cLow = new THREE.Color(0xffd166);
+  HOTSPOTS.forEach((h, i) => {
+    const t = Math.min(1, h[2] / 2000);
+    const c = t > 0.5 ? cMid.clone().lerp(cHot, (t - 0.5) * 2) : cLow.clone().lerp(cMid, t * 2);
+    const lt = Math.max(0, Math.min(1, (Math.log10(Math.max(1, h[2])) - 1) / 2.7));
+    const height = (0.04 + lt * 0.5) * (flat ? 1.7 : 1);
+    const thick = flat ? 0.02 : 0.011;
+    let pos, dir;
+    if (flat){ pos = flatVec(h[0], h[1], 0.008); dir = new THREE.Vector3(0, 0, 1); }
+    else { pos = latLonToVec3(h[0], h[1], 1.004); dir = pos.clone().normalize(); }
+    q.setFromUnitVectors(up, dir);
+    m4.compose(pos, q, new THREE.Vector3(thick, height, thick));
+    mesh.setMatrixAt(i, m4);
+    mesh.setColorAt(i, c);
+  });
+  mesh.instanceMatrix.needsUpdate = true;
+  if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  return mesh;
+}
 let hotspotPoints;
 {
   hotspotPoints = buildHotspots((lat, lon) => latLonToVec3(lat, lon, 1.006), 1);
   globeGroup.add(hotspotPoints);
+  globeGroup.add(buildBeams(false));
 }
 /* the flat map: same land mask and hotspots, equirectangular. Built once
    and tiled three across, so flying off one edge loops onto the next
@@ -359,6 +392,7 @@ let hotspotPoints;
   g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(pts), 3));
   flatWorld.add(new THREE.Points(g, new THREE.PointsMaterial({color: 0x69b98a, size: 0.024})));
   flatWorld.add(buildHotspots((lat, lon) => flatVec(lat, lon, 0.006), 3.6));
+  flatWorld.add(buildBeams(true));
   for (const k of [-1, 0, 1]){
     const tile = k === 0 ? flatWorld : flatWorld.clone();
     tile.position.x = k * Math.PI * 2;
@@ -748,6 +782,8 @@ function animate(){
   const pulse = REDUCED_MOTION ? 1.1 : 1 + Math.sin(t * 2.6) * 0.18;
   const boost = Math.min(1, intensitySmooth / 2600);
   for (const m of hotspotMats){ m.uniforms.uPulse.value = pulse; m.uniforms.uTime.value = t; m.uniforms.uBoost.value = boost; }
+  /* the light bars brighten with the intensity under the ship, too */
+  for (const b of beamMats) b.opacity = 0.34 + boost * 0.3;
 
   /* camera: smoothing is now a function of dt, so the chase feels the same at
      30, 60 and 144 fps (the old fixed per-frame factor did not).           */
