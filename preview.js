@@ -6,7 +6,7 @@
 //                                                  is served from pyrosync/node_modules)
 //   /space-jukebox/  -> space-jukebox/fly.html   (Space Jukebox 3D flight)
 //
-// Usage:  npm run preview [-- <port>] [-- --no-open]   (default port 8080)
+// Usage:  npm run preview [-- <port>] [-- --no-open]   (default port 8123)
 //         or directly: node preview.js [port] [--no-open]
 // Needs:  Node.js + npm. On first run, PyroSync's dependencies are
 //         installed automatically (same on Windows, macOS, and Linux).
@@ -18,7 +18,7 @@ const { exec, execSync } = require("child_process");
 
 const ROOT = __dirname;
 const args = process.argv.slice(2);
-const PORT = Number(args.find(a => /^\d+$/.test(a)) || process.env.PORT || 8080);
+const PORT = Number(args.find(a => /^\d+$/.test(a)) || process.env.PORT || 8123);
 const NO_OPEN = args.includes("--no-open");
 
 const MIME = {
