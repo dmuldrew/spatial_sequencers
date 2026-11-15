@@ -27,8 +27,8 @@ Live demo: https://dmuldrew.github.io/spatial_sequencers/space-jukebox/fly.html
 ## The flight
 
 Six fire regions, west to east, ~80 seconds per loop: California
-& W. US, Boreal N. America, Amazon & Cerrado, Sahel & N. Savanna,
-Mediterranean Basin, Australian Outback. The dataset is the main
+& W. US, Boreal N. America, Amazon & Cerrado, Mediterranean Basin,
+Sahel & N. Savanna, Australian Outback. The dataset is the main
 project's: 330 NASA FIRMS (MODIS) hotspots with fire radiative
 power (FRP), embedded from PyroSync's bundled data.
 

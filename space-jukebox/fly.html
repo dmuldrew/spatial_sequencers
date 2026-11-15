@@ -20,6 +20,10 @@
   #meterWrap{height:14px;background:#1b2547;border-radius:7px;overflow:hidden}
   #meter{height:100%;width:0%;background:linear-gradient(90deg,var(--acc),var(--hot),#ff3d3d);transition:width .18s}
   #hud .lab{font-size:13.5px;color:var(--dim);letter-spacing:.06em;margin-top:6px}
+  #tourDots{display:flex;gap:7px;margin-top:10px}
+  #tourDots span{width:11px;height:11px;border-radius:50%;background:#1b2547;border:2px solid var(--line)}
+  #tourDots span.next{border-color:var(--acc)}
+  #tourDots span.now{background:var(--acc);border-color:var(--acc);transform:scale(1.3)}
   #controls{position:fixed;left:0;right:0;bottom:0;z-index:6;display:flex;flex-wrap:wrap;gap:10px;justify-content:center;align-items:center;padding:14px;background:rgba(8,12,26,.92);border-top:2px solid var(--line)}
   button{font-size:18px;font-weight:700;padding:11px 20px;border-radius:999px;border:2px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer}
   button[aria-pressed="true"]{background:var(--acc);color:#141414;border-color:var(--acc)}
@@ -50,21 +54,24 @@
   <div id="meterWrap"><div id="meter"></div></div>
   <p class="lab">FIRE INTENSITY BELOW THE SHIP</p>
   <p class="sub" id="hudPos" style="margin-top:8px"></p>
+  <div id="tourDots"></div>
+  <p class="sub" id="hudNext" style="margin-top:6px"></p>
 </div>
 <p class="sr" aria-live="polite" id="liveRegion"></p>
 
 <div id="controls">
   <button id="btnFly" aria-pressed="false">&#9654; Start flight</button>
   <button id="btnNarrate" aria-pressed="true">Narration: on</button>
+  <button id="btnSound" aria-pressed="true">Sound: on</button>
   <button id="btnCam" aria-pressed="false">Camera: chase</button>
   <button id="btnSpeed" aria-pressed="false">Speed: 1&times;</button>
-  <span class="keys">Keys: Space fly &middot; N narration &middot; C camera &middot; &uarr;&darr; speed</span>
+  <span class="keys">Keys: Space fly &middot; N narration &middot; M sound &middot; C camera &middot; &uarr;&darr; speed</span>
 </div>
 
 <div id="startOverlay">
   <div id="startCard">
     <h2>&#128640; Ready to fly?</h2>
-    <p>An auto-piloted tour of six fire regions — California, the Boreal North, the Amazon, the Sahel, the Mediterranean, and the Australian Outback — built from 330 NASA FIRMS hotspots. Sound on: the fires sing as you pass. Narration is on by default, so the whole flight works with your eyes closed.</p>
+    <p>An auto-piloted tour of six fire regions — California, the Boreal North, the Amazon, the Mediterranean, the Sahel, and the Australian Outback — built from 330 NASA FIRMS hotspots. Sound on: the fires sing as you pass. Narration is on by default, so the whole flight works with your eyes closed.</p>
     <button id="startBtn">&#9654; Start flight</button>
     <p class="keys" style="margin-top:14px">One of two projects in the <a href="../" style="color:var(--acc)">Spatial Sequencers hub</a>.</p>
   </div>
@@ -73,6 +80,11 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 "use strict";
+if (typeof THREE === "undefined") {
+  document.querySelector("#startCard p").textContent = "The 3D library failed to load (it comes from a CDN), so the flight cannot start. Check your connection and reload the page.";
+  document.querySelector("#startBtn").disabled = true;
+  throw new Error("THREE failed to load");
+}
 /* ============================== DATA (embedded at build time) ==============================
    Hotspots: NASA FIRMS MODIS hotspots bundled with PyroSync (330 records: lat, lon, FRP).
    Land: dot grid rasterized from Natural Earth country borders (1.5 deg cells).          */
@@ -105,7 +117,7 @@ let renderer;
 try {
   renderer = new THREE.WebGLRenderer({canvas: $("scene"), antialias: true});
 } catch(e) {
-  document.querySelector("#startCard p").textContent = "WebGL is not available in this browser, so the 3D flight cannot start. The accessible 2D player (link above) works everywhere.";
+  document.querySelector("#startCard p").textContent = "WebGL is not available in this browser, so the 3D flight cannot start. Try a browser with WebGL enabled — the project hub (link above) has the team's other project.";
   throw e;
 }
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -205,14 +217,38 @@ const curve = new THREE.CatmullRomCurve3(tour.map(b => latLonToVec3(b.lat, b.lon
   const g = new THREE.BufferGeometry().setFromPoints(pts);
   scene.add(new THREE.Line(g, new THREE.LineBasicMaterial({color: 0x33406e, transparent: true, opacity: 0.6})));
 }
+/* tour stops: each biome's position along the loop + HUD dots */
+const stopU = tour.map(b => {
+  let bu = 0, bd = 1e9;
+  for (let i = 0; i <= 720; i++){
+    const lp = vecToLatLon(curve.getPointAt(i / 720));
+    const d = angDist(lp.lat, lp.lon, b.lat, b.lon);
+    if (d < bd){ bd = d; bu = i / 720; }
+  }
+  return bu;
+});
+const dotsEl = $("tourDots");
+tour.forEach(() => dotsEl.appendChild(document.createElement("span")));
+function nextStopIdx(uNow){
+  let bi = 0, bd = 1e9;
+  for (let i = 0; i < tour.length; i++){
+    const du = (stopU[i] - uNow + 1) % 1;
+    if (du > 0.005 && du < bd){ bd = du; bi = i; }
+  }
+  return bi;
+}
 
 /* ============================== audio ============================== */
-let AC = null, toneOsc = [], toneFilter, toneGain, noiseGain, master;
+let AC = null, toneOsc = [], toneFilter, toneGain, noiseGain, master, muteGain;
+let soundOn = true;
 function initAudio(){
   AC = new (window.AudioContext || window.webkitAudioContext)();
   master = AC.createDynamicsCompressor();
   master.threshold.value = -16; master.ratio.value = 6;
-  master.connect(AC.destination);
+  muteGain = AC.createGain();
+  muteGain.gain.value = soundOn ? 1 : 0;
+  master.connect(muteGain);
+  muteGain.connect(AC.destination);
   toneFilter = AC.createBiquadFilter(); toneFilter.type = "lowpass"; toneFilter.frequency.value = 700; toneFilter.Q.value = 2;
   toneGain = AC.createGain(); toneGain.gain.value = 0;
   for (const det of [-6, 5]){
@@ -227,7 +263,7 @@ function initAudio(){
   noiseGain = AC.createGain(); noiseGain.gain.value = 0.012;
   noise.connect(bp); bp.connect(noiseGain); noiseGain.connect(master); noise.start();
 }
-function ping(frp){
+function ping(frp, pan){
   if (!AC) return;
   const o = AC.createOscillator(), g = AC.createGain();
   o.type = "sine";
@@ -236,7 +272,14 @@ function ping(frp){
   g.gain.setValueAtTime(0, AC.currentTime);
   g.gain.linearRampToValueAtTime(peak, AC.currentTime + 0.015);
   g.gain.exponentialRampToValueAtTime(0.0001, AC.currentTime + 0.5);
-  o.connect(g); g.connect(master); o.start(); o.stop(AC.currentTime + 0.55);
+  o.connect(g);
+  let out = g; /* pan the ping toward the side the hotspot is on */
+  if (AC.createStereoPanner){
+    const p = AC.createStereoPanner();
+    p.pan.value = Math.max(-0.85, Math.min(0.85, pan || 0));
+    g.connect(p); out = p;
+  }
+  out.connect(master); o.start(); o.stop(AC.currentTime + 0.55);
 }
 
 /* ============================== speech ============================== */
@@ -325,11 +368,20 @@ function animate(){
     toneGain.gain.setTargetAtTime(flying ? 0.025 + norm * 0.12 : 0, AC.currentTime, 0.12);
     if (noiseGain) noiseGain.gain.setTargetAtTime(flying ? 0.008 + speedMul * 0.006 : 0.004, AC.currentTime, 0.2);
     if (flying){
+      const ah = vecToLatLon(ahead);
+      let hdx = ah.lon - ll.lon; if (hdx > 180) hdx -= 360; if (hdx < -180) hdx += 360;
+      const hdy = ah.lat - ll.lat;
       HOTSPOTS.forEach((h, i) => {
         if (h[2] < 280) return;
         if (angDist(ll.lat, ll.lon, h[0], h[1]) < 5.5){
           const last = pingCooldown.get(i) || -1e9;
-          if (t - last > 4){ pingCooldown.set(i, t); ping(h[2]); }
+          if (t - last > 4){
+            pingCooldown.set(i, t);
+            let dx = h[1] - ll.lon; if (dx > 180) dx -= 360; if (dx < -180) dx += 360;
+            const dy = h[0] - ll.lat;
+            const cross = hdx * dy - hdy * dx, along = hdx * dx + hdy * dy;
+            ping(h[2], -(cross / (Math.hypot(cross, along) || 1)));
+          }
         }
       });
     }
@@ -342,6 +394,14 @@ function animate(){
     : `Cruising between fire regions · ${TOTAL_7D.toLocaleString()} detections this week, planet-wide`;
   $("meter").style.width = `${Math.round(Math.min(1, intensitySmooth / 2600) * 100)}%`;
   $("hudPos").textContent = `${Math.abs(ll.lat).toFixed(1)}° ${ll.lat >= 0 ? "N" : "S"}, ${Math.abs(ll.lon).toFixed(1)}° ${ll.lon >= 0 ? "E" : "W"} · ${count} hotspots within reach`;
+  if (!inBiome && dist > 20) lastBiomeId = null;
+  const nIdx = nextStopIdx(u);
+  [...dotsEl.children].forEach((el, i) => {
+    el.className = inBiome && tour[i] === biome ? "now" : (i === nIdx ? "next" : "");
+  });
+  $("hudNext").textContent = inBiome
+    ? `Stop ${tour.indexOf(biome) + 1} of ${tour.length} · Next: ${tour[nIdx].name}`
+    : `Next stop: ${tour[nIdx].name}`;
   if (flying && inBiome && biome.id !== lastBiomeId){
     lastBiomeId = biome.id;
     const msg = `Now flying over ${biome.name}. ${biome.count} major hotspots below. Strongest fire power, ${biome.maxFrp}.`;
@@ -377,6 +437,19 @@ $("btnNarrate").addEventListener("click", () => {
   $("btnNarrate").textContent = narration ? "Narration: on" : "Narration: off";
   if (!narration && "speechSynthesis" in window) speechSynthesis.cancel();
 });
+$("btnSound").addEventListener("click", () => {
+  soundOn = !soundOn;
+  $("btnSound").setAttribute("aria-pressed", String(soundOn));
+  $("btnSound").textContent = soundOn ? "Sound: on" : "Sound: off";
+  if (AC && muteGain) muteGain.gain.setTargetAtTime(soundOn ? 1 : 0, AC.currentTime, 0.03);
+});
+if (window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches){
+  speedMul = 0.5;
+  $("btnSpeed").textContent = "Speed: 0.5×";
+}
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden && AC && AC.state === "suspended" && flying) AC.resume();
+});
 $("btnCam").addEventListener("click", () => {
   camMode = camMode === "chase" ? "orbit" : "chase";
   $("btnCam").setAttribute("aria-pressed", String(camMode === "orbit"));
@@ -391,6 +464,7 @@ $("btnSpeed").addEventListener("click", () => {
 window.addEventListener("keydown", e => {
   if (e.code === "Space"){ e.preventDefault(); $("btnFly").click(); }
   else if (e.key === "n" || e.key === "N") $("btnNarrate").click();
+  else if (e.key === "m" || e.key === "M") $("btnSound").click();
   else if (e.key === "c" || e.key === "C") $("btnCam").click();
   else if (e.key === "ArrowUp"){ e.preventDefault(); $("btnSpeed").click(); }
   else if (e.key === "ArrowDown"){
