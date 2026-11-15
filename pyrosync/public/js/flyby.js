@@ -1300,6 +1300,7 @@ export function createFlybyController(bridge) {
             `Flying over ${biome.name}. Climate departure ${(rec?.zScore || 0).toFixed(1)} sigma, ${tierName}.`
           );
           u.rate = 1.05;
+          u.onstart = u.onend = () => window.PyroAudioUnlock?.resumeContext?.();
           window.speechSynthesis.speak(u);
         } catch (_) {}
       }
@@ -1403,8 +1404,12 @@ export function createFlybyController(bridge) {
       try {
         const u = new SpeechSynthesisUtterance(item.text);
         u.rate = 1.0;
-        u.onend = () => advance(400);
-        u.onerror = () => advance(400);
+        // Speech can interrupt the AudioContext on iOS and some Android browsers; nudge it
+        // back on as each line starts and ends (the unlock helper also polls).
+        const keepSound = () => window.PyroAudioUnlock?.resumeContext?.();
+        u.onstart = keepSound;
+        u.onend = () => { keepSound(); advance(400); };
+        u.onerror = () => { keepSound(); advance(400); };
         window.speechSynthesis.speak(u);
         // Safety net: some browsers never fire onend.
         advance(readingMs * 2 + 5000);
@@ -1760,6 +1765,7 @@ export function createFlybyController(bridge) {
         window.speechSynthesis.cancel();
         const u = new SpeechSynthesisUtterance(text);
         u.rate = 1.05;
+        u.onstart = u.onend = () => window.PyroAudioUnlock?.resumeContext?.();
         window.speechSynthesis.speak(u);
       } catch (_) {}
     }
