@@ -65,13 +65,14 @@
   <button id="btnSound" aria-pressed="true">Sound: on</button>
   <button id="btnCam" aria-pressed="false">Camera: chase</button>
   <button id="btnSpeed" aria-pressed="false">Speed: 1&times;</button>
-  <span class="keys">Keys: Space fly &middot; N narration &middot; M sound &middot; C camera &middot; &uarr;&darr; speed</span>
+  <button id="btnPilot" aria-pressed="false">Pilot: auto tour</button>
+  <span class="keys">Keys: Space fly &middot; N narration &middot; M sound &middot; G pilot &middot; C camera &middot; &uarr;&darr; speed / throttle</span>
 </div>
 
 <div id="startOverlay">
   <div id="startCard">
     <h2>&#128640; Ready to fly?</h2>
-    <p>An auto-piloted tour of six fire regions — California, the Boreal North, the Amazon, the Mediterranean, the Sahel, and the Australian Outback — built from 330 NASA FIRMS hotspots. Sound on: the fires sing as you pass. Narration is on by default, so the whole flight works with your eyes closed.</p>
+    <p>An auto-piloted tour of six fire regions — California, the Boreal North, the Amazon, the Mediterranean, the Sahel, and the Australian Outback — built from 330 NASA FIRMS hotspots. Sound on: the fires sing as you pass. Narration is on by default, so the whole flight works with your eyes closed. Prefer to fly yourself? Switch to Manual pilot (the Pilot button or the G key) — arrow keys steer, and an Xbox controller works too: left stick steers, triggers set speed, Start switches pilot mode.</p>
     <button id="startBtn">&#9654; Start flight</button>
     <p class="keys" style="margin-top:14px">One of two projects in the <a href="../" style="color:var(--acc)">Spatial Sequencers hub</a>.</p>
   </div>
@@ -312,6 +313,104 @@ function localIntensity(lat, lon){
   return { sum, count };
 }
 
+/* ============================== manual pilot ==============================
+   A second way to fly: leave the tour spline and steer the ship freely.
+   Everything sonified (tone, pings, narration) keys off position, so it
+   all keeps working. Inputs: keyboard (arrows / WASD) and any standard
+   gamepad (Xbox layout: left stick steers, triggers set speed).        */
+let pilotMode = "tour", heading = 0, manualSpeed = 1, bankTarget = 0, bankSmooth = 0;
+const freePos = new THREE.Vector3(0, 0, 1.24);
+const keysDown = new Set();
+let padPrev = [], padState = null, padAnnounced = false;
+
+function localFrame(lat, lon){
+  const phi = (90 - lat) * Math.PI / 180, theta = (lon + 180) * Math.PI / 180;
+  const east = new THREE.Vector3(Math.sin(phi) * Math.sin(theta), 0, -Math.sin(phi) * Math.cos(theta)).normalize();
+  const north = new THREE.Vector3(Math.cos(phi) * Math.cos(theta), Math.sin(phi), -Math.cos(phi) * Math.sin(theta)).normalize();
+  return { east, north };
+}
+function bearingBetween(a, b){
+  let dLon = b.lon - a.lon; if (dLon > 180) dLon -= 360; if (dLon < -180) dLon += 360;
+  return Math.atan2(dLon * Math.cos(a.lat * Math.PI / 180), b.lat - a.lat);
+}
+function nearestU(v){
+  let bu = 0, bd = 1e9;
+  for (let i = 0; i <= 720; i++){
+    const d = curve.getPointAt(i / 720).distanceToSquared(v);
+    if (d < bd){ bd = d; bu = i / 720; }
+  }
+  return bu;
+}
+function setPilotMode(m){
+  pilotMode = m;
+  $("btnPilot").setAttribute("aria-pressed", String(m === "manual"));
+  $("btnPilot").textContent = m === "manual" ? "Pilot: manual" : "Pilot: auto tour";
+  if (m === "manual"){
+    freePos.copy(curve.getPointAt(u)).setLength(1.24);
+    heading = bearingBetween(vecToLatLon(freePos), vecToLatLon(curve.getPointAt((u + 0.01) % 1)));
+    const msg = "Manual pilot. You have the controls. Steer with the left stick or the arrow keys; push forward to speed up. The fires still sing below you.";
+    $("liveRegion").textContent = msg;
+    speak(msg);
+  } else {
+    u = nearestU(freePos);
+    const msg = "Auto tour resumed.";
+    $("liveRegion").textContent = msg;
+    speak(msg);
+  }
+}
+function handlePad(){
+  if (!navigator.getGamepads) return;
+  let gp = null;
+  for (const g of navigator.getGamepads()) if (g && g.connected){ gp = g; break; }
+  if (!gp){ padState = null; return; }
+  if (!padAnnounced){
+    padAnnounced = true;
+    $("liveRegion").textContent = "Controller connected. A pauses or resumes the flight. Start switches pilot mode.";
+  }
+  const pressed = i => !!(gp.buttons[i] && gp.buttons[i].pressed);
+  const edge = i => pressed(i) && !padPrev[i];
+  const ax0 = gp.axes[0] || 0;
+  padState = {
+    steer: Math.abs(ax0) < 0.15 ? 0 : ax0,
+    stickY: gp.axes[1] || 0,
+    rt: gp.buttons[7] ? gp.buttons[7].value : 0,
+    lt: gp.buttons[6] ? gp.buttons[6].value : 0
+  };
+  if (edge(0)) $("btnFly").click();
+  if (edge(1)) $("btnCam").click();
+  if (edge(2)) $("btnSound").click();
+  if (edge(3)) $("btnNarrate").click();
+  if (edge(9) || edge(8)) $("btnPilot").click();
+  if (edge(5) || edge(12)) $("btnSpeed").click();
+  if (edge(4) || edge(13)){
+    const i = SPEEDS.indexOf(speedMul);
+    speedMul = SPEEDS[(i + SPEEDS.length - 1) % SPEEDS.length];
+    $("btnSpeed").textContent = `Speed: ${speedMul}×`;
+  }
+  padPrev = gp.buttons.map(b => b.pressed);
+}
+function updateFree(dt){
+  let steer = 0;
+  if (keysDown.has("ArrowLeft") || keysDown.has("KeyA")) steer -= 1;
+  if (keysDown.has("ArrowRight") || keysDown.has("KeyD")) steer += 1;
+  if (keysDown.has("ArrowUp") || keysDown.has("KeyW")) manualSpeed = Math.min(2.4, manualSpeed + 1.1 * dt);
+  if (keysDown.has("ArrowDown") || keysDown.has("KeyS")) manualSpeed = Math.max(0, manualSpeed - 1.1 * dt);
+  if (padState){
+    if (padState.steer) steer = padState.steer;
+    if (Math.abs(padState.stickY) > 0.12 || padState.rt > 0.05 || padState.lt > 0.05)
+      manualSpeed = Math.max(0, Math.min(2.4, (1 - padState.stickY) * (1 + padState.rt * 0.8) - padState.lt * 0.6));
+  }
+  heading += steer * 1.4 * dt;
+  bankTarget = -steer * 0.55;
+  const spd = 0.09 * manualSpeed;
+  if (spd <= 0.0001) return;
+  const ll = vecToLatLon(freePos);
+  const fr = localFrame(ll.lat, ll.lon);
+  const dir = fr.north.multiplyScalar(Math.cos(heading)).addScaledVector(fr.east, Math.sin(heading)).normalize();
+  const axis = new THREE.Vector3().crossVectors(freePos.clone().normalize(), dir).normalize();
+  freePos.applyAxisAngle(axis, spd * dt).setLength(1.24);
+}
+
 const clock = new THREE.Clock();
 const camTargetPos = new THREE.Vector3(0, 1.4, 3.6);
 function animate(){
@@ -319,13 +418,27 @@ function animate(){
   const dt = Math.min(clock.getDelta(), 0.05);
   const t = clock.elapsedTime;
 
-  if (flying) u = (u + dt * speedMul / LOOP_SECONDS) % 1;
-  const pos = curve.getPointAt(u);
-  if (pos.length() < 1.16) pos.setLength(1.16);
-  const ahead = curve.getPointAt((u + 0.012) % 1);
-  if (ahead.length() < 1.16) ahead.setLength(1.16);
+  handlePad();
+  let pos, ahead;
+  if (pilotMode === "manual"){
+    if (flying) updateFree(dt);
+    pos = freePos;
+    const fl = vecToLatLon(freePos);
+    const fr = localFrame(fl.lat, fl.lon);
+    const dir = fr.north.multiplyScalar(Math.cos(heading)).addScaledVector(fr.east, Math.sin(heading));
+    ahead = freePos.clone().addScaledVector(dir, 0.09);
+    ahead.setLength(1.24);
+  } else {
+    if (flying) u = (u + dt * speedMul / LOOP_SECONDS) % 1;
+    pos = curve.getPointAt(u);
+    if (pos.length() < 1.16) pos.setLength(1.16);
+    ahead = curve.getPointAt((u + 0.012) % 1);
+    if (ahead.length() < 1.16) ahead.setLength(1.16);
+  }
   ship.position.copy(pos);
   ship.lookAt(ahead);
+  bankSmooth += ((pilotMode === "manual" ? bankTarget : 0) - bankSmooth) * 0.08;
+  ship.rotateZ(bankSmooth);
   const glow = ship.getObjectByName("engineGlow");
   if (glow) glow.scale.setScalar(flying ? 1 + Math.sin(t * 31) * 0.3 : 0.7);
 
@@ -395,13 +508,18 @@ function animate(){
   $("meter").style.width = `${Math.round(Math.min(1, intensitySmooth / 2600) * 100)}%`;
   $("hudPos").textContent = `${Math.abs(ll.lat).toFixed(1)}° ${ll.lat >= 0 ? "N" : "S"}, ${Math.abs(ll.lon).toFixed(1)}° ${ll.lon >= 0 ? "E" : "W"} · ${count} hotspots within reach`;
   if (!inBiome && dist > 20) lastBiomeId = null;
-  const nIdx = nextStopIdx(u);
-  [...dotsEl.children].forEach((el, i) => {
-    el.className = inBiome && tour[i] === biome ? "now" : (i === nIdx ? "next" : "");
-  });
-  $("hudNext").textContent = inBiome
-    ? `Stop ${tour.indexOf(biome) + 1} of ${tour.length} · Next: ${tour[nIdx].name}`
-    : `Next stop: ${tour[nIdx].name}`;
+  if (pilotMode === "manual"){
+    [...dotsEl.children].forEach(el => { el.className = ""; });
+    $("hudNext").textContent = `Manual pilot · speed ${manualSpeed.toFixed(1)}× · Start or G for auto tour`;
+  } else {
+    const nIdx = nextStopIdx(u);
+    [...dotsEl.children].forEach((el, i) => {
+      el.className = inBiome && tour[i] === biome ? "now" : (i === nIdx ? "next" : "");
+    });
+    $("hudNext").textContent = inBiome
+      ? `Stop ${tour.indexOf(biome) + 1} of ${tour.length} · Next: ${tour[nIdx].name}`
+      : `Next stop: ${tour[nIdx].name}`;
+  }
   if (flying && inBiome && biome.id !== lastBiomeId){
     lastBiomeId = biome.id;
     const msg = `Now flying over ${biome.name}. ${biome.count} major hotspots below. Strongest fire power, ${biome.maxFrp}.`;
@@ -461,11 +579,17 @@ $("btnSpeed").addEventListener("click", () => {
   speedMul = SPEEDS[(i + 1) % SPEEDS.length];
   $("btnSpeed").textContent = `Speed: ${speedMul}×`;
 });
+$("btnPilot").addEventListener("click", () => {
+  setPilotMode(pilotMode === "tour" ? "manual" : "tour");
+});
 window.addEventListener("keydown", e => {
-  if (e.code === "Space"){ e.preventDefault(); $("btnFly").click(); }
+  keysDown.add(e.code);
+  if (e.code === "Space"){ e.preventDefault(); if (!e.repeat) $("btnFly").click(); }
   else if (e.key === "n" || e.key === "N") $("btnNarrate").click();
   else if (e.key === "m" || e.key === "M") $("btnSound").click();
   else if (e.key === "c" || e.key === "C") $("btnCam").click();
+  else if (e.key === "g" || e.key === "G"){ if (!e.repeat) $("btnPilot").click(); }
+  else if (pilotMode === "manual" && ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.code)) e.preventDefault();
   else if (e.key === "ArrowUp"){ e.preventDefault(); $("btnSpeed").click(); }
   else if (e.key === "ArrowDown"){
     e.preventDefault();
@@ -474,6 +598,7 @@ window.addEventListener("keydown", e => {
     $("btnSpeed").textContent = `Speed: ${speedMul}×`;
   }
 });
+window.addEventListener("keyup", e => keysDown.delete(e.code));
 window.addEventListener("resize", () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();

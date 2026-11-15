@@ -46,10 +46,26 @@ power (FRP), embedded from PyroSync's bundled data.
 
 ## Controls
 
-Space play/pause · N narration · C chase/orbit camera · ↑/↓ speed.
-The HUD shows the current region, a fire-intensity meter, and the
-ship's coordinates; a screen-reader live region announces each
-region as it is reached.
+Space play/pause · N narration · M sound · C chase/orbit camera ·
+↑/↓ speed. The HUD shows the current region, a fire-intensity
+meter, the ship's coordinates, and tour progress (which stop you
+are at, and the next one); a screen-reader live region announces
+each region as it is reached. Hotspot pings are panned left/right
+toward the side the fire is on.
+
+## Manual pilot
+
+The tour is auto-piloted, but you can take the controls: the
+**Pilot** button (or the G key) switches to manual flight, and
+switching back resumes the tour from wherever you left it. Mode
+changes are announced aloud. Steer with the arrow keys or WASD
+(↑/↓ set speed) — or plug in an **Xbox controller**: left stick
+steers, pushing it forward (or the right trigger) speeds up, the
+left trigger slows down, A pauses/resumes, Y narration, X sound,
+B camera, bumpers set tour speed, and Start switches pilot mode.
+Everything sonified keeps working in manual flight, because the
+sound has always been driven by where the ship is, not by the
+tour path.
 
 ## Technical notes
 
