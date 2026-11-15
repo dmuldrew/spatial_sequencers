@@ -1,0 +1,1048 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Space Jukebox — 3D Fire Flight</title>
+<meta name="description" content="Fly a spaceship around a 3D Earth and hear wildfire data: NASA FIRMS hotspots become sound as you pass over them. Part of Space Jukebox, the accessible sonification side project of PyroSync (NASA Space Apps 2026).">
+<style>
+  :root{--bg:#05070f;--panel:#101830;--line:#33406e;--ink:#fff;--dim:#c2cdea;--acc:#ffd166;--acc2:#7ee0a3;--hot:#ff7847}
+  *{box-sizing:border-box}
+  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;margin:0;background:var(--bg);color:var(--ink);font-size:18px;line-height:1.5;overflow-x:hidden}
+  #scene{position:fixed;inset:0;display:block}
+  header{position:fixed;top:0;left:0;right:0;padding:14px 20px;display:flex;justify-content:space-between;align-items:flex-start;pointer-events:none;z-index:5}
+  h1{font-size:26px;margin:0}
+  header p{margin:2px 0 0;color:var(--dim);font-size:15.5px;max-width:520px}
+  header a{color:var(--acc);pointer-events:auto}
+  #hud{position:fixed;left:20px;bottom:96px;z-index:5;background:rgba(13,20,43,.88);border:2px solid var(--line);border-radius:14px;padding:14px 18px;min-width:280px}
+  #hud .region{font-size:24px;font-weight:800;margin:0}
+  #hud .sub{color:var(--dim);margin:2px 0 8px;font-size:16px}
+  #meterWrap{height:14px;background:#1b2547;border-radius:7px;overflow:hidden;transition:height .18s}
+  #meter{height:100%;width:0%;background:linear-gradient(90deg,var(--acc),var(--hot),#ff3d3d);transition:width .18s}
+  #hud .lab{font-size:13.5px;color:var(--dim);letter-spacing:.06em;margin-top:6px}
+  #tourDots{display:flex;gap:7px;margin-top:10px}
+  #tourDots span{width:11px;height:11px;border-radius:50%;background:#1b2547;border:2px solid var(--line)}
+  #tourDots span.next{border-color:var(--acc)}
+  #tourDots span.now{background:var(--acc);border-color:var(--acc);transform:scale(1.3)}
+  #controls{position:fixed;left:0;right:0;bottom:0;z-index:6;display:flex;flex-wrap:wrap;gap:10px;justify-content:center;align-items:center;padding:14px;background:rgba(8,12,26,.92);border-top:2px solid var(--line)}
+  button{font-size:18px;font-weight:700;padding:11px 20px;border-radius:999px;border:2px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer}
+  button[aria-pressed="true"]{background:var(--acc);color:#141414;border-color:var(--acc)}
+  button:focus-visible,a:focus-visible{outline:4px solid var(--acc);outline-offset:2px}
+  #startOverlay{position:fixed;inset:0;z-index:10;background:rgba(4,6,14,.78);display:flex;align-items:center;justify-content:center;padding:20px}
+  #startCard{background:var(--panel);border:2px solid var(--line);border-radius:18px;max-width:560px;padding:30px;text-align:center}
+  #startCard h2{font-size:30px;margin:0 0 10px}
+  #startCard p{color:var(--dim)}
+  #startBtn{font-size:22px;background:var(--acc);color:#141414;border-color:var(--acc);padding:14px 34px}
+  .keys{color:var(--dim);font-size:14.5px}
+  .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+</style>
+</head>
+<body>
+<canvas id="scene" aria-label="3D globe with a spaceship flying over wildfire hotspots"></canvas>
+
+<header>
+  <div>
+    <h1>&#128640; Space Jukebox — Fire Flight</h1>
+    <p>A spaceship tours Earth&rsquo;s fire regions. The sound you hear <em>is</em> the data: NASA FIRMS hotspots drive the pitch — the hotter and denser the fires below, the higher the line climbs.</p>
+  </div>
+  <nav aria-label="Experiences" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;pointer-events:auto">
+    <a href="../" style="padding:5px 11px;border-radius:999px;border:1px solid var(--line);background:var(--panel);text-decoration:none">&#129680; Hub</a>
+    <a href="../pyrosync/#spiral" style="padding:5px 11px;border-radius:999px;border:1px solid var(--line);background:var(--panel);text-decoration:none">&#127744; Spiral</a>
+    <a href="../pyrosync/#iowa-map" style="padding:5px 11px;border-radius:999px;border:1px solid var(--line);background:var(--panel);text-decoration:none">&#11041; Iowa H3</a>
+    <a href="../spaceship-flyby/" style="padding:5px 11px;border-radius:999px;border:1px solid var(--line);background:var(--panel);text-decoration:none">&#128640; Combined Flyby</a>
+    <a href="../pyrosync/#flyby" style="padding:5px 11px;border-radius:999px;border:1px solid var(--line);background:var(--panel);text-decoration:none">&#128752;&#65039; Orbital Flyby</a>
+    <a href="./fly.html" aria-current="page" style="padding:5px 12px;border-radius:999px;border:2px solid var(--acc);background:rgba(255,209,102,.18);font-weight:800;text-decoration:none">&#128293; 3D Fire Flight</a>
+  </nav>
+</header>
+
+<div id="hud" aria-hidden="true">
+  <p class="region" id="hudRegion">Standing by</p>
+  <p class="sub" id="hudSub">Press Start flight</p>
+  <div id="meterWrap"><div id="meter"></div></div>
+  <p class="lab">FIRE INTENSITY BELOW THE SHIP</p>
+  <p class="sub" id="hudPos" style="margin-top:8px"></p>
+  <div id="tourDots"></div>
+  <p class="sub" id="hudNext" style="margin-top:6px"></p>
+  <p class="sub" style="margin-top:6px; opacity:.75">A bar of light rises from every hotspot — taller and redder burns stronger.</p>
+</div>
+<p class="sr" aria-live="polite" id="liveRegion"></p>
+
+<div id="controls">
+  <button id="btnFly" aria-pressed="false">&#9654; Start flight</button>
+  <button id="btnNarrate" aria-pressed="true">Narration: on</button>
+  <button id="btnMute" aria-pressed="false">Sound: on</button>
+  <button id="btnCam" aria-pressed="false">Camera: chase</button>
+  <button id="btnSpeed" aria-pressed="false">Speed: 1&times;</button>
+  <button id="btnPilot" aria-pressed="false">Pilot: auto tour</button>
+  <span class="keys">Keys: Space fly &middot; S whereabouts &middot; N narration &middot; M mute &middot; G pilot &middot; C camera &middot; &uarr;&darr; speed / throttle</span>
+</div>
+
+<div id="startOverlay">
+  <div id="startCard">
+    <h2 id="startTitle">&#128640; Ready to fly?</h2>
+    <p id="startIntro">An auto-piloted tour of six fire regions — California, the Boreal North, the Amazon, the Mediterranean, the Sahel, and the Australian Outback — built from 330 NASA FIRMS hotspots. Sound on: the fires sing as you pass. Narration is on by default, so the whole flight works with your eyes closed. Prefer to fly yourself? Switch to Manual pilot (the Pilot button or the G key) — arrow keys steer, and an Xbox controller works too: left stick steers, triggers set speed, Start switches pilot mode.</p>
+    <button id="startBtn">&#9654; Start flight</button>
+    <p class="keys" style="margin-top:14px">One of two projects in the <a href="../" style="color:var(--acc)">Spatial Sequencers hub</a>.</p>
+  </div>
+</div>
+
+<script type="module">
+"use strict";
+/* ============================== DATA (embedded at build time) ==============================
+   Hotspots: NASA FIRMS MODIS hotspots bundled with PyroSync (330 records: lat, lon, FRP).
+   Land: dot grid rasterized from Natural Earth country borders (1.5 deg cells).          */
+const MASK = {step: 1.5, rows: 120, cols: 240, b64: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB//8////44AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPx/n/////AAAA/AAYAAAAfAAAAAAAAAAAAAAAAEO3v4f////+AAAPgAAAAAAAAcAAAAAAAAAAAAAADAAAfgP////+AAAHAAAAAAAAAMAAAAAAAAAAAAAAA9jjCAAP///+AAAAAAAAHgAAP/8AAPAAAAAAAAAAcAAAAAAD///8AAAAAAAAYAAD//gAAAAAAAAAAAAAe6zs/AAB///4AAAAAAABgDA/////wGAAAAP/7///3APzAA//gAAH///////xwHf/////z/+AAAAB//wPI/+sEP4A///wAAAAf8AACHf////////8B8P4AAAAAPPIZ+H/gAD////8AAOcgEQAAAAAAAAAAAE/AAAAAAAAB+AfAAf////4AAHAAAgAAAAAAAAAAA54AAAAAAAALwG/gH/4H//wOB4AAAAAAAAAAAAAAAAAf///////Ng+AP4ADAAA/n////////////////+AD///////8COMAHwAAAAD/P///////////////v8AD/7/////4APwABgAAAAH/P//////////////wfAAA+AH////4APzAAAAAAAD/D/////////////JhgAAAHAAf///8AH/gAAAAAIAOD////////////4AHAAAAQAAP////wH/gAAAAAMBuP////////////wAPgAACAAAH////+f/8AAAAAWAhf////////////AAPAAAAAAAT////+f/+AAAAA3H//////////////+AOAAAAAAAB/////f/8AAAAAHn//////////////+AIAAAAAAAB//////8wAAAAAMf//////////////9AAAAAAAAAA//////2HAAAAAF///////////////4AAAAAAAAAAf/////+AgAAAAD///////////////4AAAAAAAAAAf//////wAAAAAB///yfx/////////wAAAAAAAAAAf/////yAAAAAAB/z/gPj/////////jAAAAAAAAAAf/////gAAAAAA/wY/gDx////////8HAAAAAAAAAAf/////AAAAAAA/gGfnn4////////wAAAAAAAAAAAf////+AAAAAAA/ACY//4///////1gGAAAAAAAAAAP////8AAAAAAA/ACM//4///////hwEAAAAAAAAAAH////4AAAAAAAOLgA//////////4wcAAAAAAAAAAH////4AAAAAAAN/gDC/////////wz8AAAAAAAAAAB////wAAAAAAAf/gAA/////////wDgAAAAAAAAAAA////AAAAAAAA//8YB/////////4EAAAAAAAAAAAAX///AAAAAAAA///f//////////4AAAAAAAAAAAAAX/5BAAAAAAAB//////z///////4AAAAAAAAAAAAAb/gBAAAAAAAH////8/5///////4AAAAAAAAAAAAAF/gBoAAAAAAP////+/4f//////wAAAAAAAAAAAAAE/gAAAAAAAAP////+f8wH/////gAAAAAAAAAAAAAAfgAAAAAAAAf/////P/4D/////IAAAAAAAAAAAAAAPgAQAAAAAAf/////v/8D/+f/4AAAAAAAAAAAAAAAPgwOAAAAAAf/////n/4Af8P+AAAAAAAAAAAAAAAAHxwAwAAAAAf/////n/wAfwH+wAAAAAAAAAAAAAAAB/gAAAAAAAf/////z/gAfgH+AMAAAAAAAAAAAAAAAT8AAAAAAAf/////z+AAfAF/AIAAAAAAAAAAAAAAAB+AAAAAAAf/////94AAOAB/gIAAAAAAAAAAAAAAAAMAAAAAAAf//////AAAOAA/gCAAAAAAAAAAAAAAAAEBQAAAAAP/////+MAAGAAHAFAAAAAAAAAAAAAAAACDfgAAAAH//////8AAGAACAAAAAAAAAAAAAAAAAABP/wAAAAH//////4AABABgADAAAAAAAAAAAAAAAAAP/4AAAAD//////4AABAAQABAAAAAAAAAAAAAAAAAP//gAAAA/H////wAAAACYBgAAAAAAAAAAAAAAAAAH//wAAAAAA////wAAAADYDAAAAAAAAAAAAAAAAAAP//wAAAAAA////gAAAABoPgAAAAAAAAAAAAAAAAAf//4AAAAAA///+AAAAAA4fuQAAAAAAAAAAAAAAAA///+AAAAAA///8AAAAAAYfASAAAAAAAAAAAAAAAA////AAAAAA///4AAAAAAcfYBYAAAAAAAAAAAAAAA////8AAAAAf//4AAAAAAOCEh/AAAAAAAAAAAAAAA/////AAAAAP//wAAAAAAGAAAPgAAAAAAAAAAAAAA/////gAAAAP//wAAAAAADIABPwIAAAAAAAAAAAAAf////gAAAAH//wAAAAAAAOAAPYCAAAAAAAAAAAAAP////AAAAAH//4AAAAAAAACAAMAAAAAAAAAAAAAAP///+AAAAAH//4AAAAAAAAAAAAAAAAAAAAAAAAAAH///+AAAAAH//4AAAAAAAAAHhAAAAAAAAAAAAAAAH///8AAAAAP//4IAAAAAAAAvjAAAAAAAAAAAAAAAD///8AAAAAP//4cAAAAAAAB/jgAAAAAAAAAAAAAAA///8AAAAAP//h4AAAAAAAD/7gAAAAAAAAAAAAAAAf//8AAAAAP//B4AAAAAAAH//wAAAAAAAAAAAAAAAf//4AAAAAH/+AwAAAAAAAf//4AQAAAAAAAAAAAAAf//4AAAAAH//BwAAAAAAB///8AIAAAAAAAAAAAAAf//gAAAAAD//BwAAAAAAD///+AAAAAAAAAAAAAAAf/8AAAAAAD/+BgAAAAAAD////AAAAAAAAAAAAAAAf/8AAAAAAD/8AAAAAAAAD////AAAAAAAAAAAAAAAf/8AAAAAAD/8AAAAAAAAD////AAAAAAAAAAAAAAA//4AAAAAAB/4AAAAAAAAB////AAAAAAAAAAAAAAA//wAAAAAAA/wAAAAAAAAB////AAAAAAAAAAAAAAA//gAAAAAAA/gAAAAAAAAB/h//AAAAAAAAAAAAAAA//AAAAAAAA+AAAAAAAAAB+Av+AAAAAAAAAAAAAAA/8AAAAAAAAAAAAAAAAAAAAAP8AAQAAAAAAAAAAAB/8AAAAAAAAAAAAAAAAAAAAAH8AAIAAAAAAAAAAAB/4AAAAAAAAAAAAAAAAAAAAADQAAOAAAAAAAAAAAB/gAAAAAAAAAAAAAAAAAAAAAAAAAMAAAAAAAAAAAB+AAAAAAAAAAAAAAAAAAAAAAAYAAIAAAAAAAAAAAB+AAAAAAAAAAAAAAAAAAAAAAAYAAwAAAAAAAAAAAD8AAAAAAAAAAAAAAAAAAAAAAAAADAAAAAAAAAAAAD4AAAAAAAAAAAAAAAAAAAAAAAAAHAAAAAAAAAAAAD8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADwYAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGAAAAAAAAAAAADwAACAefH/gAAAAAAAAAAAAAAAAEAAAAAAAAAAAB//8B///////4AAAAAAAAAAAAAAA/AAAAAAAAAAH///8P////////8AAAAAAAAAAAAAB3gAAAAATf//////8//////////+AAAAAAAAAAAgAHgAAAAH////////////////////AAAAAAAB4B////gAAAAP///////////////////4AAAAD////////4AAAAD////////////////////gAAALP///////8AAAAD/////////////////////gAABj////////wAAHg//////////////////////4AAAAD///////8AQ/AB////////////////////+AAAAB//////////AGP//////////////////////AAAAA///////////////////////////////////8AAD//gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"};
+const HOTSPOTS = [[42.29,-120.38,424],[42.28,-120.38,311],[35.05,-120.31,301],[35.06,-120.32,227],[36.98,-119.05,224],[33.64,-116.67,204],[37.29,-119.44,203],[36.98,-119.03,141],[33.63,-116.66,129],[39.11,-122.22,119],[37.01,-119.23,114],[32.62,-115.4,108],[41.27,-121.97,102],[39.09,-122.22,100],[41.28,-121.96,93],[33.65,-116.68,90],[41.28,-121.95,88],[41.27,-122.78,83],[36.96,-119.06,79],[41.71,-121.94,79],[35.05,-120.31,74],[40.37,-123.06,74],[42.28,-120.39,71],[33.65,-116.67,71],[39.09,-122.19,70],[41.71,-121.96,62],[38.94,-122.02,60],[36.97,-119.06,60],[41.28,-122.79,56],[41.27,-122.77,55],[37.01,-119.24,52],[36.95,-119.06,49],[41.27,-122.81,49],[41.72,-121.96,46],[32.62,-115.39,45],[42.27,-120.39,45],[39.1,-122.18,43],[41.27,-121.94,43],[37.01,-119.25,42],[41.14,-123.88,42],[39.66,-121.02,42],[41.14,-123.91,41],[32.61,-114.6,40],[41.26,-122.81,40],[38.76,-117.39,40],[41.27,-122.83,39],[40.3,-123.84,36],[41.15,-123.88,36],[41.27,-121.96,34],[35.04,-120.35,34],[33.63,-116.66,34],[32.61,-114.59,33],[41.99,-123.57,32],[41.26,-122.78,32],[39.09,-122.21,32],[50.45,-98.95,218],[48.08,-98.51,186],[56.56,-118.97,156],[50.46,-98.95,151],[53.73,-122.91,140],[57.06,-117.68,135],[58.0,-116.69,118],[57.05,-117.7,95],[58.57,-116.48,94],[54.19,-122.74,88],[48.5,-118.36,85],[49.34,-99.82,77],[49.62,-92.87,76],[56.56,-118.98,76],[57.63,-117.26,75],[49.37,-99.21,74],[48.94,-94.06,72],[57.75,-116.76,70],[50.62,-101.23,67],[49.84,-113.55,66],[57.63,-117.27,64],[53.89,-126.12,64],[49.58,-92.94,63],[48.4,-99.35,58],[57.05,-117.67,57],[50.61,-101.25,54],[48.65,-98.35,54],[57.75,-116.77,53],[49.88,-101.83,52],[48.38,-117.53,52],[56.36,-121.52,51],[48.98,-98.95,51],[53.04,-109.14,50],[58.0,-116.65,50],[53.88,-126.14,50],[57.06,-117.66,50],[56.36,-121.5,48],[48.38,-117.54,48],[56.12,-116.92,47],[58.0,-116.66,46],[50.81,-99.55,45],[48.99,-99.57,43],[56.27,-117.99,43],[49.88,-101.82,43],[49.3,-99.03,43],[48.17,-117.15,42],[50.08,-118.43,42],[57.63,-117.25,41],[57.63,-117.24,41],[49.87,-101.86,41],[53.05,-109.15,40],[55.42,-123.68,40],[48.94,-94.07,38],[48.39,-99.34,38],[56.27,-117.96,37],[-4.07,-46.06,1640],[-5.51,-60.27,1562],[-1.05,-53.54,1440],[-10.58,-42.31,1119],[-10.58,-42.3,1039],[-1.41,-52.53,1033],[-3.27,-49.8,923],[-0.95,-51.64,922],[-5.51,-60.28,911],[-3.27,-48.62,911],[-20.3,-59.27,902],[-18.18,-60.2,894],[-1.36,-52.62,859],[-0.86,-52.74,816],[-20.72,-61.27,754],[-1.04,-53.54,730],[-4.64,-45.2,728],[-20.3,-59.28,721],[-3.6,-44.58,703],[-4.25,-43.45,692],[-0.99,-47.37,676],[-1.66,-45.79,675],[-20.66,-60.31,652],[1.95,-60.38,639],[-20.2,-59.13,636],[2.66,-60.18,629],[-1.14,-53.58,622],[-20.67,-60.31,619],[-20.65,-60.22,609],[-2.62,-48.68,609],[-4.07,-46.04,602],[-3.26,-49.79,601],[-2.62,-48.68,592],[-0.98,-47.4,583],[-3.27,-48.62,580],[-3.43,-51.42,574],[-3.35,-44.31,563],[-2.28,-46.56,557],[-11.07,-40.88,542],[-3.27,-49.82,536],[-3.39,-51.49,526],[-1.89,-54.04,525],[-3.27,-48.61,520],[-5.64,-43.94,515],[-4.83,-40.73,514],[-20.73,-61.29,503],[-0.98,-47.37,501],[-13.47,-65.13,497],[-4.64,-45.21,494],[-3.6,-44.59,486],[-4.29,-43.45,481],[-20.3,-59.26,463],[-20.66,-60.3,461],[-20.75,-61.25,459],[-5.65,-43.93,458],[9.12,21.03,2022],[9.13,21.02,1377],[7.53,30.02,1339],[9.12,21.03,1115],[7.53,30.02,1114],[7.29,29.6,1063],[7.31,29.62,995],[7.29,29.6,988],[7.1,29.64,902],[7.54,29.99,898],[12.31,20.49,859],[7.1,29.64,838],[6.96,29.99,820],[7.6,30.09,818],[7.58,30.07,816],[7.55,30.05,797],[10.19,23.05,745],[7.53,29.99,743],[8.74,26.41,731],[12.3,20.49,727],[7.6,30.1,716],[8.44,32.85,713],[8.75,26.41,708],[12.07,14.58,696],[9.2,20.79,693],[7.11,29.64,686],[7.11,29.82,680],[9.12,21.08,663],[7.8,29.67,649],[9.65,30.4,638],[7.32,29.66,637],[7.81,29.7,637],[10.19,23.04,632],[9.5,31.18,612],[7.54,30.02,595],[7.11,29.63,576],[8.74,26.4,576],[7.34,31.64,572],[9.07,21.18,568],[8.06,31.35,567],[10.2,23.06,563],[5.54,29.91,531],[9.5,31.19,520],[10.12,29.45,516],[7.55,31.39,516],[9.12,21.08,512],[7.25,29.83,506],[7.8,29.69,500],[9.9,31.2,500],[7.64,29.42,500],[8.56,32.57,480],[12.07,14.59,472],[8.42,32.85,470],[9.5,31.17,466],[9.6,29.48,465],[36.63,6.98,287],[36.63,6.97,175],[41.34,21.37,88],[38.7,22.48,75],[41.58,0.9,75],[45.32,28.57,69],[38.06,30.39,63],[36.63,6.97,46],[37.27,27.66,41],[38.51,-7.82,35],[35.8,-0.26,34],[38.51,-7.84,34],[35.85,0.54,30],[41.57,0.88,30],[38.69,22.5,29],[38.79,30.25,28],[40.83,21.48,25],[39.66,30.6,24],[36.62,5.9,23],[42.2,25.39,23],[36.86,6.96,23],[38.98,-6.44,23],[36.87,7.0,22],[39.11,33.46,21],[39.31,22.32,21],[36.77,6.46,20],[38.65,32.79,19],[36.64,6.98,19],[45.14,9.94,19],[37.55,14.95,18],[35.81,-0.26,17],[36.73,5.75,17],[35.8,-0.25,16],[35.05,32.88,16],[40.86,26.28,16],[43.3,25.03,16],[39.32,22.34,16],[39.82,33.13,16],[35.81,-0.27,16],[44.91,17.86,15],[42.36,21.72,14],[45.14,9.95,13],[37.81,13.67,13],[37.82,13.68,13],[41.34,21.39,13],[36.74,6.25,12],[39.54,32.25,12],[43.3,25.05,12],[35.07,32.91,11],[39.42,22.52,11],[38.58,27.6,11],[42.33,26.18,11],[36.2,7.5,11],[38.7,22.49,11],[38.69,22.48,11],[-19.57,124.36,5083],[-19.56,124.37,5077],[-19.56,124.37,4079],[-20.03,136.33,3730],[-20.35,124.87,3166],[-20.35,124.87,2961],[-20.41,125.15,2755],[-20.03,136.36,2704],[-19.31,125.19,2677],[-20.25,125.06,2392],[-19.31,125.18,2391],[-19.56,124.35,2318],[-20.26,125.1,2240],[-20.01,136.39,2236],[-19.52,124.64,2102],[-17.5,122.95,2002],[-24.42,122.92,1793],[-20.24,125.09,1724],[-20.57,124.77,1670],[-17.51,122.95,1657],[-20.41,124.57,1654],[-20.41,124.57,1638],[-17.73,136.52,1622],[-20.59,124.77,1587],[-18.44,123.92,1572],[-20.01,136.38,1559],[-20.43,124.57,1508],[-20.57,124.77,1466],[-19.32,125.15,1462],[-17.73,136.53,1455],[-19.52,124.65,1446],[-20.43,124.58,1428],[-19.68,125.63,1424],[-20.24,125.1,1400],[-20.37,125.13,1390],[-17.74,136.49,1390],[-20.02,136.36,1315],[-20.26,125.06,1248],[-20.6,124.78,1248],[-20.59,124.78,1242],[-19.51,124.63,1232],[-19.57,124.34,1220],[-20.8,139.83,1207],[-19.21,125.5,1197],[-21.29,119.78,1195],[-19.45,125.12,1193],[-19.33,125.14,1187],[-19.36,125.13,1180],[-20.33,125.12,1172],[-20.35,125.12,1168],[-20.24,125.05,1157],[-17.52,122.92,1148],[-19.75,124.34,1138],[-17.75,136.49,1118],[-19.69,136.29,1117]];
+const BIOMES = [{"id":"california","name":"California & W. US","lat":37.5,"lon":-120.2,"count":55,"maxFrp":424},{"id":"boreal","name":"Boreal N. America","lat":55.5,"lon":-115.0,"count":55,"maxFrp":218},{"id":"amazon","name":"Amazon & Cerrado","lat":-10.5,"lon":-55.0,"count":55,"maxFrp":1640},{"id":"africa","name":"Sahel & N. Savanna","lat":9.5,"lon":23.0,"count":55,"maxFrp":2022},{"id":"mediterranean","name":"Mediterranean Basin","lat":39.0,"lon":21.5,"count":55,"maxFrp":287},{"id":"australia","name":"Australian Outback","lat":-17.5,"lon":129.0,"count":55,"maxFrp":5083}];
+const TOTAL_7D = 80347;
+
+/* Per-region spoken detail: total fire power (the 330 hotspots are
+   stored grouped by biome, 55 each, in BIOMES order), a rank line by
+   strongest single fire, and a one-line character note per region.  */
+const REGION_NOTES = {
+  california: "Wildfires across the western states.",
+  boreal: "Forest fires burning across the Canadian north.",
+  amazon: "Fires across the rainforest and the Cerrado savanna.",
+  africa: "Savanna fires burning across the Sahel.",
+  mediterranean: "Summer wildfires around the Mediterranean Sea.",
+  australia: "Bushfires burning in the Outback.",
+};
+const ORDINALS = ["strongest", "second strongest", "third strongest", "fourth strongest", "fifth strongest", "sixth strongest"];
+{
+  const byRank = [...BIOMES].sort((a, b) => b.maxFrp - a.maxFrp);
+  BIOMES.forEach((b, i) => {
+    b.totalFrp = HOTSPOTS.slice(i * b.count, (i + 1) * b.count).reduce((s, h) => s + h[2], 0);
+    const r = byRank.indexOf(b);
+    b.rankLine = r === 0
+      ? "It is the strongest fire region on Earth this week."
+      : `Ranked ${ORDINALS[r]} of the six regions.`;
+    b.note = REGION_NOTES[b.id] || "";
+  });
+}
+
+/* ============================== helpers ============================== */
+const $ = id => document.getElementById(id);
+/* land/ocean from the same Natural Earth mask that draws the dot
+   continents — a cell lookup, so narration can name open water      */
+const MASK_BYTES = Uint8Array.from(atob(MASK.b64), c => c.charCodeAt(0));
+function isLand(lat, lon){
+  const r = Math.max(0, Math.min(MASK.rows - 1, Math.floor((90 - lat) / MASK.step)));
+  const c = Math.max(0, Math.min(MASK.cols - 1, Math.floor((lon + 180) / MASK.step)));
+  const i = r * MASK.cols + c;
+  return (MASK_BYTES[i >> 3] & (1 << (7 - (i & 7)))) !== 0;
+}
+function oceanName(lat, lon){
+  if (isLand(lat, lon)) return null;
+  if (lat < -58) return "Southern Ocean";
+  if (lon >= -6 && lon <= 36 && lat >= 30 && lat <= 46) return "Mediterranean Sea";
+  if (lon >= -98 && lon <= -60 && lat >= 5 && lat <= 32) return "Caribbean Sea";
+  if (lon >= 142 || lon <= -78) return "Pacific Ocean";
+  if (lon >= 20 && lat < 28) return "Indian Ocean";
+  if (lon > -78 && lon < 20) return "Atlantic Ocean";
+  return null;
+}
+const COMPASS8 = ["north", "northeast", "east", "southeast", "south", "southwest", "west", "northwest"];
+function compass8(rad){
+  let d = rad * 180 / Math.PI; if (d < 0) d += 360;
+  return COMPASS8[Math.round(d / 45) % 8];
+}
+function latLonToVec3(lat, lon, r){
+  const phi = (90 - lat) * Math.PI / 180, theta = (lon + 180) * Math.PI / 180;
+  return new THREE.Vector3(-r * Math.sin(phi) * Math.cos(theta), r * Math.cos(phi), r * Math.sin(phi) * Math.sin(theta));
+}
+function angDist(aLat, aLon, bLat, bLon){
+  const p1 = aLat * Math.PI / 180, p2 = bLat * Math.PI / 180;
+  const dp = (bLat - aLat) * Math.PI / 180, dl = (bLon - aLon) * Math.PI / 180;
+  const h = Math.sin(dp/2)**2 + Math.cos(p1) * Math.cos(p2) * Math.sin(dl/2)**2;
+  return 2 * Math.asin(Math.sqrt(h)) * 180 / Math.PI;
+}
+/* Equirectangular projection for the flat map (manual pilot): x = lon,
+   y = lat, in radians, so the plane spans 2π × π like the globe's skin. */
+function flatVec(lat, lon, z){
+  return new THREE.Vector3(lon * Math.PI / 180, lat * Math.PI / 180, z);
+}
+function vecToLatLon(v){
+  const r = v.length();
+  let lon = Math.atan2(v.z, -v.x) * 180 / Math.PI + 180;
+  if (lon > 180) lon -= 360; /* wrap to -180..+180 (was 0..360 W) */
+  /* clamp: float error can push v.y/r a hair past 1 near the poles,
+     and an unclamped acos returns NaN — which poisons the flat-map
+     ship and camera positions and takes the whole view down        */
+  const cy = Math.min(1, Math.max(-1, v.y / r));
+  return { lat: 90 - Math.acos(cy) * 180 / Math.PI, lon };
+}
+
+/* Degraded mode: say what happened in the one place the listener is looking,
+   and leave the buttons in a state that cannot pretend to work. */
+function fail(msg){
+  $("startTitle").textContent = "Flight unavailable";
+  $("startIntro").textContent = msg;
+  $("startBtn").disabled = true;
+  $("startBtn").textContent = "3D unavailable";
+  $("controls").style.opacity = "0.45";
+  $("liveRegion").textContent = msg;
+}
+
+/* ============================== 3D library ==============================
+   Prefer the copy vendored with the repo (the same file PyroSync imports) so
+   the flight needs no network at all; the CDN is a fallback for opening
+   fly.html straight from disk, where a relative module import is refused.   */
+let THREE = null;
+try {
+  THREE = await import("../pyrosync/vendor/three.module.min.js");
+} catch(e) {
+  try { THREE = await import("https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js"); }
+  catch(e2) { THREE = null; }
+}
+if (!THREE){
+  fail("The 3D library could not be loaded, so the flight can't start here. From the repo root, run npm run preview and open http://localhost:8080/space-jukebox/ — the vendored copy is served from there.");
+  throw new Error("three.js unavailable");
+}
+/* r128-era palette: colour management and output encoding are pinned so the
+   scene renders exactly as it did on the old CDN build. */
+THREE.ColorManagement.enabled = false;
+
+/* ============================== scene ============================== */
+let renderer;
+try {
+  renderer = new THREE.WebGLRenderer({canvas: $("scene"), antialias: true});
+  renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
+} catch(e) {
+  fail("WebGL is not available in this browser, so the 3D flight cannot start. The same NASA fire data is available as PyroSync's audio-visual spiral at ../pyrosync/.");
+  throw e;
+}
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x05070f);
+const REDUCED_MOTION = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const _radial = new THREE.Vector3(), _tangent = new THREE.Vector3();
+const FLAT_UP = new THREE.Vector3(0, 0, 1);
+const DEG = Math.PI / 180;
+const _flatPos = new THREE.Vector3(), _flatAhead = new THREE.Vector3();
+let flatLonCont = null, flatPrevLon = 0; /* continuous (unwrapped) flat longitude */
+let flatX = 0, flatY = 0; /* manual flight state: the ship's position on the flat map itself */
+const _desired = new THREE.Vector3(), _look = new THREE.Vector3();
+const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.01, 100);
+camera.position.set(0, 1.4, 3.6);
+scene.add(new THREE.AmbientLight(0xffffff, 0.85));
+const sun = new THREE.DirectionalLight(0xfff2d8, 0.9); sun.position.set(5, 2, 3); scene.add(sun);
+
+/* stars */
+{
+  const n = 900, pos = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++){
+    const th = Math.random() * Math.PI * 2, ph = Math.acos(2 * Math.random() - 1), rr = 30 + Math.random() * 20;
+    pos.set([rr * Math.sin(ph) * Math.cos(th), rr * Math.cos(ph), rr * Math.sin(ph) * Math.sin(th)], i * 3);
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+  scene.add(new THREE.Points(g, new THREE.PointsMaterial({color: 0x8fa3d9, size: 0.09, sizeAttenuation: true})));
+}
+/* Two world views of the same data: the sphere (auto tour) and a flat
+   equirectangular map (manual pilot). Only one is visible at a time. */
+const globeGroup = new THREE.Group(); scene.add(globeGroup);
+const flatGroup = new THREE.Group(); flatGroup.visible = false; scene.add(flatGroup);
+/* ocean + atmosphere */
+const globe = new THREE.Mesh(new THREE.SphereGeometry(1, 64, 64),
+  new THREE.MeshLambertMaterial({color: 0x0d2142}));
+globeGroup.add(globe);
+const atmo = new THREE.Mesh(new THREE.SphereGeometry(1.06, 64, 64),
+  new THREE.MeshBasicMaterial({color: 0x3d6fb8, transparent: true, opacity: 0.10, side: THREE.BackSide}));
+globeGroup.add(atmo);
+/* land dots */
+{
+  const bytes = Uint8Array.from(atob(MASK.b64), c => c.charCodeAt(0));
+  const pts = [];
+  for (let r = 0; r < MASK.rows; r++) for (let c = 0; c < MASK.cols; c++){
+    const i = r * MASK.cols + c;
+    if (bytes[i >> 3] & (1 << (7 - (i & 7)))){
+      const v = latLonToVec3(90 - (r + 0.5) * MASK.step, -180 + (c + 0.5) * MASK.step, 1.002);
+      pts.push(v.x, v.y, v.z);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(pts), 3));
+  globeGroup.add(new THREE.Points(g, new THREE.PointsMaterial({color: 0x69b98a, size: 0.011})));
+}
+/* Hotspot dots: colour AND size by FRP — the fire's magnitude. A shader
+   gives every point its own size; PointsMaterial only does one size for
+   all. Sizes are log-scaled: FRP runs 11..5083, so a linear scale would
+   make everything except Australia invisible.                        */
+const hotspotMats = [];
+function hotspotScale(){ return renderer.domElement.height * 0.5; }
+function hotspotMaterial(){
+  const m = new THREE.ShaderMaterial({
+    uniforms: { uPulse: { value: 1 }, uScale: { value: hotspotScale() },
+      uTime: { value: 0 }, uFlick: { value: REDUCED_MOTION ? 0 : 1 }, uBoost: { value: 0 } },
+    vertexShader: `
+      attribute float aSize;
+      attribute float aMag;
+      attribute float aPhase;
+      attribute vec3 aColor;
+      varying vec3 vColor;
+      varying float vFlick;
+      uniform float uPulse, uScale, uTime, uFlick, uBoost;
+      void main(){
+        /* living fire: every hotspot flickers on its own phase, and the
+           bigger the fire (aMag), the faster and harder it flickers.
+           uBoost is the fire intensity under the ship: as it climbs,
+           every fire on screen swells and brightens with it, so the
+           rendering intensifies exactly when the tone does           */
+        float flick = sin(uTime * (2.0 + aMag * 3.5) + aPhase) * (0.08 + aMag * 0.30) * uFlick;
+        vFlick = flick;
+        vColor = aColor * (1.0 + uBoost * 0.55);
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        gl_PointSize = aSize * uPulse * (1.0 + flick) * (1.0 + uBoost * 0.9) * uScale / -mv.z;
+        gl_Position = projectionMatrix * mv;
+      }`,
+    fragmentShader: `
+      varying vec3 vColor;
+      varying float vFlick;
+      void main(){
+        float d = length(gl_PointCoord - 0.5);
+        float a = smoothstep(0.5, 0.1, d);
+        if (a < 0.03) discard;
+        gl_FragColor = vec4(vColor * (1.0 + vFlick * 0.9), a * 0.95);
+      }`,
+    transparent: true, depthWrite: false
+  });
+  hotspotMats.push(m);
+  return m;
+}
+function buildHotspots(project, sizeMul){
+  const pos = new Float32Array(HOTSPOTS.length * 3), col = new Float32Array(HOTSPOTS.length * 3), siz = new Float32Array(HOTSPOTS.length);
+  const mag = new Float32Array(HOTSPOTS.length), pha = new Float32Array(HOTSPOTS.length);
+  const cHot = new THREE.Color(0xff2d2d), cMid = new THREE.Color(0xff7847), cLow = new THREE.Color(0xffd166);
+  HOTSPOTS.forEach((h, i) => {
+    const v = project(h[0], h[1]);
+    pos.set([v.x, v.y, v.z], i * 3);
+    const t = Math.min(1, h[2] / 2000);
+    const c = t > 0.5 ? cMid.clone().lerp(cHot, (t - 0.5) * 2) : cLow.clone().lerp(cMid, t * 2);
+    col.set([c.r, c.g, c.b], i * 3);
+    const lt = Math.max(0, Math.min(1, (Math.log10(Math.max(1, h[2])) - 1) / 2.7));
+    siz[i] = (0.012 + 0.030 * lt) * sizeMul;
+    mag[i] = lt;
+    pha[i] = Math.random() * Math.PI * 2;
+  });
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+  g.setAttribute("aColor", new THREE.BufferAttribute(col, 3));
+  g.setAttribute("aSize", new THREE.BufferAttribute(siz, 1));
+  g.setAttribute("aMag", new THREE.BufferAttribute(mag, 1));
+  g.setAttribute("aPhase", new THREE.BufferAttribute(pha, 1));
+  return new THREE.Points(g, hotspotMaterial());
+}
+/* intensity as light: a glowing bar extruded from every hotspot,
+   height on the same log scale as the dot sizes — the stronger the
+   fire, the taller its column of light                              */
+const beamMats = [];
+function buildBeams(flat){
+  const geo = new THREE.BoxGeometry(1, 1, 1);
+  geo.translate(0, 0.5, 0); /* base at the surface, grows along +Y */
+  const mat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.4,
+    blending: THREE.AdditiveBlending, depthWrite: false });
+  beamMats.push(mat);
+  const mesh = new THREE.InstancedMesh(geo, mat, HOTSPOTS.length);
+  mesh.frustumCulled = false;
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
+  const cHot = new THREE.Color(0xff2d2d), cMid = new THREE.Color(0xff7847), cLow = new THREE.Color(0xffd166);
+  HOTSPOTS.forEach((h, i) => {
+    const t = Math.min(1, h[2] / 2000);
+    const c = t > 0.5 ? cMid.clone().lerp(cHot, (t - 0.5) * 2) : cLow.clone().lerp(cMid, t * 2);
+    const lt = Math.max(0, Math.min(1, (Math.log10(Math.max(1, h[2])) - 1) / 2.7));
+    const height = (0.04 + lt * 0.5) * (flat ? 1.7 : 1);
+    const thick = flat ? 0.02 : 0.011;
+    let pos, dir;
+    if (flat){ pos = flatVec(h[0], h[1], 0.008); dir = new THREE.Vector3(0, 0, 1); }
+    else { pos = latLonToVec3(h[0], h[1], 1.004); dir = pos.clone().normalize(); }
+    q.setFromUnitVectors(up, dir);
+    m4.compose(pos, q, new THREE.Vector3(thick, height, thick));
+    mesh.setMatrixAt(i, m4);
+    mesh.setColorAt(i, c);
+  });
+  mesh.instanceMatrix.needsUpdate = true;
+  if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  return mesh;
+}
+let hotspotPoints;
+{
+  hotspotPoints = buildHotspots((lat, lon) => latLonToVec3(lat, lon, 1.006), 1);
+  globeGroup.add(hotspotPoints);
+  globeGroup.add(buildBeams(false));
+}
+/* the flat map: same land mask and hotspots, equirectangular. Built once
+   and tiled three across, so flying off one edge loops onto the next
+   copy of the world instead of running out of map.                    */
+{
+  const flatWorld = new THREE.Group();
+  const board = new THREE.Mesh(new THREE.PlaneGeometry(Math.PI * 2 + 0.35, Math.PI + 0.35),
+    new THREE.MeshLambertMaterial({color: 0x0d2142}));
+  board.position.z = -0.012;
+  flatWorld.add(board);
+  const bytes = Uint8Array.from(atob(MASK.b64), c => c.charCodeAt(0));
+  const pts = [];
+  for (let r = 0; r < MASK.rows; r++) for (let c = 0; c < MASK.cols; c++){
+    const i = r * MASK.cols + c;
+    if (bytes[i >> 3] & (1 << (7 - (i & 7)))){
+      const v = flatVec(90 - (r + 0.5) * MASK.step, -180 + (c + 0.5) * MASK.step, 0.002);
+      pts.push(v.x, v.y, v.z);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(pts), 3));
+  flatWorld.add(new THREE.Points(g, new THREE.PointsMaterial({color: 0x69b98a, size: 0.024})));
+  flatWorld.add(buildHotspots((lat, lon) => flatVec(lat, lon, 0.006), 3.6));
+  flatWorld.add(buildBeams(true));
+  for (const k of [-1, 0, 1]){
+    const tile = k === 0 ? flatWorld : flatWorld.clone();
+    tile.position.x = k * Math.PI * 2;
+    flatGroup.add(tile);
+  }
+}
+/* the ship (built from primitives, nose = +Z) */
+const ship = new THREE.Group();
+{
+  const white = new THREE.MeshLambertMaterial({color: 0xf2f4f8});
+  const orange = new THREE.MeshLambertMaterial({color: 0xff7847});
+  const dark = new THREE.MeshLambertMaterial({color: 0x33406e});
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.02, 0.075, 12), white);
+  body.geometry.rotateX(Math.PI / 2); ship.add(body);
+  const nose = new THREE.Mesh(new THREE.ConeGeometry(0.016, 0.045, 12), orange);
+  nose.geometry.rotateX(Math.PI / 2); nose.position.z = 0.06; ship.add(nose);
+  const win = new THREE.Mesh(new THREE.SphereGeometry(0.008, 10, 10), dark);
+  win.position.set(0, 0.012, 0.028); ship.add(win);
+  for (const s of [-1, 1]){
+    const fin = new THREE.Mesh(new THREE.BoxGeometry(0.004, 0.035, 0.03), orange);
+    fin.position.set(0.022 * s, -0.012, -0.032); fin.rotation.z = -0.5 * s; ship.add(fin);
+  }
+  const glow = new THREE.Mesh(new THREE.SphereGeometry(0.009, 10, 10),
+    new THREE.MeshBasicMaterial({color: 0x7ee0a3}));
+  glow.position.z = -0.045; glow.name = "engineGlow"; ship.add(glow);
+  ship.scale.setScalar(1.6);
+  scene.add(ship);
+}
+/* trail */
+const TRAIL_N = 140;
+const trailPos = new Float32Array(TRAIL_N * 3);
+const trailGeo = new THREE.BufferGeometry();
+trailGeo.setAttribute("position", new THREE.BufferAttribute(trailPos, 3));
+const trailLine = new THREE.Line(trailGeo, new THREE.LineBasicMaterial({color: 0x7ee0a3, transparent: true, opacity: 0.55}));
+trailLine.frustumCulled = false; /* positions stream in per frame; the
+  bounds computed from the initial zeros would cull it off-camera     */
+scene.add(trailLine);
+const trailPts = [];
+
+/* flight path: closed loop through the biomes, west to east. The spline is
+   projected onto one constant-altitude shell before the ship ever uses it, so
+   the ship flies exactly along the drawn ribbon. (It used to be clamped to a
+   different radius every frame, which left it flying off its own line.)      */
+const tour = [...BIOMES].sort((a, b) => a.lon - b.lon);
+const ALTITUDE = 1.24;
+const spline = new THREE.CatmullRomCurve3(tour.map(b => latLonToVec3(b.lat, b.lon, ALTITUDE)), true, "centripetal");
+const curve = new THREE.CatmullRomCurve3(
+  spline.getPoints(480).map(p => p.setLength(ALTITUDE)), true, "centripetal");
+{ /* faint path ribbon */
+  const g = new THREE.BufferGeometry().setFromPoints(curve.getPoints(240));
+  globeGroup.add(new THREE.Line(g, new THREE.LineBasicMaterial({color: 0x33406e, transparent: true, opacity: 0.6})));
+}
+/* tour stops: each biome's position along the loop + HUD dots */
+const stopU = tour.map(b => {
+  let bu = 0, bd = 1e9;
+  for (let i = 0; i <= 720; i++){
+    const lp = vecToLatLon(curve.getPointAt(i / 720));
+    const d = angDist(lp.lat, lp.lon, b.lat, b.lon);
+    if (d < bd){ bd = d; bu = i / 720; }
+  }
+  return bu;
+});
+const dotsEl = $("tourDots");
+tour.forEach(() => dotsEl.appendChild(document.createElement("span")));
+function nextStopIdx(uNow){
+  let bi = 0, bd = 1e9;
+  for (let i = 0; i < tour.length; i++){
+    const du = (stopU[i] - uNow + 1) % 1;
+    if (du > 0.005 && du < bd){ bd = du; bi = i; }
+  }
+  return bi;
+}
+
+/* ============================== audio ============================== */
+let AC = null, toneOsc = [], toneFilter, toneGain, noiseGain, master, outGain;
+let violinFilter = null, lfoGain = null, noiseFilter = null;
+let muted = false;
+function initAudio(){
+  if (AC) return; /* re-entry used to stack a second set of oscillators */
+  AC = new (window.AudioContext || window.webkitAudioContext)();
+  outGain = AC.createGain();
+  outGain.gain.value = muted ? 0 : 1;
+  outGain.connect(AC.destination);
+  master = AC.createDynamicsCompressor();
+  master.threshold.value = -16; master.ratio.value = 6;
+  master.connect(outGain);
+  toneFilter = AC.createBiquadFilter(); toneFilter.type = "lowpass"; toneFilter.frequency.value = 700; toneFilter.Q.value = 4.5;
+  toneGain = AC.createGain(); toneGain.gain.value = 0;
+  for (const det of [-6, 5]){
+    const o = AC.createOscillator(); o.type = "sawtooth"; o.frequency.value = 110; o.detune.value = det;
+    o.connect(toneFilter); o.start(); toneOsc.push(o);
+  }
+  /* the voice is a bowed string: a formant peak in the tone chain for
+     the body, and a vibrato LFO on the oscillators' detune           */
+  violinFilter = AC.createBiquadFilter(); violinFilter.type = "peaking";
+  violinFilter.frequency.value = 2900; violinFilter.Q.value = 1.1; violinFilter.gain.value = 7;
+  toneFilter.connect(violinFilter); violinFilter.connect(toneGain); toneGain.connect(master);
+  const lfo = AC.createOscillator(); lfo.type = "sine"; lfo.frequency.value = 5.4;
+  lfoGain = AC.createGain(); lfoGain.gain.value = 22;
+  lfo.connect(lfoGain);
+  for (const o of toneOsc) lfoGain.connect(o.detune);
+  lfo.start();
+  const len = AC.sampleRate * 2, buf = AC.createBuffer(1, len, AC.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+  const noise = AC.createBufferSource(); noise.buffer = buf; noise.loop = true;
+  noiseFilter = AC.createBiquadFilter(); noiseFilter.type = "bandpass"; noiseFilter.frequency.value = 480; noiseFilter.Q.value = 0.8;
+  noiseGain = AC.createGain(); noiseGain.gain.value = 0.012;
+  noise.connect(noiseFilter); noiseFilter.connect(noiseGain); noiseGain.connect(master); noise.start();
+}
+const PING_MIN_GAP = 0.09;
+let lastPingAt = -1;
+function ping(frp, pan){
+  if (!AC) return;
+  /* A whole MODIS cluster can pass under the ship in one frame: cap the note
+     rate instead of stacking dozens of voices at once. */
+  if (AC.currentTime - lastPingAt < PING_MIN_GAP) return;
+  lastPingAt = AC.currentTime;
+  const o = AC.createOscillator(), g = AC.createGain();
+  /* the pings are pizzicato: triangle, short and plucked */
+  o.type = "triangle";
+  o.frequency.value = 620 + Math.min(1, frp / 5000) * 880;
+  const peak = (0.05 + Math.min(1, frp / 5000) * 0.13) * (speaking ? 0.45 : 1);
+  const dur = 0.3;
+  g.gain.setValueAtTime(0, AC.currentTime);
+  g.gain.linearRampToValueAtTime(peak, AC.currentTime + 0.015);
+  g.gain.exponentialRampToValueAtTime(0.0001, AC.currentTime + dur);
+  o.connect(g);
+  let out = g; /* pan the ping toward the side the hotspot is on */
+  if (AC.createStereoPanner){
+    const p = AC.createStereoPanner();
+    p.pan.value = Math.max(-0.85, Math.min(0.85, pan || 0));
+    g.connect(p); out = p;
+  }
+  out.connect(master); o.start(); o.stop(AC.currentTime + 0.35);
+}
+
+/* ============================== speech ============================== */
+let narration = true, speaking = false;
+function speak(text, force){
+  if (muted || !(force || narration) || !("speechSynthesis" in window)) return;
+  speechSynthesis.cancel();
+  speaking = false;
+  const u = new SpeechSynthesisUtterance(text);
+  u.rate = 1.04;
+  u.onstart = () => { speaking = true; };
+  u.onend = u.onerror = () => { speaking = false; };
+  speechSynthesis.speak(u);
+}
+function announce(text, force){
+  $("liveRegion").textContent = text;
+  speak(text, force);
+}
+
+/* ============================== flight state ============================== */
+let flying = false, u = 0, speedMul = 1, camMode = "chase", camAngle = 0;
+let lastBiomeId = null, intensitySmooth = 0, peakBiomeId = null, lastOcean = null;
+const pingCooldown = new Map();
+const LOOP_SECONDS = 80;
+const TOTAL_LABEL = TOTAL_7D.toLocaleString();
+
+/* The readout is throttled to 10 Hz and only written when a value changes:
+   it used to rewrite four text nodes and the meter width on every frame.   */
+let hudAt = 0, hudPct = -1;
+const hudRegionEl = $("hudRegion"), hudSubEl = $("hudSub");
+const hudPosEl = $("hudPos"), meterEl = $("meter"), hudNextEl = $("hudNext"), meterWrapEl = $("meterWrap");
+function setText(el, value){
+  if (el.__text === value) return;
+  el.__text = value; el.textContent = value;
+}
+
+function nearestBiome(lat, lon){
+  let best = null, bd = 1e9;
+  for (const b of BIOMES){ const d = angDist(lat, lon, b.lat, b.lon); if (d < bd){ bd = d; best = b; } }
+  return { biome: best, dist: bd };
+}
+/* One pass over the hotspots now does the work the old code split between a
+   per-frame intensity scan and a second per-frame proximity scan for pings.
+   Unit vectors turn each distance into a dot product, and anything beyond the
+   16 deg intensity radius is rejected before any trig runs at all.          */
+const COS_NEAR = Math.cos(16 * Math.PI / 180);
+const COS_PING = Math.cos(5.5 * Math.PI / 180);
+const RAD2DEG = 180 / Math.PI;
+const HS = HOTSPOTS.map(h => {
+  const v = latLonToVec3(h[0], h[1], 1);
+  return { x: v.x, y: v.y, z: v.z, frp: h[2] };
+});
+function sampleFires(px, py, pz, ax, ay, az, now, canPing){
+  /* Pan basis for the pings: tangent heading H from the ahead vector, and
+     R = up x H (the ship's right). A hotspot's pan is its dot with R. */
+  let rx = 0, ry = 0, rz = 0;
+  if (canPing){
+    const along = ax * px + ay * py + az * pz;
+    let hx = ax - px * along, hy = ay - py * along, hz = az - pz * along;
+    const hl = Math.hypot(hx, hy, hz) || 1;
+    hx /= hl; hy /= hl; hz /= hl;
+    rx = py * hz - pz * hy; ry = pz * hx - px * hz; rz = px * hy - py * hx;
+  }
+  let sum = 0, count = 0;
+  for (let i = 0; i < HS.length; i++){
+    const h = HS[i];
+    const dot = px * h.x + py * h.y + pz * h.z;
+    if (dot < COS_NEAR) continue;
+    const d = Math.acos(dot > 1 ? 1 : dot) * RAD2DEG;
+    sum += h.frp * Math.exp(-(d * d) / 90);
+    if (d < 12) count++;
+    if (canPing && h.frp >= 280 && dot >= COS_PING){
+      const last = pingCooldown.get(i) || -1e9;
+      if (now - last > 4){ pingCooldown.set(i, now); ping(h.frp, h.x * rx + h.y * ry + h.z * rz); }
+    }
+  }
+  return { sum, count };
+}
+
+/* ============================== manual pilot ==============================
+   A second way to fly: leave the tour spline and steer the ship freely.
+   Everything sonified (tone, pings, narration) keys off position, so it
+   all keeps working. Inputs: keyboard (arrows / WASD) and any standard
+   gamepad (Xbox layout: left stick steers, triggers set speed).        */
+let pilotMode = "tour", heading = 0, manualSpeed = 1, bankTarget = 0, bankSmooth = 0;
+const freePos = new THREE.Vector3(0, 0, 1.24);
+const keysDown = new Set();
+let padPrev = [], padState = null, padAnnounced = false;
+
+function localFrame(lat, lon){
+  const phi = (90 - lat) * Math.PI / 180, theta = (lon + 180) * Math.PI / 180;
+  const east = new THREE.Vector3(Math.sin(phi) * Math.sin(theta), 0, -Math.sin(phi) * Math.cos(theta)).normalize();
+  const north = new THREE.Vector3(Math.cos(phi) * Math.cos(theta), Math.sin(phi), -Math.cos(phi) * Math.sin(theta)).normalize();
+  return { east, north };
+}
+function bearingBetween(a, b){
+  let dLon = b.lon - a.lon; if (dLon > 180) dLon -= 360; if (dLon < -180) dLon += 360;
+  return Math.atan2(dLon * Math.cos(a.lat * Math.PI / 180), b.lat - a.lat);
+}
+function nearestU(v){
+  let bu = 0, bd = 1e9;
+  for (let i = 0; i <= 720; i++){
+    const d = curve.getPointAt(i / 720).distanceToSquared(v);
+    if (d < bd){ bd = d; bu = i / 720; }
+  }
+  return bu;
+}
+function setPilotMode(m){
+  pilotMode = m;
+  $("btnPilot").setAttribute("aria-pressed", String(m === "manual"));
+  $("btnPilot").textContent = m === "manual" ? "Pilot: manual" : "Pilot: auto tour";
+  /* the world itself changes shape with the mode: sphere for the tour,
+     flat map for manual flight */
+  globeGroup.visible = m !== "manual";
+  flatGroup.visible = m === "manual";
+  ship.scale.setScalar(m === "manual" ? 3.4 : 1.6);
+  flatLonCont = null; /* re-anchor the flat longitude on the next frame */
+  if (m === "manual"){
+    freePos.copy(curve.getPointAt(u)).setLength(1.24);
+    heading = bearingBetween(vecToLatLon(freePos), vecToLatLon(curve.getPointAt((u + 0.01) % 1)));
+    const ll0 = vecToLatLon(freePos);
+    flatX = ll0.lon * DEG; flatY = ll0.lat * DEG;
+    announce("Manual pilot. You have the controls. Steer with the left stick or the arrow keys; push forward to speed up. The globe flattens into a map while you fly. The fires still sing below you.");
+  } else {
+    u = nearestU(freePos);
+    announce("Auto tour resumed.");
+  }
+}
+function handlePad(){
+  if (!navigator.getGamepads) return;
+  let gp = null;
+  for (const g of navigator.getGamepads()) if (g && g.connected){ gp = g; break; }
+  if (!gp){ padState = null; return; }
+  if (!padAnnounced){
+    padAnnounced = true;
+    $("liveRegion").textContent = "Controller connected. A pauses or resumes the flight. Start switches pilot mode.";
+  }
+  const pressed = i => !!(gp.buttons[i] && gp.buttons[i].pressed);
+  const edge = i => pressed(i) && !padPrev[i];
+  const ax0 = gp.axes[0] || 0;
+  padState = {
+    steer: Math.abs(ax0) < 0.15 ? 0 : ax0,
+    stickY: gp.axes[1] || 0,
+    rt: gp.buttons[7] ? gp.buttons[7].value : 0,
+    lt: gp.buttons[6] ? gp.buttons[6].value : 0
+  };
+  if (edge(0)) $("btnFly").click();
+  if (edge(1)) $("btnCam").click();
+  if (edge(2)) $("btnMute").click();
+  if (edge(3)) $("btnNarrate").click();
+  if (edge(9) || edge(8)) $("btnPilot").click();
+  if (edge(5) || edge(12)) $("btnSpeed").click();
+  if (edge(4) || edge(13)){
+    const i = SPEEDS.indexOf(speedMul);
+    speedMul = SPEEDS[(i + SPEEDS.length - 1) % SPEEDS.length];
+    $("btnSpeed").textContent = `Speed: ${speedMul}×`;
+  }
+  padPrev = gp.buttons.map(b => b.pressed);
+}
+function updateFree(dt){
+  let steer = 0;
+  if (keysDown.has("ArrowLeft") || keysDown.has("KeyA")) steer -= 1;
+  if (keysDown.has("ArrowRight") || keysDown.has("KeyD")) steer += 1;
+  if (keysDown.has("ArrowUp") || keysDown.has("KeyW")) manualSpeed = Math.min(2.4, manualSpeed + 1.1 * dt);
+  if (keysDown.has("ArrowDown") || keysDown.has("KeyS")) manualSpeed = Math.max(0, manualSpeed - 1.1 * dt);
+  if (padState){
+    if (padState.steer) steer = padState.steer;
+    if (Math.abs(padState.stickY) > 0.12 || padState.rt > 0.05 || padState.lt > 0.05)
+      manualSpeed = Math.max(0, Math.min(2.4, (1 - padState.stickY) * (1 + padState.rt * 0.8) - padState.lt * 0.6));
+  }
+  heading += steer * 1.4 * dt;
+  bankTarget = -steer * 0.55;
+  const spd = 0.09 * manualSpeed;
+  if (spd <= 0.0001) return;
+  /* Manual flight is planar: the ship flies on the flat map itself.
+     Straight lines stay straight, flying east holds your latitude,
+     the world loops at the left and right edges, and the top and
+     bottom are simply the ends of the map. The sphere position is
+     re-derived from the map position every step, because the sound,
+     narration and HUD all read latitude/longitude from it.         */
+  flatX += Math.sin(heading) * spd * dt;
+  flatY += Math.cos(heading) * spd * dt;
+  const yMax = Math.PI / 2 - 0.03;
+  flatY = Math.max(-yMax, Math.min(yMax, flatY));
+  const lonDeg = ((flatX / DEG + 180) % 360 + 360) % 360 - 180;
+  freePos.copy(latLonToVec3(flatY / DEG, lonDeg, 1.24));
+}
+
+const clock = new THREE.Clock();
+const camTargetPos = new THREE.Vector3(0, 1.4, 3.6);
+function animate(){
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  const t = clock.elapsedTime;
+
+  handlePad();
+  let pos, ahead;
+  if (pilotMode === "manual"){
+    if (flying) updateFree(dt);
+    pos = freePos;
+    const fl = vecToLatLon(freePos);
+    const fr = localFrame(fl.lat, fl.lon);
+    const dir = fr.north.multiplyScalar(Math.cos(heading)).addScaledVector(fr.east, Math.sin(heading));
+    ahead = freePos.clone().addScaledVector(dir, 0.09);
+    ahead.setLength(1.24);
+  } else {
+    if (flying) u = (u + dt * speedMul / LOOP_SECONDS) % 1;
+    pos = curve.getPointAt(u);
+    ahead = curve.getPointAt((u + 0.012) % 1);
+  }
+  /* Render space: the tour flies the sphere; manual pilot flattens the
+     world into the equirectangular map and flies that instead. All the
+     sonification below still keys off the sphere position (pos).       */
+  const manual = pilotMode === "manual";
+  let rPos = pos, rAhead = ahead;
+  const rUp = manual ? FLAT_UP : _radial.copy(pos).normalize();
+  if (manual){
+    /* The ship's flat position IS the flight state (flatX, flatY) —
+       no projection from the sphere. Rebasing by one map width when
+       it crosses an edge keeps it on the centre tile of the looped
+       world, camera shifted along so nothing jumps.                */
+    if (flatX > Math.PI){ flatX -= Math.PI * 2; camTargetPos.x -= Math.PI * 2; }
+    else if (flatX < -Math.PI){ flatX += Math.PI * 2; camTargetPos.x += Math.PI * 2; }
+    _flatPos.set(flatX, flatY, 0.06);
+    _flatAhead.set(flatX + Math.sin(heading) * 0.12, flatY + Math.cos(heading) * 0.12, 0.06);
+    rPos = _flatPos; rAhead = _flatAhead;
+    flatLonCont = flatX / DEG; flatPrevLon = vecToLatLon(pos).lon; /* for the trail */
+  }
+  if (manual) ship.up.set(0, 0, 1); else ship.up.set(0, 1, 0);
+  ship.position.copy(rPos);
+  ship.lookAt(rAhead);
+  bankSmooth += ((pilotMode === "manual" ? bankTarget : 0) - bankSmooth) * 0.08;
+  ship.rotateZ(bankSmooth);
+  const glow = ship.getObjectByName("engineGlow");
+  if (glow) glow.scale.setScalar(flying ? 1 + Math.sin(t * 31) * 0.3 : 0.7);
+
+  trailPts.push(pos.clone());
+  if (trailPts.length > TRAIL_N) trailPts.shift();
+  for (let i = 0; i < TRAIL_N; i++){
+    const p = trailPts[Math.min(i, trailPts.length - 1)] || pos;
+    const o = i * 3; /* write in place: the old trailPos.set([...]) allocated */
+    if (manual){
+      /* unwrapped relative to the ship, written inline: allocating a
+         vector per trail point per frame was GC churn (micro-stutter) */
+      const q = vecToLatLon(p);
+      let dl = q.lon - flatPrevLon; if (dl > 180) dl -= 360; if (dl < -180) dl += 360;
+      trailPos[o] = (flatLonCont + dl) * DEG; trailPos[o + 1] = q.lat * DEG; trailPos[o + 2] = 0.055;
+    } else {
+      trailPos[o] = p.x; trailPos[o + 1] = p.y; trailPos[o + 2] = p.z;
+    }
+  }
+  trailGeo.attributes.position.needsUpdate = true;
+  const pulse = REDUCED_MOTION ? 1.1 : 1 + Math.sin(t * 2.6) * 0.18;
+  const boost = Math.min(1, intensitySmooth / 2600);
+  for (const m of hotspotMats){ m.uniforms.uPulse.value = pulse; m.uniforms.uTime.value = t; m.uniforms.uBoost.value = boost; }
+  /* the light bars brighten with the intensity under the ship, too */
+  for (const b of beamMats) b.opacity = 0.34 + boost * 0.3;
+
+  /* camera: smoothing is now a function of dt, so the chase feels the same at
+     30, 60 and 144 fps (the old fixed per-frame factor did not).           */
+  const smooth = k => 1 - Math.pow(1 - k, dt * 60);
+  if (manual) camera.up.set(0, 0, 1); else camera.up.set(0, 1, 0);
+  if (camMode === "chase"){
+    const camK = manual ? 2.2 : 1; /* the flat map is ~3x wider: pull back */
+    /* on the flat map the old low, level camera left the ground (and the
+       fire) as a thin wedge at the bottom of the frame, ship hidden
+       behind the info card — sit high and behind, looking at the ship,
+       so the map and its fires fill the view                           */
+    const upK = manual ? 1.3 : 0.30, backK = manual ? 0.9 : 0.5, lookK = manual ? 0 : 0.7;
+    _tangent.copy(rAhead).sub(rPos).normalize();
+    _desired.copy(rPos).addScaledVector(_tangent, -backK * camK).addScaledVector(rUp, upK * camK);
+    camTargetPos.lerp(_desired, smooth(0.045));
+    camera.position.copy(camTargetPos);
+    camera.lookAt(_look.copy(rPos).addScaledVector(_tangent, lookK * camK));
+  } else if (manual){
+    /* orbit on the flat map: hover above, following the ship loosely */
+    _desired.set(rPos.x * 0.5, rPos.y * 0.5, 3.8);
+    camTargetPos.lerp(_desired, smooth(0.03));
+    camera.position.copy(camTargetPos);
+    camera.lookAt(rPos.x * 0.5, rPos.y * 0.5, 0);
+  } else {
+    if (!REDUCED_MOTION) camAngle += dt * 0.05;
+    _desired.set(Math.sin(camAngle) * 3.3, 1.15, Math.cos(camAngle) * 3.3);
+    camTargetPos.lerp(_desired, smooth(0.03));
+    camera.position.copy(camTargetPos);
+    camera.lookAt(0, 0, 0);
+  }
+
+  /* data under the ship */
+  const ll = vecToLatLon(pos);
+  const inv = 1 / pos.length(), invA = 1 / ahead.length();
+  const { sum, count } = sampleFires(pos.x * inv, pos.y * inv, pos.z * inv,
+    ahead.x * invA, ahead.y * invA, ahead.z * invA, t, flying && !!AC);
+  intensitySmooth += (sum - intensitySmooth) * 0.06;
+  const { biome, dist } = nearestBiome(ll.lat, ll.lon);
+  const inBiome = dist < 17;
+
+  if (AC){
+    const norm = Math.min(1, intensitySmooth / 2600);
+    const duck = speaking ? 0.35 : 1; /* get out of the narrator's way */
+    const freq = 110 * Math.pow(2, norm * 2.1);
+    for (const o of toneOsc) o.frequency.setTargetAtTime(freq, AC.currentTime, 0.08);
+    /* the string's brightness tracks the pitch being played, and the
+       bow noise rides along at twice the fundamental                  */
+    toneFilter.frequency.setTargetAtTime(Math.min(5200, Math.max(700, freq * 5.5)), AC.currentTime, 0.1);
+    if (noiseFilter) noiseFilter.frequency.setTargetAtTime(freq * 2, AC.currentTime, 0.15);
+    toneGain.gain.setTargetAtTime(flying ? (0.025 + norm * 0.12) * duck : 0, AC.currentTime, 0.12);
+    /* the engine hiss used to keep playing at 0.004 while the flight was paused */
+    if (noiseGain) noiseGain.gain.setTargetAtTime(flying ? (0.008 + speedMul * 0.006) * duck : 0, AC.currentTime, 0.2);
+  }
+
+  /* HUD + narration */
+  if (!inBiome && dist > 20) lastBiomeId = null;
+  if (t - hudAt > 0.1){
+    hudAt = t;
+    setText(hudRegionEl, inBiome ? biome.name : "In transit");
+    setText(hudSubEl, inBiome
+      ? `${biome.count} major hotspots in this region · strongest FRP ${biome.maxFrp}`
+      : `Cruising between fire regions · ${TOTAL_LABEL} detections this week, planet-wide`);
+    setText(hudPosEl, `${Math.abs(ll.lat).toFixed(1)}° ${ll.lat >= 0 ? "N" : "S"}, ${Math.abs(ll.lon).toFixed(1)}° ${ll.lon >= 0 ? "E" : "W"} · ${count} hotspots within reach`);
+    const pct = Math.round(Math.min(1, intensitySmooth / 2600) * 100);
+    if (pct !== hudPct){
+      hudPct = pct; meterEl.style.width = pct + "%";
+      /* the bar's height carries the intensity too: a 6px sliver over
+         quiet ground, a 26px band at a region's core                 */
+      meterWrapEl.style.height = (6 + pct * 0.2) + "px";
+    }
+    if (pilotMode === "manual"){
+      [...dotsEl.children].forEach(el => { el.className = ""; });
+      setText(hudNextEl, `Manual pilot · speed ${manualSpeed.toFixed(1)}× · Start or G for auto tour`);
+    } else {
+      const nIdx = nextStopIdx(u);
+      [...dotsEl.children].forEach((el, i) => {
+        el.className = inBiome && tour[i] === biome ? "now" : (i === nIdx ? "next" : "");
+      });
+      setText(hudNextEl, inBiome
+        ? `Stop ${tour.indexOf(biome) + 1} of ${tour.length} · Next: ${tour[nIdx].name}`
+        : `Next stop: ${tour[nIdx].name}`);
+    }
+  }
+  if (flying && inBiome && biome.id !== lastBiomeId){
+    lastBiomeId = biome.id;
+    announce(`Now flying over ${biome.name}. ${biome.note} ${biome.count} major hotspots below, totalling about ${Math.round(biome.totalFrp)} megawatts of fire power. Strongest single fire, ${biome.maxFrp} megawatts. ${biome.rankLine}`);
+  }
+  /* bonus detail at a region's core — only when the voice is free, so
+     it never talks over the entry announcement                        */
+  if (flying && inBiome && intensitySmooth > 2200 && peakBiomeId !== biome.id){
+    peakBiomeId = biome.id;
+    if (!speaking) announce(`Passing the densest fires of ${biome.name} now. Hear the tone climb — this is the region at its strongest.`);
+  }
+  if (!inBiome) peakBiomeId = null;
+  /* crossing narration: entering open water gets named, with the
+     heading — retried until the voice is free, like the peak callout */
+  if (flying && !inBiome){
+    const oc = oceanName(ll.lat, ll.lon);
+    if (oc && oc !== lastOcean && !speaking){
+      const brg = manual ? heading : bearingBetween(ll, vecToLatLon(ahead));
+      announce(`Crossing the ${oc}, heading ${compass8(brg)}. Open water below — the next fires are still ahead.`);
+      lastOcean = oc;
+    }
+    if (!oc) lastOcean = null;
+  }
+  if (inBiome) lastOcean = null;
+  renderer.render(scene, camera);
+}
+animate();
+
+/* ============================== controls ============================== */
+function setFlying(on){
+  flying = on;
+  $("btnFly").setAttribute("aria-pressed", String(on));
+  $("btnFly").innerHTML = on ? "&#10074;&#10074; Pause flight" : "&#9654; Resume flight";
+  if (AC && AC.state === "suspended") AC.resume();
+  if (!on && "speechSynthesis" in window) speechSynthesis.cancel();
+  /* resuming inside a region should re-announce it rather than stay silent */
+  if (on) lastBiomeId = null;
+  $("liveRegion").textContent = on ? "Flight resumed." : "Flight paused.";
+}
+
+/* On-demand whereabouts: the HUD is aria-hidden and region narration only
+   fires on entry, so without this a listener who misses a sentence, joins
+   mid-region, or turns narration on late has no way to ask where they are. */
+function announceHere(){
+  /* read the flight state, not the ship mesh: in manual mode the mesh
+     sits on the flat map, where a sphere lat/lon read is meaningless  */
+  const ll = pilotMode === "manual"
+    ? { lat: flatY / DEG, lon: ((flatX / DEG + 180) % 360 + 360) % 360 - 180 }
+    : vecToLatLon(curve.getPointAt(u));
+  const brg = pilotMode === "manual" ? heading
+    : bearingBetween(ll, vecToLatLon(curve.getPointAt((u + 0.01) % 1)));
+  const { biome, dist } = nearestBiome(ll.lat, ll.lon);
+  const pct = Math.round(Math.min(1, intensitySmooth / 2600) * 100);
+  const oc = dist >= 17 ? oceanName(ll.lat, ll.lon) : null;
+  const where = dist < 17
+    ? `Over ${biome.name}: ${biome.count} major hotspots below, totalling about ${Math.round(biome.totalFrp)} megawatts. Strongest fire power ${biome.maxFrp} megawatts. ${biome.rankLine}`
+    : `In transit between fire regions, at ${Math.abs(ll.lat).toFixed(0)} degrees ${ll.lat >= 0 ? "north" : "south"}, ${Math.abs(ll.lon).toFixed(0)} degrees ${ll.lon >= 0 ? "east" : "west"}.${oc ? ` Crossing the ${oc}.` : ""} The nearest fire region is ${biome.name}.`;
+  announce(`${where} Heading ${compass8(brg)}. Fire intensity ${pct} percent.${flying ? "" : " Flight paused."}`, true);
+}
+/* ============================== start gate ==============================
+   The start screen explains the flight out loud before anyone flies.
+   While the explanation is speaking, the start button is a Skip
+   button; only when the explanation finishes — or is skipped — does
+   it become the Start button. If speech is unavailable, or an
+   utterance never reports finishing, the button still unlocks on a
+   timer, so nobody is ever trapped on this screen.                 */
+const EXPLAIN_TEXT = `Welcome to Space Jukebox, the fire flight. You are about to tour six fire regions of Earth, west to east, in a spaceship. The ship follows 330 of the largest hotspots NASA satellites recorded this week, out of ${TOTAL_7D} detections in total. A hotspot is a fire the satellites spotted from orbit, and its fire power is measured in megawatts of heat. As we fly, a tone rises and falls with the fires below. Hotter, denser fires sing higher, and the largest hotspots ping as we pass them. I will name each region as we arrive, with its fire totals, and name the oceans as we cross them. Press S at any time to hear where you are. After takeoff, press G to take manual control and fly the flat map yourself, with the arrow keys or a controller. Sit back, listen, and enjoy the flight.`;
+let explainDone = false, explainQueue = [], explainTimer = null;
+function nextExplainChunk(){
+  if (explainDone) return;
+  const s = explainQueue.shift();
+  if (!s){ finishExplanation(); return; }
+  $("liveRegion").textContent = s;
+  const u = new SpeechSynthesisUtterance(s);
+  u.rate = 1.04;
+  u.onend = u.onerror = () => nextExplainChunk();
+  speechSynthesis.speak(u);
+}
+function finishExplanation(){
+  if (explainDone) return;
+  explainDone = true;
+  clearTimeout(explainTimer);
+  if ("speechSynthesis" in window) speechSynthesis.cancel();
+  const btn = $("startBtn");
+  btn.innerHTML = "&#9654; Start flight";
+  btn.disabled = false;
+}
+function speakExplanation(){
+  if (!("speechSynthesis" in window)){ finishExplanation(); return; }
+  $("startBtn").textContent = "Skip explanation";
+  explainQueue = EXPLAIN_TEXT.split(/(?<=[.!?])\s+/).filter(Boolean);
+  explainTimer = setTimeout(finishExplanation, EXPLAIN_TEXT.split(/\s+/).length * 450 + 8000);
+  nextExplainChunk();
+}
+$("startBtn").addEventListener("click", () => {
+  if (!explainDone){ finishExplanation(); return; } /* skip the explanation */
+  initAudio();
+  $("startOverlay").style.display = "none";
+  setFlying(true);
+  /* u begins on the first region, so mark it announced: the takeoff line
+     names the first stop, and its detail would only talk over it.      */
+  lastBiomeId = tour[0].id;
+  announce(`Taking off. First stop, ${tour[0].name}.`);
+  $("btnFly").focus();
+});
+if (!$("startBtn").disabled) speakExplanation();
+$("btnFly").addEventListener("click", () => {
+  if (!AC){ $("startBtn").click(); return; }
+  setFlying(!flying);
+});
+$("btnNarrate").addEventListener("click", () => {
+  narration = !narration;
+  $("btnNarrate").setAttribute("aria-pressed", String(narration));
+  $("btnNarrate").textContent = narration ? "Narration: on" : "Narration: off";
+  if (!narration && "speechSynthesis" in window) speechSynthesis.cancel();
+  else announceHere(); /* turning narration on should say where you are now */
+});
+$("btnMute").addEventListener("click", () => {
+  muted = !muted;
+  $("btnMute").setAttribute("aria-pressed", String(muted));
+  $("btnMute").textContent = muted ? "Sound: off" : "Sound: on";
+  if (outGain) outGain.gain.setTargetAtTime(muted ? 0 : 1, AC.currentTime, 0.03);
+  if (muted && "speechSynthesis" in window) speechSynthesis.cancel();
+  $("liveRegion").textContent = muted ? "Sound off." : "Sound on.";
+});
+if (window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches){
+  speedMul = 0.5;
+  $("btnSpeed").textContent = "Speed: 0.5×";
+}
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden && AC && AC.state === "suspended" && flying) AC.resume();
+});
+$("btnCam").addEventListener("click", () => {
+  camMode = camMode === "chase" ? "orbit" : "chase";
+  $("btnCam").setAttribute("aria-pressed", String(camMode === "orbit"));
+  $("btnCam").textContent = camMode === "chase" ? "Camera: chase" : "Camera: orbit";
+});
+const SPEEDS = [0.5, 1, 2, 3];
+$("btnSpeed").addEventListener("click", () => {
+  const i = SPEEDS.indexOf(speedMul);
+  speedMul = SPEEDS[(i + 1) % SPEEDS.length];
+  $("btnSpeed").textContent = `Speed: ${speedMul}×`;
+});
+$("btnPilot").addEventListener("click", () => {
+  setPilotMode(pilotMode === "tour" ? "manual" : "tour");
+});
+window.addEventListener("keydown", e => {
+  /* Stand down narrowly: while a form field has focus, and for Space on a
+     focused button (Space should activate that button natively, not also
+     fire the global shortcut). An earlier all-keys version swallowed every
+     shortcut after Start, because Start leaves focus on the Fly button. */
+  const tgt = e.target instanceof Element ? e.target : null;
+  if (tgt && tgt.closest("input, select, textarea")) return;
+  keysDown.add(e.code);
+  if (e.code === "Space" && tgt && tgt.closest("button, a")) return;
+  if (e.code === "Space"){ e.preventDefault(); if (!e.repeat) $("btnFly").click(); }
+  else if (e.key === "s" || e.key === "S") announceHere();
+  else if (e.key === "n" || e.key === "N") $("btnNarrate").click();
+  else if (e.key === "m" || e.key === "M") $("btnMute").click();
+  else if (e.key === "c" || e.key === "C") $("btnCam").click();
+  else if (e.key === "g" || e.key === "G"){ if (!e.repeat) $("btnPilot").click(); }
+  else if (pilotMode === "manual" && ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.code)) e.preventDefault();
+  else if (e.key === "ArrowUp"){ e.preventDefault(); $("btnSpeed").click(); }
+  else if (e.key === "ArrowDown"){
+    e.preventDefault();
+    const i = SPEEDS.indexOf(speedMul);
+    speedMul = SPEEDS[(i + SPEEDS.length - 1) % SPEEDS.length];
+    $("btnSpeed").textContent = `Speed: ${speedMul}×`;
+  }
+});
+window.addEventListener("keyup", e => keysDown.delete(e.code));
+window.addEventListener("resize", () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  for (const m of hotspotMats) m.uniforms.uScale.value = hotspotScale();
+});
+</script>
+</body>
+</html>

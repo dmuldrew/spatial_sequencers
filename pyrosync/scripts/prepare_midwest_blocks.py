@@ -1,6 +1,6 @@
-"""Crop Terra MODIS GeoTIFF bands to the study box and prepare H3 cell means.
+"""Crop Terra MODIS GeoTIFF bands to the study box and prepare H3 map blocks.
 
-Usage: python3 scripts/prepare_midwest.py path/to/geotiffs
+Usage: python3 scripts/prepare_midwest_blocks.py path/to/geotiffs [--blocks DIR | --output FILE]
 Requires rasterio, numpy, h3 (v4) and raster-h3 (v0.7.0). See README for source asset names.
 """
 import argparse

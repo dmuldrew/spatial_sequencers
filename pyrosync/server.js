@@ -27,6 +27,7 @@ const VENDOR_ROUTES = {
   '/vendor/d3.min.js': path.join(__dirname, 'node_modules/d3/dist/d3.min.js'),
   '/vendor/Tone.js': path.join(__dirname, 'node_modules/tone/build/Tone.js'),
   '/vendor/d3-audio.js': path.join(__dirname, 'node_modules/d3-audio/dist/d3-audio.js'),
+  '/vendor/three.module.min.js': path.join(__dirname, 'node_modules/three/build/three.module.min.js'),
   '/vendor/topojson-client.min.js': path.join(__dirname, 'node_modules/topojson-client/dist/topojson-client.min.js'),
   '/vendor/countries-110m.json': path.join(__dirname, 'node_modules/world-atlas/countries-110m.json')
 };
@@ -143,7 +144,23 @@ async function serveMidwest(requestPath, requestUrl, res) {
 }
 
 const server = http.createServer(async (req, res) => {
-  const reqPath = decodeURI((req.url || '/').split('?')[0]);
+  const rawPath = decodeURI((req.url || '/').split('?')[0]);
+
+  // Redirect directory roots without trailing slash so relative links resolve cleanly
+  if (['/pyrosync', '/spaceship-flyby', '/space-jukebox', '/hub'].includes(rawPath)) {
+    res.writeHead(301, { Location: `${rawPath}/` });
+    res.end();
+    return;
+  }
+
+  // Serve the Centralized Navigation Hub at / and /hub/
+  if (rawPath === '/' || rawPath === '/index.html' || rawPath === '/hub/' || rawPath === '/hub/index.html') {
+    return serveFile(path.join(PUBLIC_DIR, 'hub/index.html'), res);
+  }
+
+  const reqPath = rawPath
+    .replace(/^\/hub\/(pyrosync|spaceship-flyby|space-jukebox)(?=\/|$)/, '/$1')
+    .replace(/^\/pyrosync(?=\/|$)/, '') || '/';
 
   if (req.method === 'GET' && reqPath.startsWith('/api/midwest/')) {
     return serveMidwest(reqPath, req.url, res);
@@ -174,6 +191,10 @@ const server = http.createServer(async (req, res) => {
 
   if (VENDOR_ROUTES[reqPath]) {
     return serveFile(VENDOR_ROUTES[reqPath], res);
+  }
+
+  if (reqPath === '/space-jukebox/' || reqPath === '/space-jukebox/index.html') {
+    return serveFile(path.join(PUBLIC_DIR, 'space-jukebox/fly.html'), res);
   }
 
   const normalized = reqPath === '/' ? '/index.html' : reqPath;
