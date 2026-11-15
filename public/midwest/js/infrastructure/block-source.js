@@ -1,7 +1,7 @@
 import { DATASET_SOURCE } from '../domain/inputs.js';
 import { validateDataset } from './data-source.js';
 import { BlockCache, blocksInView, cacheWindow } from './block-cache.js';
-import { DownloadGate, PREVIEW_BYTES } from './download-gate.js';
+import { DownloadGate, SMALL_DOWNLOAD_BYTES } from './download-gate.js';
 import { enableDynamicBlocks, fetchRemoteBlock, planRemoteBlock } from './dynamic-blocks.js';
 
 const MANIFEST = DATASET_SOURCE.manifest;
@@ -37,7 +37,7 @@ function validBounds(bounds) {
 
 export async function loadManifest(signal) {
   const response = await fetch(MANIFEST, { signal, cache: 'no-cache' });
-  const manifest = await readJSON(response, PREVIEW_BYTES);
+  const manifest = await readJSON(response, SMALL_DOWNLOAD_BYTES);
   validateDataset({ ...manifest, cells: [] });
   if (manifest.blockSchema !== 1 || !manifest.cacheKey || !validBounds(manifest.coverage)
     || !manifest.blocks || !Object.keys(manifest.blocks).length) {
@@ -77,9 +77,8 @@ export class BlockSource {
     this.active?.cancel();
   }
 
-  allow() {
-    this.active?.allow();
-    this.prompt(null);
+  dismiss() {
+    this.active?.dismiss();
   }
 
   stop() {
@@ -105,7 +104,7 @@ export class BlockSource {
     const controller = new AbortController();
     this.prefetching = controller;
     const { signal } = controller;
-    let remaining = PREVIEW_BYTES;
+    let remaining = SMALL_DOWNLOAD_BYTES;
     for (const id of ids.slice(0, 2)) {
       try {
         const entry = this.manifest.blocks[id];
@@ -155,11 +154,11 @@ export class BlockSource {
         const rawBytes = entry.dynamic
           ? await planRemoteBlock(id, entry, this.manifest.date, gate.signal) : 0;
         if (rawBytes) gate.addEstimate(rawBytes);
-        await gate.beforeBlock(delivery + rawBytes);
+        gate.beforeBlock(delivery + rawBytes);
         downloaded.set(id, await this.fetchBlock(id, gate.signal, rawBytes));
         gate.completed(delivery + rawBytes);
       }
-      await gate.beforeCommit();
+      gate.beforeCommit();
       await this.cache.replace(target, downloaded, staged);
       if (this.active === gate) {
         this.status('', false);

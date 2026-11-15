@@ -294,9 +294,7 @@ function showDownloadPrompt(details) {
   const progress = details.total
     ? `${size(details.completed)} of ${size(details.total)} received.`
     : 'Checking the map data catalog.';
-  const state = details.ready ? 'Ready to load into the map.'
-    : details.paused ? 'Paused at the preview limit.' : 'A small preview can download while you decide.';
-  element('download-message').textContent = `${progress} ${state}`;
+  element('download-message').textContent = `${progress} The update continues unless you cancel.`;
   downloadPrompt.hidden = false;
   positionDownloadPrompt();
 }
@@ -329,7 +327,6 @@ async function loadSelection(next = selection, fromForm = false) {
       manifest.periodLabel = `${compositeStart} to ${compositeEnd} (satellite composites)`;
       manifest.description = Object.values(INPUTS).map(input => `${input.product} ${input.label}`).join(' · ');
     }
-    await gate.beforeCommit();
     const source = new BlockSource(manifest, (status, canRetry, loading = false) => {
       if (blockSource !== source) return;
       loadingBlocks = loading;
@@ -341,6 +338,7 @@ async function loadSelection(next = selection, fromForm = false) {
     }, showDownloadPrompt);
     await source.restore(!fromForm);
     if (version !== requestVersion) return;
+    gate.beforeCommit();
     showDownloadPrompt(null);
     blockSource?.stop();
     blockSource = source;
@@ -487,7 +485,7 @@ function bindControls() {
   }
   element('map').addEventListener('keydown', moveWithArrows);
   element('download-allow').addEventListener('click', () => {
-    (manifestGate ?? blockSource)?.allow();
+    (manifestGate ?? blockSource)?.dismiss();
     showDownloadPrompt(null);
   });
   element('download-cancel').addEventListener('click', () => {

@@ -6,7 +6,7 @@ import vm from 'node:vm';
 import { areaBounds } from '../public/midwest/js/domain/study-area.js';
 import { blocksInView, cacheWindow } from '../public/midwest/js/infrastructure/block-cache.js';
 import { BlockSource } from '../public/midwest/js/infrastructure/block-source.js';
-import { DownloadGate, PREVIEW_BYTES } from '../public/midwest/js/infrastructure/download-gate.js';
+import { DownloadGate } from '../public/midwest/js/infrastructure/download-gate.js';
 
 const dataFolder = new URL('../public/midwest/data/', import.meta.url);
 const manifest = JSON.parse(readFileSync(new URL('manifest.json', dataFolder)));
@@ -103,23 +103,34 @@ test('cancel aborts a pending block, preserves the old cache, and permits retry'
   assert.ok(eastBlocks.every(id => source.cache.blocks.has(id)));
 });
 
-test('projected or elapsed slow loads prompt, allow a preview, and wait for approval', async () => {
+test('a projected slow load installs the cache without waiting for a reply', { timeout: 1000 }, async t => {
   const prompts = [];
-  const gate = new DownloadGate(10_000_000, details => prompts.push(details));
-  assert.equal(prompts.length, 1);
-  await gate.beforeBlock(PREVIEW_BYTES);
-  gate.completed(PREVIEW_BYTES);
-  const next = gate.beforeBlock(1);
-  assert.equal(prompts.at(-1).paused, true);
-  gate.allow();
-  await next;
-  await gate.beforeCommit();
+  const slowManifest = {
+    ...manifest,
+    blocks: Object.fromEntries(Object.entries(manifest.blocks).map(([id, entry]) =>
+      [id, { ...entry, bytes: 2_000_000 }])),
+  };
+  t.mock.method(globalThis, 'fetch', async url =>
+    new Response(readFileSync(new URL(url.pathname.split('/data/').at(-1), dataFolder))));
+  const source = new BlockSource(slowManifest, () => {}, details => prompts.push(details));
+  await source.update(home);
+  assert.ok(prompts.some(details => details && details.completed > 0));
+  assert.equal(prompts.at(-1), null);
+  assert.ok(homeBlocks.every(id => source.cache.blocks.has(id)));
+});
 
-  const timed = new DownloadGate(100, details => prompts.push(details), { threshold: 0.02 });
-  await new Promise(resolve => setTimeout(resolve, 35));
-  assert.ok(timed.decision);
-  const finish = timed.beforeCommit();
-  assert.equal(prompts.at(-1).ready, true);
-  timed.cancel();
-  await assert.rejects(finish, { name: 'AbortError' });
+test('an elapsed slow load can dismiss the notice while keeping the request active', { timeout: 1000 }, async () => {
+  let appeared;
+  const firstNotice = new Promise(resolve => { appeared = resolve; });
+  const prompts = [];
+  const timed = new DownloadGate(100, details => {
+    prompts.push(details);
+    appeared();
+  }, { threshold: 0.02 });
+  await firstNotice;
+  timed.dismiss();
+  timed.completed(100);
+  timed.beforeCommit();
+  assert.equal(timed.signal.aborted, false);
+  assert.deepEqual(prompts, [{ total: 100, completed: 0 }]);
 });
