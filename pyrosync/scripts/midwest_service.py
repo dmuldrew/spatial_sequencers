@@ -16,7 +16,7 @@ import h3
 
 from midwest_archive import Archive, MAX_RAW_BYTES, composite_window
 from fire_context import lookup_context
-from prepare_midwest import latitude_at, mercator_y, prepare, study_bounds
+from prepare_midwest_blocks import latitude_at, mercator_y, prepare, study_bounds
 
 COVERAGE = {'west': -124.8, 'south': 24.5, 'east': -66.9, 'north': 49.3}
 DEFAULT_DATE = date(2024, 7, 11)

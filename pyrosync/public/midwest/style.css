@@ -19,6 +19,7 @@ a { color: var(--green); }
 
 .row { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
 header { justify-content: space-between; margin-bottom: 14px; }
+.hub-nav { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; }
 #study-selection, .map-tools { align-items: end; margin-bottom: 10px; }
 label { font-size: 12px; font-weight: 600; }
 label > :is(input:not([type=checkbox]), select) { display: block; margin-top: 3px; }
