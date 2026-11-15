@@ -6,6 +6,14 @@ An interactive **audio-visual NASA wildfire, meteorology, and Earth-data sonific
 
 **Our challenge:** [The Earth Information Jukebox](https://www.spaceappschallenge.org/2026/challenges/the-earth-information-jukebox/) — translate NASA Earth Information Center visuals into sound, so Earth data can be *heard*, not just seen, including by blind and low-vision audiences. That is the challenge this submission answers. The same fire data also touches *Dancing with the SARs* and *Harmonization of MODIS and VIIRS Hot Spots* (summaries at the bottom of this README), but the Jukebox is the primary challenge.
 
+## TL;DR
+
+- **What:** Two sonification apps that turn NASA Earth data into sound, built for the **2026 NASA Space Apps Challenge** (Seattle). Submission challenge: **The Earth Information Jukebox**.
+- **PyroSync** — a fire-weather observatory: 26 years of NASA POWER meteorology, EONET wildfires, and FIRMS hotspots, sonified with `d3-audio` across a climate spiral, an Iowa H3 hex map, and an orbital flyby.
+- **Space Jukebox** — an audio-first 3D fire flight designed for blind and low-vision listeners: a ship tours the 330 largest NASA FIRMS hotspots on Earth this week while spoken narration, a bowed-string tone, and extruded light bars make the fires audible and visible.
+- **Live demo:** https://dmuldrew.github.io/spatial_sequencers/
+- **Run it locally:** `npm run preview` from the repo root → http://localhost:8123 (see *Local preview* under How to Run).
+
 ---
 
 ## Sub-projects at a Glance
@@ -53,6 +61,16 @@ An interactive **audio-visual NASA wildfire, meteorology, and Earth-data sonific
 ---
 
 ## How to Run the App
+
+### Local preview (fastest — Node.js only, no Docker)
+
+From the repo root:
+
+```bash
+npm run preview
+```
+
+then open **[http://localhost:8123](http://localhost:8123)** — the hub is at `/`, PyroSync at `/pyrosync/`, and Space Jukebox at `/space-jukebox/`. The preview server mirrors the GitHub Pages layout exactly, needs only Node.js (it has no dependencies of its own), opens your browser automatically, and installs PyroSync's dependencies on first run if they are missing. Use a different port with `npm run preview -- 9000`; stop it with Ctrl+C.
 
 ### Option 1: Docker Compose (Recommended)
 
