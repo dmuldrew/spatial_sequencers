@@ -11,6 +11,8 @@
     "apache-arrow": "21.2.0",
     "d3": "^7.9.0",
     "d3-audio": "github:dmuldrew/d3-audio",
+    "maplibre-gl": "6.18.0",
+    "pmtiles": "4.5.0",
     "three": "0.170.0",
     "tone": "^14.8.49",
     "topojson-client": "^3.1.0",

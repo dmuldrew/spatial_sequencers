@@ -1349,10 +1349,10 @@ function activatePageTab(tabId, { focusTab = false, updateHash = true } = {}) {
     if (panel) panel.hidden = !selected;
   });
 
-  if (targetTab.id === 'tab-iowa') {
+  if (targetTab.id === 'tab-iowa' || targetTab.id === 'tab-globalfire') {
     if (state.isPlaying) togglePlay();
     flybyController?.setActive(false);
-    const frame = document.getElementById('midwest-map-frame');
+    const frame = document.getElementById(targetTab.id === 'tab-iowa' ? 'midwest-map-frame' : 'global-fire-frame');
     if (frame) {
       if (!frame.getAttribute('src') && frame.dataset.src) {
         frame.src = frame.dataset.src;
@@ -1377,6 +1377,7 @@ function activatePageTab(tabId, { focusTab = false, updateHash = true } = {}) {
     let hash = '#spiral';
     if (targetTab.id === 'tab-iowa') hash = '#iowa-map';
     else if (targetTab.id === 'tab-flyby') hash = '#flyby';
+    else if (targetTab.id === 'tab-globalfire') hash = '#global-fire';
     window.history.replaceState(null, '', hash);
   }
   window.dispatchEvent(new CustomEvent('pyrosync:tabchange'));
@@ -1411,6 +1412,8 @@ function wirePageTabs() {
       activatePageTab('tab-iowa', { updateHash: false });
     } else if (h === '#flyby' || h === '#tab-flyby') {
       activatePageTab('tab-flyby', { updateHash: false });
+    } else if (h === '#global-fire' || h === '#tab-globalfire') {
+      activatePageTab('tab-globalfire', { updateHash: false });
     } else if (h === '#spiral' || h === '#tab-spiral') {
       activatePageTab('tab-spiral', { updateHash: false });
     }

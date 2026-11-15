@@ -39,6 +39,10 @@ copy_vendor_from_dir() {
   cp "$nm/d3-audio/dist/d3-audio.js" "$STAGE_DIR/vendor/d3-audio.js"
   cp "$nm/three/build/three.module.min.js" "$STAGE_DIR/vendor/three.module.min.js"
   cp "$nm/apache-arrow/Arrow.esnext.min.js" "$STAGE_DIR/vendor/arrow.min.js"
+  mkdir -p "$STAGE_DIR/vendor/maplibre"
+  cp "$nm/maplibre-gl/dist/maplibre-gl.mjs" "$nm/maplibre-gl/dist/maplibre-gl-worker.mjs" \
+     "$nm/maplibre-gl/dist/maplibre-gl.css" "$STAGE_DIR/vendor/maplibre/"
+  cp "$nm/pmtiles/dist/pmtiles.js" "$STAGE_DIR/vendor/pmtiles.js"
   cp "$nm/topojson-client/dist/topojson-client.min.js" "$STAGE_DIR/vendor/topojson-client.min.js"
   cp "$nm/world-atlas/countries-110m.json" "$STAGE_DIR/vendor/countries-110m.json"
 }
@@ -64,6 +68,11 @@ elif command -v docker >/dev/null 2>&1; then
   docker cp "$CID:/app/node_modules/d3-audio/dist/d3-audio.js" "$STAGE_DIR/vendor/d3-audio.js"
   docker cp "$CID:/app/node_modules/three/build/three.module.min.js" "$STAGE_DIR/vendor/three.module.min.js"
   docker cp "$CID:/app/node_modules/apache-arrow/Arrow.esnext.min.js" "$STAGE_DIR/vendor/arrow.min.js"
+  mkdir -p "$STAGE_DIR/vendor/maplibre"
+  for f in maplibre-gl.mjs maplibre-gl-worker.mjs maplibre-gl.css; do
+    docker cp "$CID:/app/node_modules/maplibre-gl/dist/$f" "$STAGE_DIR/vendor/maplibre/$f"
+  done
+  docker cp "$CID:/app/node_modules/pmtiles/dist/pmtiles.js" "$STAGE_DIR/vendor/pmtiles.js"
   docker cp "$CID:/app/node_modules/topojson-client/dist/topojson-client.min.js" "$STAGE_DIR/vendor/topojson-client.min.js"
   docker cp "$CID:/app/node_modules/world-atlas/countries-110m.json" "$STAGE_DIR/vendor/countries-110m.json"
   docker rm -f "$CID" >/dev/null
@@ -87,12 +96,21 @@ REQUIRED_FILES=(
   "data/fire_weather_data.json"
   "midwest/map.html"
   "midwest/data/midwest.json"
+  "global-fire/index.html"
+  "global-fire/map.js"
+  "data/global-fire/manifest.json"
+  "data/global-fire/global_fire.pmtiles"
   "spaceship-flyby/index.html"
   "hub/index.html"
   "vendor/d3.min.js"
   "vendor/Tone.js"
   "vendor/d3-audio.js"
   "vendor/three.module.min.js"
+  "vendor/arrow.min.js"
+  "vendor/maplibre/maplibre-gl.mjs"
+  "vendor/maplibre/maplibre-gl-worker.mjs"
+  "vendor/maplibre/maplibre-gl.css"
+  "vendor/pmtiles.js"
   "vendor/topojson-client.min.js"
   "vendor/countries-110m.json"
 )

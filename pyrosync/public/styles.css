@@ -1027,6 +1027,11 @@ table.data-table tbody tr.is-current-row td {
   border-radius: .75rem;
 }
 
+.global-fire-frame {
+  min-height: 680px;
+  height: 680px;
+}
+
 /* =========================================================================
    Three.js Orbital Flyby Experience
    ========================================================================= */
