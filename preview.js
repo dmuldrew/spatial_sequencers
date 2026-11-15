@@ -40,6 +40,7 @@ const VENDOR = {
   "d3.min.js": "d3/dist/d3.min.js",
   "Tone.js": "tone/build/Tone.js",
   "d3-audio.js": "d3-audio/dist/d3-audio.js",
+  "three.module.min.js": "three/build/three.module.min.js",
   "topojson-client.min.js": "topojson-client/dist/topojson-client.min.js",
   "countries-110m.json": "world-atlas/countries-110m.json"
 };
