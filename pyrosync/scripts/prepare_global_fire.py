@@ -479,6 +479,22 @@ def write_lod(con, out_dir, lod_resolutions, period_label, years, meta, lod_form
         'max': round(quantile(log_density, 0.95), 4) if log_density else None,
     }
 
+    # Per-resolution ranges (same log10 5th-95th percentiles) for maps that show one
+    # resolution at a time: coarse cells average in empty land and fine cells reach
+    # higher peaks, so each resolution gets a scale that fits its own spread.
+    color_range_by_res = {}
+    for res in sorted(present):
+        values = sorted(
+            row[0] for row in con.execute(
+                f'SELECT log10(density) FROM cells WHERE resolution = {res} AND density > 0'
+            ).fetchall()
+        )
+        if values:
+            color_range_by_res[str(res)] = {
+                'min': round(quantile(values, 0.05), 4),
+                'max': round(quantile(values, 0.95), 4),
+            }
+
     files = []
     for res in levels:
         rows = con.execute(f'''
@@ -511,6 +527,7 @@ def write_lod(con, out_dir, lod_resolutions, period_label, years, meta, lod_form
         'years': years,
         'densityUnits': 'detections per km² per year',
         'colorRange': color_range,
+        'colorRangeByResolution': color_range_by_res,
         'levels': files,
         **meta,
     }

@@ -31,8 +31,28 @@ function densityExpression(lo, hi) {
   return ['interpolate', ['linear'], ['log10', ['max', ['get', 'density'], 1e-9]], ...stops];
 }
 
-function paintFor(selected) {
+// Density colour range for one H3 resolution (manifest.colorRangeByResolution), or the
+// shared flyby range for older manifests.
+function rangeFor(res) {
+  return manifest.colorRangeByResolution?.[String(res)] || manifest.colorRange;
+}
+
+function currentResolution() {
+  const z = Math.min(RES_FOR_ZOOM.length - 1, Math.max(0, Math.floor(map ? map.getZoom() : INITIAL_VIEW.zoom)));
+  return RES_FOR_ZOOM[z];
+}
+
+// Each hexagon is coloured on its own resolution's scale; the tile pyramid shows one
+// resolution per zoom, so the colours and the legend always match what is on screen.
+function densityByResolution() {
+  const byRes = manifest.colorRangeByResolution;
   const { min: lo, max: hi } = manifest.colorRange;
+  if (!byRes || !Object.keys(byRes).length) return densityExpression(lo, hi);
+  const cases = Object.entries(byRes).flatMap(([res, r]) => [Number(res), densityExpression(r.min, r.max)]);
+  return ['match', ['get', 'resolution'], ...cases, densityExpression(lo, hi)];
+}
+
+function paintFor(selected) {
   if (selected === 'trend') {
     return {
       color: ['interpolate', ['linear'], ['coalesce', ['get', 'trend_log2'], 0], ...TREND_STOPS.flat()],
@@ -46,7 +66,7 @@ function paintFor(selected) {
       opacity: CONFIDENCE_OPACITY
     };
   }
-  return { color: densityExpression(lo, hi), opacity: HEX_OPACITY };
+  return { color: densityByResolution(), opacity: HEX_OPACITY };
 }
 
 // world-atlas cuts shapes at the 180th meridian, so a line can step from +180 to -180
@@ -85,19 +105,24 @@ function unwrapAntimeridianRings(collection) {
   return collection;
 }
 
-const per1000 = (density) => (density * 1000).toPrecision(2);
+// Two significant figures without exponents (0.00049, 4.5, 110, 1,800).
+const per1000 = (density) => Number(density * 1000).toLocaleString('en-US', { maximumSignificantDigits: 2 });
 const trendPercent = (t) => Math.round((Math.pow(2, t) - 1) * 100);
 
 function renderLegend() {
   const legend = el('gf-legend');
   const note = el('gf-legend-note');
-  const { min: lo, max: hi } = manifest.colorRange;
   const win = manifest.trend;
   if (mode === 'density') {
+    const res = currentResolution();
+    const perRes = Boolean(manifest.colorRangeByResolution?.[String(res)]);
+    const { min: lo, max: hi } = rangeFor(res);
     legend.innerHTML = `
       <div class="gf-ramp" style="background:linear-gradient(90deg,${DENSITY_STOPS.join(',')})"></div>
       <div class="gf-ramp-labels"><span>≤ ${per1000(10 ** lo)}</span><span>${per1000(10 ** ((lo + hi) / 2))}</span><span>≥ ${per1000(10 ** hi)}</span></div>`;
-    note.textContent = 'Fire detections per 1,000 km² per year (log scale, shared with the flyby).';
+    note.textContent = perRes
+      ? `Fire detections per 1,000 km² per year (log scale), scaled for the resolution ${res} hexagons shown at this zoom. The scale changes as you zoom.`
+      : 'Fire detections per 1,000 km² per year (log scale).';
   } else if (mode === 'trend') {
     const colors = TREND_STOPS.map(([, c]) => c).join(',');
     legend.innerHTML = `
@@ -120,9 +145,15 @@ function setMode(next) {
   renderLegend();
 }
 
+let legendRes = null;
+
 function updateStatus() {
-  const z = Math.min(RES_FOR_ZOOM.length - 1, Math.max(0, Math.floor(map.getZoom())));
-  const res = RES_FOR_ZOOM[z];
+  const res = currentResolution();
+  // Re-draw the density legend when zooming crosses into another resolution.
+  if (res !== legendRes) {
+    legendRes = res;
+    renderLegend();
+  }
   el('gf-status').textContent = `Zoom ${map.getZoom().toFixed(1)} · H3 resolution ${res} (edges ≈ ${EDGE_KM[res]} km)` +
     (map.getZoom() > 8 ? ' · finest data is resolution 4' : '');
 }

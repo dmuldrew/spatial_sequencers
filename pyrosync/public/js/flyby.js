@@ -289,6 +289,8 @@ export function createFlybyController(bridge) {
   let historyLevels = [];
   let historyMeta = null;
   let activeHistoryLevel = null;
+  // Blinking highlight on the featured hexagon of the current tour stop.
+  let tourHighlight = null;
   let historyColorRange = null;
   let craftGroup = null;
   let plumeLeft = null;
@@ -1534,10 +1536,83 @@ export function createFlybyController(bridge) {
     });
   }
 
+  // Highlight the stop's featured resolution-3 hexagon (the one the narration describes):
+  // a cyan fill and outline just above the carpet, so it reads against the fire colours.
+  function setTourHighlight(stop) {
+    if (tourHighlight) {
+      scene.remove(tourHighlight);
+      tourHighlight.traverse((o) => { o.geometry?.dispose(); o.material?.dispose(); });
+      tourHighlight = null;
+    }
+    if (!window.h3 || !scene) return;
+    const id = window.h3.latLngToCell(stop.lat, stop.lon, 3);
+    const boundary = window.h3.cellToBoundary(id);
+    const [cLat, cLon] = window.h3.cellToLatLng(id);
+    const radius = EARTH_R + 0.15; // above the tallest carpet prisms (~0.13)
+    const center = latLonAltToVec3(cLat, cLon, radius);
+    const ring = boundary.map(([lat, lon]) => latLonAltToVec3(lat, lon, radius));
+    const positions = [];
+    ring.forEach((p, i) => {
+      const q = ring[(i + 1) % ring.length];
+      positions.push(center.x, center.y, center.z, p.x, p.y, p.z, q.x, q.y, q.z);
+    });
+    const fillGeo = new THREE.BufferGeometry();
+    fillGeo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    const fill = new THREE.Mesh(fillGeo, new THREE.MeshBasicMaterial({
+      color: '#22d3ee', transparent: true, opacity: 0.4, depthWrite: false,
+      side: THREE.DoubleSide, blending: THREE.AdditiveBlending
+    }));
+    // Solid band along the edge (WebGL lines are only 1 px wide).
+    const inner = ring.map((p) => p.clone().lerp(center, 0.25));
+    const band = [];
+    ring.forEach((p, i) => {
+      const j = (i + 1) % ring.length;
+      const q = ring[j];
+      const pi = inner[i];
+      const qi = inner[j];
+      band.push(p.x, p.y, p.z, q.x, q.y, q.z, qi.x, qi.y, qi.z, p.x, p.y, p.z, qi.x, qi.y, qi.z, pi.x, pi.y, pi.z);
+    });
+    const bandGeo = new THREE.BufferGeometry();
+    bandGeo.setAttribute('position', new THREE.Float32BufferAttribute(band, 3));
+    const outline = new THREE.Mesh(bandGeo, new THREE.MeshBasicMaterial({
+      color: '#ecfeff', transparent: true, opacity: 0.9, depthWrite: false,
+      side: THREE.DoubleSide, blending: THREE.AdditiveBlending
+    }));
+    // Thin light column at the centre, visible from high transits.
+    const beaconHeight = 2.2;
+    const beacon = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.035, 0.035, beaconHeight, 8, 1, true),
+      new THREE.MeshBasicMaterial({
+        color: '#67e8f9', transparent: true, opacity: 0.6, depthWrite: false, blending: THREE.AdditiveBlending
+      })
+    );
+    const up = center.clone().normalize();
+    beacon.position.copy(center).addScaledVector(up, beaconHeight / 2);
+    beacon.quaternion.setFromUnitVectors(UP_Y, up);
+    tourHighlight = new THREE.Group();
+    tourHighlight.add(fill, outline, beacon);
+    tourHighlight.userData = { stopId: stop.id, fill, outline, beacon };
+    scene.add(tourHighlight);
+  }
+
+  // Blink about once a second (steady glow when the user prefers reduced motion).
+  function updateTourHighlight(nowMs) {
+    if (!tourHighlight) return;
+    const on = tourActive() && historyGroup?.visible !== false;
+    tourHighlight.visible = on;
+    if (!on) return;
+    const steady = bridge.getState().prefersReducedMotion;
+    const pulse = steady ? 0.6 : 0.5 + 0.5 * Math.sin((nowMs / 1000) * Math.PI * 2 * 1.1);
+    tourHighlight.userData.fill.material.opacity = 0.2 + 0.6 * pulse;
+    tourHighlight.userData.outline.material.opacity = 0.45 + 0.55 * pulse;
+    tourHighlight.userData.beacon.material.opacity = 0.25 + 0.6 * pulse;
+  }
+
   // Scripted tour flight, replacing the steering physics while the tour is active.
   function stepTourFlight(dt) {
     const stop = tourStop();
     if (!sim.tour.leg) beginTourLeg(stop);
+    if (tourHighlight?.userData.stopId !== stop.id) setTourHighlight(stop);
     const prev = sim.craftPos.clone();
     const radial = new THREE.Vector3();
     let speed;
@@ -2076,6 +2151,7 @@ export function createFlybyController(bridge) {
 
     stepFlightPhysics(dt);
     updateFireHistoryLod((sim.craftPos.length() - EARTH_R) * KM_PER_UNIT);
+    updateTourHighlight(nowMs);
     const scan = scanFootprint();
     sim.lastScan = scan;
     updateHudReadout(nowMs, scan);
