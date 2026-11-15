@@ -117,7 +117,11 @@ function vecToLatLon(v){
   const r = v.length();
   let lon = Math.atan2(v.z, -v.x) * 180 / Math.PI + 180;
   if (lon > 180) lon -= 360; /* wrap to -180..+180 (was 0..360 W) */
-  return { lat: 90 - Math.acos(v.y / r) * 180 / Math.PI, lon };
+  /* clamp: float error can push v.y/r a hair past 1 near the poles,
+     and an unclamped acos returns NaN — which poisons the flat-map
+     ship and camera positions and takes the whole view down        */
+  const cy = Math.min(1, Math.max(-1, v.y / r));
+  return { lat: 90 - Math.acos(cy) * 180 / Math.PI, lon };
 }
 
 /* Degraded mode: say what happened in the one place the listener is looking,
@@ -336,7 +340,10 @@ const TRAIL_N = 140;
 const trailPos = new Float32Array(TRAIL_N * 3);
 const trailGeo = new THREE.BufferGeometry();
 trailGeo.setAttribute("position", new THREE.BufferAttribute(trailPos, 3));
-scene.add(new THREE.Line(trailGeo, new THREE.LineBasicMaterial({color: 0x7ee0a3, transparent: true, opacity: 0.55})));
+const trailLine = new THREE.Line(trailGeo, new THREE.LineBasicMaterial({color: 0x7ee0a3, transparent: true, opacity: 0.55}));
+trailLine.frustumCulled = false; /* positions stream in per frame; the
+  bounds computed from the initial zeros would cull it off-camera     */
+scene.add(trailLine);
 const trailPts = [];
 
 /* flight path: closed loop through the biomes, west to east. The spline is
@@ -637,10 +644,17 @@ function animate(){
     const mp = vecToLatLon(pos), la = vecToLatLon(ahead);
     if (flatLonCont === null){ flatLonCont = mp.lon; flatPrevLon = mp.lon; }
     let dl = mp.lon - flatPrevLon; if (dl > 180) dl -= 360; if (dl < -180) dl += 360;
+    /* rate-limit the flat longitude: near the poles the sphere longitude
+       swings ~180° in a step, and following it literally teleports the
+       ship across the map every frame (the polar stutter). Legit flight
+       never exceeds ~15°/s, so a 120°/s cap only binds at the poles.  */
+    const maxDl = 120 * dt + 0.5;
+    dl = Math.max(-maxDl, Math.min(maxDl, dl));
     flatLonCont += dl; flatPrevLon = mp.lon;
     if (flatLonCont > 180){ flatLonCont -= 360; camTargetPos.x -= Math.PI * 2; }
     else if (flatLonCont < -180){ flatLonCont += 360; camTargetPos.x += Math.PI * 2; }
     let dlA = la.lon - mp.lon; if (dlA > 180) dlA -= 360; if (dlA < -180) dlA += 360;
+    dlA = Math.max(-60, Math.min(60, dlA)); /* heading follows suit */
     _flatPos.set(flatLonCont * DEG, mp.lat * DEG, 0.06);
     _flatAhead.set((flatLonCont + dlA) * DEG, la.lat * DEG, 0.06);
     rPos = _flatPos; rAhead = _flatAhead;
