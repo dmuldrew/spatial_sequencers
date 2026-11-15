@@ -4,8 +4,12 @@ Outputs, from one pass over the input CSVs:
 
 1. ``global_fire_h3.parquet``: every requested H3 resolution (default 0-5) in one
    table, one row per cell, keyed by ``h3_index``.
-2. ``global_fire.pmtiles``: the same table as a PMTiles v3 vector pyramid, written by
-   raster_h3 (https://github.com/dmuldrew/raster_h3). Each resolution fills a band
+2. ``global_fire.pmtiles``: a PMTiles v3 vector pyramid of that table, written by
+   raster_h3 (https://github.com/dmuldrew/raster_h3). By default it keeps resolutions
+   0-4 and the ``detections`` and ``density`` properties (about 9 MB for 2001-2025),
+   small enough to commit and serve from GitHub Pages. ``--pmtiles-max-resolution 5
+   --pmtiles-columns all`` builds the full archive (about 121 MB), which is over
+   GitHub's 100 MB file limit and needs other hosting. Each resolution fills a band
    of Web Mercator zooms (res 0: z0-1, 1: z2-3, 2: z4, 3: z5, 4: z6-7, 5: z8-9), so
    no zoom is empty. raster_h3 builds without zoom bands put each resolution at a
    single zoom and leave z1, z3, z6 and z9 empty.
@@ -241,8 +245,51 @@ def write_parquet(con, path):
     tmp.replace(path)
 
 
+# Cell-table columns that can go into the PMTiles features. raster_h3 always adds
+# h3_index, h3_hex and resolution.
+PMTILES_COLUMNS = ('detections', 'high_conf_detections', 'frp_sum', 'frp_max', 'first_year',
+                   'last_year', 'area_km2', 'density', 'frp_density')
+GITHUB_WARN_BYTES = 50 * 1024 * 1024
+GITHUB_LIMIT_BYTES = 100 * 1024 * 1024
+
+
+def parse_pmtiles_columns(text):
+    """'all' or a comma list of PMTILES_COLUMNS."""
+    if text.strip().lower() == 'all':
+        return list(PMTILES_COLUMNS)
+    columns = [c.strip() for c in text.split(',') if c.strip()]
+    unknown = sorted(set(columns) - set(PMTILES_COLUMNS))
+    if unknown:
+        raise argparse.ArgumentTypeError(
+            f'Unknown PMTiles column(s) {unknown}; choose from {", ".join(PMTILES_COLUMNS)} or "all"'
+        )
+    return columns
+
+
+def write_pmtiles_subset(con, out_dir, pmtiles_path, max_resolution, columns, cli_bin=None):
+    """Write the chosen resolutions and properties to a temporary Parquet, then tile it."""
+    subset = out_dir / 'global_fire_pmtiles_input.tmp.parquet'
+    select = ', '.join(['h3_index', *columns])
+    con.execute(f"""
+        COPY (SELECT {select} FROM cells WHERE resolution <= {int(max_resolution)})
+        TO '{subset}' (FORMAT parquet, COMPRESSION zstd)
+    """)
+    try:
+        write_pmtiles(subset, pmtiles_path, cli_bin)
+    finally:
+        subset.unlink(missing_ok=True)
+    size = pmtiles_path.stat().st_size
+    if size > GITHUB_LIMIT_BYTES:
+        print(f'warning: {pmtiles_path.name} is over GitHub\'s 100 MB file limit; '
+              'host it outside git (e.g. R2, S3) or lower --pmtiles-max-resolution')
+    elif size > GITHUB_WARN_BYTES:
+        print(f'warning: {pmtiles_path.name} is over 50 MB; GitHub warns about files this size '
+              'and every regeneration stays in git history')
+    return size
+
+
 def write_pmtiles(parquet_path, pmtiles_path, cli_bin=None):
-    """Transcode the multi-resolution Parquet to PMTiles with raster_h3."""
+    """Transcode an H3 Parquet table (h3_index first) to PMTiles with raster_h3."""
     pmtiles_path.parent.mkdir(parents=True, exist_ok=True)
     try:
         import raster_h3
@@ -409,7 +456,14 @@ def main():
                         help='First resolution the --min-detections filter applies to (default 4)')
     parser.add_argument('--out-dir', type=Path, default=DEFAULT_OUT,
                         help=f'Output directory (default {DEFAULT_OUT.relative_to(PROJECT)})')
-    parser.add_argument('--skip-pmtiles', action='store_true', help='Stop after Parquet + LOD JSON')
+    parser.add_argument('--skip-pmtiles', action='store_true', help='Stop after Parquet + LOD extracts')
+    parser.add_argument('--pmtiles-max-resolution', type=int, default=4,
+                        help='Finest H3 resolution in the PMTiles (default 4: ~9 MB, commit-sized; '
+                             '5 roughly 6x larger)')
+    parser.add_argument('--pmtiles-columns', type=parse_pmtiles_columns,
+                        default=parse_pmtiles_columns('detections,density'),
+                        help='Feature properties in the PMTiles: comma list or "all" '
+                             '(default detections,density)')
     parser.add_argument('--cli-bin', default=None, help='Path to raster-h3-cli')
     parser.add_argument('--threads', type=int, default=None, help='DuckDB threads')
     args = parser.parse_args()
@@ -466,10 +520,16 @@ def main():
 
     if not args.skip_pmtiles:
         pmtiles_path = args.out_dir / 'global_fire.pmtiles'
-        write_pmtiles(parquet_path, pmtiles_path, args.cli_bin)
-        print(f'wrote {pmtiles_path} ({pmtiles_path.stat().st_size / 1e6:.1f} MB) '
+        size = write_pmtiles_subset(con, args.out_dir, pmtiles_path, args.pmtiles_max_resolution,
+                                    args.pmtiles_columns, args.cli_bin)
+        print(f'wrote {pmtiles_path} ({size / 1e6:.1f} MB, resolutions '
+              f'0-{args.pmtiles_max_resolution}, properties {",".join(args.pmtiles_columns)}) '
               f'[{time.perf_counter() - started:.1f}s]')
-        meta['pmtiles'] = pmtiles_path.name
+        meta['pmtiles'] = {
+            'file': pmtiles_path.name,
+            'maxResolution': args.pmtiles_max_resolution,
+            'properties': args.pmtiles_columns,
+        }
 
     levels = write_lod(con, args.out_dir, args.lod_resolutions, period_label, round(years, 3), meta,
                        args.lod_format)

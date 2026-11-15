@@ -90,5 +90,12 @@
     4,
     5
   ],
-  "pmtiles": "global_fire.pmtiles"
+  "pmtiles": {
+    "file": "global_fire.pmtiles",
+    "maxResolution": 4,
+    "properties": [
+      "detections",
+      "density"
+    ]
+  }
 }

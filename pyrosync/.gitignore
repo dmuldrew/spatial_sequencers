@@ -2,6 +2,6 @@ node_modules/
 dist/
 .DS_Store
 
-# Global fire hex job: large outputs stay out of git (LOD JSON + manifest are committed)
-public/data/global-fire/*.pmtiles
+# Global fire hex job: the full cell table stays out of git. The default PMTiles
+# (resolutions 0-4, ~9 MB), Arrow extracts and manifest are committed.
 public/data/global-fire/*.parquet
