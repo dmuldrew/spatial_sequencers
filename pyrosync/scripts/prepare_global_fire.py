@@ -9,8 +9,10 @@ Outputs, from one pass over the input CSVs:
    of Web Mercator zooms (res 0: z0-1, 1: z2-3, 2: z4, 3: z5, 4: z6-7, 5: z8-9), so
    no zoom is empty. raster_h3 builds without zoom bands put each resolution at a
    single zoom and leave z1, z3, z6 and z9 empty.
-3. ``lod-r{N}.json`` + ``manifest.json``: small level-of-detail extracts (default
-   res 2-4) for the Three.js orbital flyby, which swaps levels by altitude.
+3. ``lod-r{N}.arrow`` + ``manifest.json``: small level-of-detail extracts (default
+   res 2-4) for the Three.js orbital flyby, which swaps levels by altitude. Arrow IPC
+   (uncompressed) with typed columns and precomputed cell centres; ``--lod-format json``
+   writes the older JSON form instead.
 
 Every resolution is indexed directly from the detection coordinates, never rolled up
 from finer cells, because H3 children do not tile their parent exactly.
@@ -29,7 +31,7 @@ Usage:
     python3 scripts/prepare_global_fire.py data/firms/*.csv --resolutions 0-5 \
         --lod-resolutions 2,3,4 --min-confidence 30 --vegetation-only
 
-Dependencies: duckdb, h3 (v4), pandas; plus the raster_h3 Python package or the
+Dependencies: duckdb, h3 (v4), pandas, pyarrow (Arrow extracts); plus the raster_h3 Python package or the
 ``raster-h3-cli`` binary for the PMTiles step (skip it with ``--skip-pmtiles``).
 """
 import argparse
@@ -270,8 +272,56 @@ def quantile(sorted_values, fraction):
     return sorted_values[lo] + (sorted_values[hi] - sorted_values[lo]) * (pos - lo)
 
 
-def write_lod(con, out_dir, lod_resolutions, period_label, years, meta):
-    """Compact per-resolution JSON for the flyby plus a manifest with a shared colour range."""
+def write_lod_arrow(path, res, rows, period_label, color_range):
+    """Uncompressed Arrow IPC file: typed columns the browser reads without parsing.
+
+    Buffers stay uncompressed because Apache Arrow JS cannot read LZ4/Zstd IPC buffers;
+    rely on HTTP compression instead. Cell centres are precomputed so the flyby can
+    place hexagons without an h3-js call per cell.
+    """
+    import pyarrow as pa
+    from h3.api import basic_int as h3i
+
+    centres = [h3i.cell_to_latlng(cell) for cell, *_ in rows]
+    table = pa.table({
+        'h3_index': pa.array([cell for cell, *_ in rows], pa.uint64()),
+        'lat': pa.array([c[0] for c in centres], pa.float32()),
+        'lng': pa.array([c[1] for c in centres], pa.float32()),
+        'detections': pa.array([d for _, d, _, _ in rows], pa.uint32()),
+        'density': pa.array([float(v) for _, _, v, _ in rows], pa.float32()),
+        'frp_max': pa.array([f for _, _, _, f in rows], pa.float32()),
+    })
+    table = table.replace_schema_metadata({
+        'schemaVersion': '1',
+        'resolution': str(res),
+        'periodLabel': period_label,
+        'colorRange': json.dumps(color_range),
+    })
+    tmp = path.with_name(path.name + '.tmp')
+    with pa.OSFile(str(tmp), 'wb') as sink, pa.ipc.new_file(sink, table.schema) as writer:
+        writer.write_table(table)
+    tmp.replace(path)
+
+
+def write_lod_json(path, res, rows, period_label):
+    payload = {
+        'schemaVersion': 1,
+        'resolution': res,
+        'periodLabel': period_label,
+        'fields': ['id', 'detections', 'density', 'frpMax'],
+        'cells': [
+            [format(cell, 'x'), detections, float(f'{density:.4g}'),
+             None if frp_max is None else round(frp_max, 1)]
+            for cell, detections, density, frp_max in rows
+        ],
+    }
+    tmp = path.with_name(path.name + '.tmp')
+    tmp.write_text(json.dumps(payload, separators=(',', ':')) + '\n')
+    tmp.replace(path)
+
+
+def write_lod(con, out_dir, lod_resolutions, period_label, years, meta, lod_format='arrow'):
+    """Per-resolution flyby extracts (Arrow or JSON) plus a manifest with a shared colour range."""
     out_dir.mkdir(parents=True, exist_ok=True)
     present = {row[0] for row in con.execute('SELECT DISTINCT resolution FROM cells').fetchall()}
     levels = [res for res in lod_resolutions if res in present]
@@ -297,28 +347,25 @@ def write_lod(con, out_dir, lod_resolutions, period_label, years, meta):
             SELECT h3_index, detections, density, frp_max
             FROM cells WHERE resolution = {res} ORDER BY h3_index
         ''').fetchall()
-        name = f'lod-r{res}.json'
-        payload = {
-            'schemaVersion': 1,
-            'resolution': res,
-            'periodLabel': period_label,
-            'fields': ['id', 'detections', 'density', 'frpMax'],
-            'cells': [
-                [format(cell, 'x'), detections, float(f'{density:.4g}'),
-                 None if frp_max is None else round(frp_max, 1)]
-                for cell, detections, density, frp_max in rows
-            ],
-        }
-        tmp = out_dir / (name + '.tmp')
-        tmp.write_text(json.dumps(payload, separators=(',', ':')) + '\n')
-        tmp.replace(out_dir / name)
+        name = f'lod-r{res}.{lod_format}'
+        if lod_format == 'arrow':
+            write_lod_arrow(out_dir / name, res, rows, period_label, color_range)
+        else:
+            write_lod_json(out_dir / name, res, rows, period_label)
         lo, hi = LOD_ALTITUDE_KM.get(res, (None, None))
         files.append({
             'resolution': res,
             'file': name,
+            'format': lod_format,
             'cells': len(rows),
             'altitudeKm': {'min': lo, 'max': hi},
         })
+
+    # Drop extracts this job wrote earlier that the new manifest no longer lists.
+    written = {f['file'] for f in files}
+    for old in [*out_dir.glob('lod-r*.json'), *out_dir.glob('lod-r*.arrow')]:
+        if old.name not in written:
+            old.unlink()
 
     manifest = {
         'schemaVersion': 1,
@@ -345,7 +392,9 @@ def main():
                         help='H3 resolutions for Parquet/PMTiles (default 0-5)')
     parser.add_argument('--lod-resolutions', type=parse_resolutions,
                         default=parse_resolutions('2,3,4'),
-                        help='Resolutions to extract as flyby JSON (default 2,3,4)')
+                        help='Resolutions to extract for the flyby (default 2,3,4)')
+    parser.add_argument('--lod-format', choices=('arrow', 'json'), default='arrow',
+                        help='Flyby extract format (default arrow; needs pyarrow)')
     parser.add_argument('--min-confidence', type=int, default=30,
                         help='Drop detections below this confidence, 0-100 (default 30)')
     parser.add_argument('--high-confidence', type=int, default=80,
@@ -422,9 +471,10 @@ def main():
               f'[{time.perf_counter() - started:.1f}s]')
         meta['pmtiles'] = pmtiles_path.name
 
-    levels = write_lod(con, args.out_dir, args.lod_resolutions, period_label, round(years, 3), meta)
+    levels = write_lod(con, args.out_dir, args.lod_resolutions, period_label, round(years, 3), meta,
+                       args.lod_format)
     for level in levels:
-        print(f'  lod-r{level["resolution"]}.json: {level["cells"]:,} cells')
+        print(f'  {level["file"]}: {level["cells"]:,} cells')
     print(f'done in {time.perf_counter() - started:.1f}s')
 
 

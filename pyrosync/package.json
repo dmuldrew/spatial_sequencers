@@ -8,6 +8,7 @@
     "fetch-data": "python3 scripts/fetch_nasa_data.py"
   },
   "dependencies": {
+    "apache-arrow": "21.2.0",
     "d3": "^7.9.0",
     "d3-audio": "github:dmuldrew/d3-audio",
     "three": "0.170.0",

@@ -194,11 +194,13 @@ Available on the second home page tab (**Central Iowa MODIS Hex Map** / `/#iowa-
 
 - `public/data/global-fire/global_fire_h3.parquet`: all resolutions, one row per cell (`detections`, `frp_sum`, `frp_max`, `area_km2`, `density` = detections per km² per year, and more).
 - `public/data/global-fire/global_fire.pmtiles`: the same table as a PMTiles v3 pyramid, written by [`raster_h3`](https://github.com/dmuldrew/raster_h3) (`parquet_to_pmtiles` or `raster-h3-cli parquet-to-pmtiles`).
-- `public/data/global-fire/lod-r{2,3,4}.json` + `manifest.json`: small level-of-detail extracts for the orbital flyby, with suggested altitude bands and one shared log-density colour range so colours stay stable when levels swap.
+- `public/data/global-fire/lod-r{2,3,4}.arrow` + `manifest.json`: small level-of-detail extracts for the orbital flyby's **Fire History** layer, which swaps resolution by altitude. Uncompressed Arrow IPC with typed columns (`h3_index`, `lat`, `lng`, `detections`, `density`, `frp_max`), read in the browser by Apache Arrow JS (`/vendor/arrow.min.js`). The manifest carries suggested altitude bands and one shared log-density colour range so colours stay stable when levels swap. `--lod-format json` writes JSON instead.
 
 ```bash
-pip install duckdb h3 pandas            # plus raster_h3, or put raster-h3-cli on PATH
-python3 pyrosync/scripts/prepare_global_fire.py /path/to/firms/*.csv --vegetation-only
+pip install duckdb h3 pandas pyarrow    # plus raster_h3, or put raster-h3-cli on PATH
+# Yearly MODIS archives (2001 onward) -> one Parquet file per year (~45 MB each)
+python3 pyrosync/scripts/fetch_firms_archive.py --years 2001-2025 --out-dir /path/to/firms
+python3 pyrosync/scripts/prepare_global_fire.py /path/to/firms/modis_*.parquet --vegetation-only
 # --skip-pmtiles stops after Parquet + LOD JSON; --snap-degrees 0 bins every detection exactly
 ```
 

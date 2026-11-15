@@ -37,6 +37,22 @@ function loadH3Once() {
   return h3LoadPromise;
 }
 
+// Apache Arrow JS (UMD, global `Arrow`), loaded only when the fire history uses Arrow files.
+let arrowLoadPromise = null;
+function loadArrowOnce() {
+  if (window.Arrow?.tableFromIPC) return Promise.resolve(window.Arrow);
+  if (arrowLoadPromise) return arrowLoadPromise;
+  arrowLoadPromise = new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = './vendor/arrow.min.js';
+    script.async = true;
+    script.onload = () => (window.Arrow?.tableFromIPC ? resolve(window.Arrow) : reject(new Error('Arrow failed to expose global')));
+    script.onerror = () => reject(new Error('Failed to load ./vendor/arrow.min.js'));
+    document.head.appendChild(script);
+  });
+  return arrowLoadPromise;
+}
+
 function clamp(v, lo, hi) {
   return Math.max(lo, Math.min(hi, v));
 }
@@ -619,9 +635,50 @@ export function createFlybyController(bridge) {
     return out;
   }
 
-  function buildFireHistoryLevel(h3, level, payload, colorRange) {
+  // Columnar fire history for one level: { ids, lat, lng, detections, density, frpMax }.
+  // Arrow files carry typed columns and cell centres; JSON rows get centres from h3-js.
+  async function fetchFireHistoryColumns(h3, level) {
+    const url = `${FIRE_HISTORY_DIR}${level.file}`;
+    if (level.format === 'arrow' || level.file.endsWith('.arrow')) {
+      const [Arrow, buffer] = await Promise.all([
+        loadArrowOnce(),
+        fetch(url).then((r) => (r.ok ? r.arrayBuffer() : null))
+      ]);
+      if (!buffer) return null;
+      const table = Arrow.tableFromIPC(new Uint8Array(buffer));
+      const col = (name) => table.getChild(name)?.toArray();
+      const h3Index = col('h3_index');
+      if (!h3Index) return null;
+      const ids = Array.from(h3Index, (v) => v.toString(16));
+      return {
+        ids,
+        lat: col('lat'),
+        lng: col('lng'),
+        detections: col('detections'),
+        density: col('density'),
+        frpMax: col('frp_max')
+      };
+    }
+    const payload = await fetch(url).then((r) => (r.ok ? r.json() : null));
     const rows = Array.isArray(payload?.cells) ? payload.cells : [];
-    if (!rows.length) return null;
+    const n = rows.length;
+    const out = {
+      ids: rows.map((r) => r[0]),
+      lat: new Float32Array(n),
+      lng: new Float32Array(n),
+      detections: Float64Array.from(rows, (r) => r[1]),
+      density: Float64Array.from(rows, (r) => r[2]),
+      frpMax: Float64Array.from(rows, (r) => (r[3] == null ? NaN : r[3]))
+    };
+    out.ids.forEach((id, i) => {
+      [out.lat[i], out.lng[i]] = h3.cellToLatLng(id);
+    });
+    return out;
+  }
+
+  function buildFireHistoryLevel(h3, level, data, colorRange) {
+    const n = data?.ids?.length || 0;
+    if (!n) return null;
     // A hexagon's circumradius equals its edge length.
     const radius = (h3.getHexagonEdgeLengthAvg(level.resolution, 'km') / KM_PER_UNIT) * 0.94;
     const lo = Number.isFinite(colorRange?.min) ? colorRange.min : -4;
@@ -629,7 +686,7 @@ export function createFlybyController(bridge) {
 
     const geo = new THREE.CylinderGeometry(1, 1, 1, 6);
     const mat = new THREE.MeshLambertMaterial({ color: '#ffffff' });
-    const mesh = new THREE.InstancedMesh(geo, mat, rows.length);
+    const mesh = new THREE.InstancedMesh(geo, mat, n);
     mesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
     mesh.visible = false;
 
@@ -638,13 +695,13 @@ export function createFlybyController(bridge) {
     const pos = new THREE.Vector3();
     const scale = new THREE.Vector3();
     const quat = new THREE.Quaternion();
-    rows.forEach(([id, detections, density, frpMax], idx) => {
-      cells.set(id, [detections, density, frpMax]);
+    for (let idx = 0; idx < n; idx += 1) {
+      const density = data.density[idx];
+      cells.set(data.ids[idx], [data.detections[idx], density, data.frpMax[idx]]);
       const t = density > 0 ? (Math.log10(density) - lo) / (hi - lo || 1) : 0;
       // Same absolute heights at every level, so swapping levels does not jump.
       const height = 0.012 + clamp(t, 0, 1) * 0.11;
-      const [lat, lon] = h3.cellToLatLng(id);
-      latLonAltToVec3(lat, lon, EARTH_R, pos);
+      latLonAltToVec3(data.lat[idx], data.lng[idx], EARTH_R, pos);
       tmpUp.copy(pos).normalize();
       quat.setFromUnitVectors(UP_Y, tmpUp);
       pos.addScaledVector(tmpUp, height * 0.5 + 0.006);
@@ -652,7 +709,7 @@ export function createFlybyController(bridge) {
       tmpM4.compose(pos, quat, scale);
       mesh.setMatrixAt(idx, tmpM4);
       mesh.setColorAt(idx, fireHistoryColor(t, col));
-    });
+    }
     mesh.instanceMatrix.needsUpdate = true;
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     return {
@@ -677,10 +734,11 @@ export function createFlybyController(bridge) {
     // Coarsest first, so the high-orbit view appears soonest.
     const levels = [...manifest.levels].sort((a, b) => a.resolution - b.resolution);
     for (const level of levels) {
-      const payload = await fetch(`${FIRE_HISTORY_DIR}${level.file}`)
-        .then((r) => (r.ok ? r.json() : null))
-        .catch(() => null);
-      const built = buildFireHistoryLevel(h3, level, payload, manifest.colorRange);
+      const data = await fetchFireHistoryColumns(h3, level).catch((err) => {
+        console.warn(`Fire history level r${level.resolution} unavailable:`, err);
+        return null;
+      });
+      const built = buildFireHistoryLevel(h3, level, data, manifest.colorRange);
       if (!built) continue;
       historyGroup.add(built.mesh);
       historyLevels.push(built);

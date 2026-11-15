@@ -25,6 +25,7 @@ const VENDOR_ROUTES = {
   '/vendor/Tone.js': path.join(__dirname, 'node_modules/tone/build/Tone.js'),
   '/vendor/d3-audio.js': path.join(__dirname, 'node_modules/d3-audio/dist/d3-audio.js'),
   '/vendor/three.module.min.js': path.join(__dirname, 'node_modules/three/build/three.module.min.js'),
+  '/vendor/arrow.min.js': path.join(__dirname, 'node_modules/apache-arrow/Arrow.esnext.min.js'),
   '/vendor/topojson-client.min.js': path.join(__dirname, 'node_modules/topojson-client/dist/topojson-client.min.js'),
   '/vendor/countries-110m.json': path.join(__dirname, 'node_modules/world-atlas/countries-110m.json')
 };

@@ -38,6 +38,7 @@ copy_vendor_from_dir() {
   cp "$nm/tone/build/Tone.js" "$STAGE_DIR/vendor/Tone.js"
   cp "$nm/d3-audio/dist/d3-audio.js" "$STAGE_DIR/vendor/d3-audio.js"
   cp "$nm/three/build/three.module.min.js" "$STAGE_DIR/vendor/three.module.min.js"
+  cp "$nm/apache-arrow/Arrow.esnext.min.js" "$STAGE_DIR/vendor/arrow.min.js"
   cp "$nm/topojson-client/dist/topojson-client.min.js" "$STAGE_DIR/vendor/topojson-client.min.js"
   cp "$nm/world-atlas/countries-110m.json" "$STAGE_DIR/vendor/countries-110m.json"
 }
@@ -62,6 +63,7 @@ elif command -v docker >/dev/null 2>&1; then
   docker cp "$CID:/app/node_modules/tone/build/Tone.js" "$STAGE_DIR/vendor/Tone.js"
   docker cp "$CID:/app/node_modules/d3-audio/dist/d3-audio.js" "$STAGE_DIR/vendor/d3-audio.js"
   docker cp "$CID:/app/node_modules/three/build/three.module.min.js" "$STAGE_DIR/vendor/three.module.min.js"
+  docker cp "$CID:/app/node_modules/apache-arrow/Arrow.esnext.min.js" "$STAGE_DIR/vendor/arrow.min.js"
   docker cp "$CID:/app/node_modules/topojson-client/dist/topojson-client.min.js" "$STAGE_DIR/vendor/topojson-client.min.js"
   docker cp "$CID:/app/node_modules/world-atlas/countries-110m.json" "$STAGE_DIR/vendor/countries-110m.json"
   docker rm -f "$CID" >/dev/null
