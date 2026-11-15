@@ -12,9 +12,9 @@ An interactive **audio-visual NASA wildfire, meteorology, and Earth-data sonific
   - **26-Year Wildfire Spiral (`/#spiral`)**, **Central Iowa MODIS Hex Map (`/#iowa-map`)**, and **Orbital Flyby (3D) (`/#flyby`)**.
 - **[Combined Spaceship Flyby (`spaceship-flyby/`)](spaceship-flyby/README.md)** — Live Demo: `https://dmuldrew.github.io/spatial_sequencers/spaceship-flyby/`
   - Separate website choice uniting **3D Fire Flight** (continuous detuned sawtooth thermal violin, stereo hotspot proximity bells, and spoken region narration) with **PyroSync Observatory** (1991–2020 harmonic tension `σ` chords, Euclidean wind-ember pulses, 26-year 3D climate spirals, and Central Iowa MODIS H3 hex plucks).
-- **[Space Jukebox (`space-jukebox/`)](space-jukebox/README.md)** — Live Demo: `https://dmuldrew.github.io/spatial_sequencers/space-jukebox/`
-  - Audio-first Web Audio + Speech Synthesis sonification of NASA GISS temperature, NOAA Mauna Loa CO₂, and **3D Fire Flight** (`fly.html`) designed for blind and low-vision listeners.
-- **Hub Landing Page (`site/`)** — Multi-project entry page deployed to the root of GitHub Pages (`/hub/` locally on port 3000).
+- **[Space Jukebox (`space-jukebox/`)](space-jukebox/README.md)** — Live Demo: `https://dmuldrew.github.io/spatial_sequencers/space-jukebox/fly.html`
+  - **3D Fire Flight** (`fly.html`) — a spaceship tours NASA FIRMS fire regions on a 3D globe; Web Audio sonification + Speech Synthesis narration designed for blind and low-vision listeners.
+- **Centralized Navigation Hub (`site/`)** — Multi-project entry page deployed to the root of GitHub Pages (`/` locally on port 3000 or 8080).
 
 ---
 
@@ -96,7 +96,7 @@ npm install
 npm start
 ```
 
-Then visit **[http://localhost:3000](http://localhost:3000)**. For **Space Jukebox**, open `space-jukebox/index.html` or `space-jukebox/fly.html` directly in your browser.
+Then visit **[http://localhost:3000](http://localhost:3000)**. For **Space Jukebox**, run `npm run preview` from the repo root and open **http://localhost:8080/space-jukebox/**, or open `space-jukebox/fly.html` directly in your browser.
 
 ### Option 4: Deploy to GitHub Pages
 
@@ -111,7 +111,7 @@ This repository includes [.github/workflows/deploy-pages.yml](.github/workflows/
 3. Push any commit to `main` to deploy automatically, **or deploy a specific branch manually**:
    - Open **Actions → Deploy GitHub Pages → Run workflow**.
    - Keep **Use workflow from** set to **`main`**, enter your target branch/tag/SHA in **`Branch, tag, or SHA to build and deploy`**, and click **Run workflow**.
-4. Visit **`https://dmuldrew.github.io/spatial_sequencers/`** (or `/pyrosync/` and `/space-jukebox/`).
+4. Visit **`https://dmuldrew.github.io/spatial_sequencers/`** (or `/pyrosync/` and `/space-jukebox/fly.html`).
 
 #### Manual PyroSync Branch Deploy via Script
 
@@ -144,9 +144,8 @@ spatial_sequencers/
 │   └── deploy-pages.yml            # GitHub Actions multi-project Pages deploy
 ├── site/
 │   └── index.html                  # Hub landing page linking PyroSync & Space Jukebox
-├── space-jukebox/                  # Audio-first accessible Earth sonification prototype
-│   ├── index.html                  # Temperature & CO2 sonification tracks
-│   ├── fly.html                    # 3D Fire Flight sonification tour
+├── space-jukebox/                  # 3D sonification flight, audio-first for blind & low-vision listeners
+│   ├── fly.html                    # 3D Fire Flight sonification tour (the app)
 │   └── README.md                   # Space Jukebox architecture & input model
 └── pyrosync/                       # PyroSync Observatory web app & data pipeline
     ├── Dockerfile                  # Node 22 Alpine container image

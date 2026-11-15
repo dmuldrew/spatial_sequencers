@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Spatial Sequencers — Centralized Experience Hub | NASA Space Apps 2026</title>
-  <meta name="description" content="Centralized navigation hub for all 6 Spatial Sequencers visual and audio sonification experiences: 26-Year Wildfire Spiral, Central Iowa MODIS H3 Hex Map, Combined Spaceship Flyby, PyroSat-1 3D Flyby, Space Jukebox 2D Player, and 3D Fire Flight.">
+  <meta name="description" content="Centralized navigation hub for all Spatial Sequencers visual and audio sonification experiences: 26-Year Wildfire Spiral, Central Iowa MODIS H3 Hex Map, Combined Spaceship Flyby, PyroSat-1 3D Flyby, and Space Jukebox 3D Fire Flight.">
   <style>
     :root {
       color-scheme: dark;
@@ -481,7 +481,6 @@
           <li><a href="./pyrosync/#iowa-map" data-exp="iowa-map">⬡ Iowa Hex Map</a></li>
           <li><a href="./spaceship-flyby/" data-exp="combined-flyby">🚀 Combined Flyby</a></li>
           <li><a href="./pyrosync/#flyby" data-exp="pyrosat-flyby">🛰️ PyroSat-1 3D</a></li>
-          <li><a href="./space-jukebox/" data-exp="space-jukebox">🎵 Space Jukebox</a></li>
           <li><a href="./space-jukebox/fly.html" data-exp="fire-flight">🔥 3D Fire Flight</a></li>
         </ul>
       </nav>
@@ -492,11 +491,11 @@
     <div class="hero">
       <h1>🪐 Spatial Sequencers — Experience Hub</h1>
       <p class="hero-lede">
-        One centralized launchpad for all <strong>six visual &amp; auditory Earth-science experiences</strong> — from 26-year wildfire harmonic spirals and MODIS H3 hexagons to 3D spacecraft flybys and blind-accessible climate sonification.
+        One centralized launchpad for all <strong>visual &amp; auditory Earth-science experiences</strong> — from 26-year wildfire harmonic spirals and MODIS H3 hexagons to 3D spacecraft flybys and blind-accessible climate sonification.
       </p>
       <div class="badge-row">
         <span class="badge">NASA SPACE APPS CHALLENGE 2026 · SEATTLE</span>
-        <span class="badge">6 INTERACTIVE EXPERIENCES</span>
+        <span class="badge">5 INTERACTIVE EXPERIENCES</span>
       </div>
     </div>
 
@@ -591,38 +590,20 @@
         </div>
       </li>
 
-      <!-- 5. Space Jukebox (2D Accessible Player) -->
-      <li class="exp-card">
-        <div class="exp-top">
-          <span class="exp-icon" aria-hidden="true">🎵</span>
-          <span class="exp-pill">Audio-First · Accessible</span>
-        </div>
-        <h3>Space Jukebox (2D Player)</h3>
-        <p class="exp-tag">Hear 146 Years of Planetary Change</p>
-        <p class="exp-desc">
-          Turns NASA GISS global temperature anomalies (1880–2025) and NOAA Mauna Loa CO₂ (1959–2025) into continuous violin and pentatonic pluck melodies. Built for blind and low-vision listeners with spoken guides, a home tone, and sound-first mode.
-        </p>
-        <p class="exp-tech">NASA GISTEMP v4 · NOAA Mauna Loa · Web Audio · Speech Synthesis</p>
-        <div class="exp-actions">
-          <a class="btn btn-green" href="./space-jukebox/">Open Space Jukebox →</a>
-          <button type="button" class="btn btn-ghost" data-preview-url="./space-jukebox/" data-preview-title="Space Jukebox (2D Player)">Preview in Hub</button>
-        </div>
-      </li>
-
-      <!-- 6. Space Jukebox — 3D Fire Flight -->
+      <!-- 5. Space Jukebox — 3D Fire Flight -->
       <li class="exp-card">
         <div class="exp-top">
           <span class="exp-icon" aria-hidden="true">🔥</span>
-          <span class="exp-pill">Space Jukebox 3D</span>
+          <span class="exp-pill">Space Jukebox · Audio-First</span>
         </div>
-        <h3>3D Fire Flight</h3>
+        <h3>Space Jukebox — 3D Fire Flight</h3>
         <p class="exp-tag">The Ship Is the Playhead, the Map Is the Score</p>
         <p class="exp-desc">
-          An auto-piloted tour of six global fire regions over a 1.5° Natural Earth dot globe with 330 NASA FIRMS hotspots. Continuous sawtooth pitch tracks nearby fire power while spoken narration announces each biome eyes-closed.
+          A spaceship tours a 3D Earth while 330 NASA FIRMS wildfire hotspots become sound — the tone climbs over fire regions and major hotspots ping in stereo as you pass them. Narration on by default for blind and low-vision listeners, with Auto Tour + Manual Pilot (keyboard &amp; Xbox controller).
         </p>
-        <p class="exp-tech">Three.js · Web Audio Sawtooth &amp; Bell Pings · Speech Synthesis</p>
+        <p class="exp-tech">NASA FIRMS · Three.js · Web Audio · Speech Synthesis · Gamepad API</p>
         <div class="exp-actions">
-          <a class="btn btn-green" href="./space-jukebox/fly.html">Open 3D Fire Flight →</a>
+          <a class="btn btn-green" href="./space-jukebox/fly.html">Start the Flight →</a>
           <button type="button" class="btn btn-ghost" data-preview-url="./space-jukebox/fly.html" data-preview-title="Space Jukebox — 3D Fire Flight">Preview in Hub</button>
         </div>
       </li>
@@ -630,8 +611,9 @@
 
     <footer>
       <p>
-        Team Workspace: <a href="https://github.com/dmuldrew/spatial_sequencers">github.com/dmuldrew/spatial_sequencers</a> ·
-        Built for the 2026 NASA International Space Apps Challenge (Seattle).
+        Team Workspace: <a href="https://github.com/lanly-dev/spatial_sequencers">github.com/lanly-dev/spatial_sequencers</a> ·
+        forked from <a href="https://github.com/dmuldrew/spatial_sequencers">dmuldrew/spatial_sequencers</a><br>
+        Built at F5 Tower, Seattle — NASA Space Apps Challenge 2026.
       </p>
     </footer>
   </main>

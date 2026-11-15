@@ -148,6 +148,10 @@ const server = http.createServer(async (req, res) => {
     return serveFile(VENDOR_ROUTES[reqPath], res);
   }
 
+  if (reqPath === '/space-jukebox/' || reqPath === '/space-jukebox/index.html') {
+    return serveFile(path.join(PUBLIC_DIR, 'space-jukebox/fly.html'), res);
+  }
+
   const normalized = reqPath === '/' ? '/index.html' : reqPath;
   const resolved = path.resolve(PUBLIC_DIR, `.${normalized}`);
   if (!resolved.startsWith(PUBLIC_DIR)) {
