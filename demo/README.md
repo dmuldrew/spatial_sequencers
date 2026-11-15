@@ -4,6 +4,9 @@ Submission demo assets for **Spatial Sequencers** (NASA Space Apps Challenge
 2026). The submission rules allow **one** of: a video up to 30 seconds, or up
 to 7 slides — public link, no login required.
 
+- **`spatial-sequencers-demo-30s.mp4`** — the assembled 29-second demo
+  video with the apps' real captured sound (sonification only; no narration
+  track), built per the shot list below.
 - **`slides.html`** — the 7-slide deck, covering the whole project (PyroSync,
   Space Jukebox, the Midwest Fire Timeline, and the combined flyby). Open it
   in any browser; navigate
