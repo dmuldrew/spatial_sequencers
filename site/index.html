@@ -1,75 +1,673 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Spatial Sequencers — NASA Space Apps 2026 · Seattle</title>
-<meta name="description" content="Three ways to hear Earth data: PyroSync fire-weather observatory, the Combined Spaceship Flyby (PyroSync × 3D Fire Flight soundscape), and Space Jukebox for blind and low-vision listeners.">
-<style>
-  :root{--bg:#070a16;--card:#121a33;--line:#33406e;--ink:#ffffff;--dim:#c2cdea;--acc:#ffd166;--acc2:#7ee0a3;--acc3:#38bdf8}
-  *{box-sizing:border-box}
-  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:1120px;margin:0 auto;padding:32px 24px 48px;background:var(--bg);color:var(--ink);font-size:18px;line-height:1.55}
-  header{text-align:center;margin-bottom:36px}
-  h1{font-size:clamp(2rem,1.4rem + 2.5vw,2.75rem);margin:0 0 8px}
-  .lede{color:var(--dim);font-size:clamp(1.05rem,0.95rem + 0.4vw,1.3rem);margin:0}
-  .badge{display:inline-block;margin-top:14px;padding:4px 14px;border:1px solid var(--line);border-radius:999px;color:var(--acc);font-size:15px;font-weight:700;letter-spacing:.04em}
-  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
-  @media (max-width:920px){.grid{grid-template-columns:1fr}}
-  .card{background:var(--card);border:2px solid var(--line);border-radius:16px;padding:26px;display:flex;flex-direction:column}
-  .card.featured{border-color:var(--acc3);box-shadow:0 12px 32px rgba(56,189,248,.14)}
-  .card h2{font-size:26px;margin:0 0 4px}
-  .icon{font-size:42px;line-height:1;margin-bottom:12px}
-  .tag{color:var(--acc);font-weight:700;margin:0 0 12px}
-  .card.featured .tag{color:var(--acc3)}
-  .card p{margin:0 0 14px}
-  .tech{color:var(--dim);font-size:15px;margin-top:auto;padding-top:6px}
-  a.btn{display:inline-block;margin-top:14px;font-size:19px;font-weight:800;padding:13px 22px;border-radius:999px;background:var(--acc);color:#141414;text-decoration:none;text-align:center}
-  a.btn.cyan{background:var(--acc3);color:#061326}
-  a.btn.green{background:var(--acc2);color:#0b2013}
-  a.btn:focus-visible{outline:4px solid #fff;outline-offset:2px}
-  footer{margin-top:40px;text-align:center;color:var(--dim);font-size:16px}
-  footer a{color:var(--acc)}
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Spatial Sequencers — Centralized Experience Hub | NASA Space Apps 2026</title>
+  <meta name="description" content="Centralized navigation hub for all 6 Spatial Sequencers visual and audio sonification experiences: 26-Year Wildfire Spiral, Central Iowa MODIS H3 Hex Map, Combined Spaceship Flyby, PyroSat-1 3D Flyby, Space Jukebox 2D Player, and 3D Fire Flight.">
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #050814;
+      --card: #101830;
+      --card-elevated: #162242;
+      --line: #2e3d6b;
+      --ink: #f8fafc;
+      --dim: #cbd5e1;
+      --acc-gold: #ffd166;
+      --acc-green: #7ee0a3;
+      --acc-cyan: #38bdf8;
+      --acc-orange: #ff7847;
+      --acc-purple: #c084fc;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      min-block-size: 100dvh;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 1rem;
+      line-height: 1.55;
+    }
+
+    .visually-hidden:where(:not(:focus-within, :active)) {
+      position: absolute !important;
+      clip-path: inset(50%) !important;
+      overflow: hidden !important;
+      width: 1px !important;
+      height: 1px !important;
+      margin: -1px !important;
+      padding: 0 !important;
+      border: 0 !important;
+      white-space: nowrap !important;
+    }
+
+    .skip-link {
+      position: fixed;
+      top: 0.75rem;
+      left: 0.75rem;
+      z-index: 200;
+      padding: 0.6rem 1rem;
+      background: var(--acc-gold);
+      color: #0f172a;
+      font-weight: 800;
+      border-radius: 0.5rem;
+      text-decoration: none;
+    }
+
+    :where(a:any-link, button, [tabindex="0"]):focus-visible {
+      outline: 3px solid var(--acc-gold);
+      outline-offset: 3px;
+    }
+
+    /* Centralized Responsive Navbar (modern-web-guidance `navbar`) */
+    .hub-header {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: rgba(5, 8, 20, 0.92);
+      border-block-end: 1.5px solid var(--line);
+      backdrop-filter: blur(12px);
+    }
+
+    .hub-header.is-measuring,
+    .hub-header.is-measuring * {
+      transition: none !important;
+    }
+
+    .hub-header-inner {
+      max-inline-size: 84rem;
+      margin-inline: auto;
+      padding: 0.65rem 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.85rem;
+    }
+
+    .hub-header-inner > * {
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
+
+    .hub-brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 1.08rem;
+      font-weight: 800;
+      color: var(--ink);
+      text-decoration: none;
+      letter-spacing: -0.01em;
+    }
+
+    .menu-button {
+      anchor-name: --menu-button;
+      min-block-size: 2.35rem;
+      padding: 0.4rem 0.9rem;
+      border-radius: 999px;
+      border: 1.5px solid var(--acc-cyan);
+      background: var(--card);
+      color: var(--ink);
+      font-size: 0.9rem;
+      font-weight: 800;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .site-menu {
+      list-style: none;
+      position: fixed;
+      inset: auto;
+      inset-block-start: 3.75rem;
+      inset-block-start: anchor(--menu-button bottom);
+      inset-inline-end: 1rem;
+      inline-size: min(86dvw, 23rem);
+      max-inline-size: calc(100dvw - 2rem);
+      block-size: fit-content;
+      max-block-size: calc(100dvh - 5rem);
+      margin-block-start: 0.45rem;
+      padding: 0.65rem;
+      border-radius: 0.9rem;
+      border: 1.5px solid var(--acc-cyan);
+      background: #0c142c;
+      box-shadow: 0 20px 44px rgba(0, 0, 0, 0.7);
+      overflow: auto;
+    }
+
+    .site-menu[popover]:is(:popover-open, .\:popover-open) {
+      display: grid;
+      gap: 0.35rem;
+    }
+
+    .site-menu a {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.38rem;
+      min-block-size: 2.2rem;
+      inline-size: 100%;
+      padding: 0.35rem 0.75rem;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      color: var(--dim);
+      font-size: 0.85rem;
+      font-weight: 700;
+      text-decoration: none;
+    }
+
+    .site-menu a:hover {
+      background: rgba(56, 189, 248, 0.12);
+      color: var(--ink);
+      border-color: var(--line);
+    }
+
+    .site-menu a[aria-current="page"] {
+      background: rgba(255, 209, 102, 0.16);
+      color: var(--acc-gold);
+      border: 1.5px solid var(--acc-gold);
+      box-shadow: inset 0 -2px 0 var(--acc-gold);
+    }
+
+    .hub-header.is-wide .menu-button {
+      display: none;
+    }
+
+    .hub-header.is-wide .site-menu {
+      position: static;
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      inline-size: auto;
+      max-inline-size: none;
+      block-size: auto;
+      max-block-size: none;
+      overflow: visible;
+      margin: 0;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      box-shadow: none;
+    }
+
+    .hub-header.is-wide .site-menu::backdrop {
+      display: none;
+    }
+
+    .hub-header.is-wide .site-menu a {
+      inline-size: auto;
+    }
+
+    /* Hub Main Layout */
+    .hub-container {
+      max-inline-size: 80rem;
+      margin-inline: auto;
+      padding: 2rem 1.5rem 3.5rem;
+    }
+
+    .hero {
+      text-align: center;
+      margin-block-end: 2.2rem;
+    }
+
+    .hero h1 {
+      margin: 0 0 0.5rem;
+      font-size: clamp(1.85rem, 1.3rem + 2.2vw, 2.85rem);
+      letter-spacing: -0.02em;
+    }
+
+    .hero-lede {
+      margin: 0 auto;
+      max-inline-size: 64ch;
+      color: var(--dim);
+      font-size: clamp(1rem, 0.92rem + 0.35vw, 1.2rem);
+    }
+
+    .badge-row {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.55rem;
+      margin-block-start: 0.95rem;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 0.28rem 0.85rem;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--acc-gold);
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+    }
+
+    /* Interactive Stage Dock (for inline experience switching inside the Hub) */
+    .stage-dock {
+      margin-block-end: 2.2rem;
+      background: var(--card);
+      border: 2px solid var(--acc-cyan);
+      border-radius: 1rem;
+      overflow: hidden;
+      box-shadow: 0 18px 44px rgba(0, 0, 0, 0.55);
+    }
+
+    .stage-dock[hidden] {
+      display: none;
+    }
+
+    .stage-dock-bar {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.75rem 1.15rem;
+      background: #0b1226;
+      border-block-end: 1px solid var(--line);
+    }
+
+    .stage-dock-title {
+      font-weight: 800;
+      font-size: 1rem;
+      color: var(--acc-cyan);
+    }
+
+    .stage-dock-actions {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    .stage-frame {
+      display: block;
+      inline-size: 100%;
+      block-size: min(78dvh, 48rem);
+      border: 0;
+      background: #040711;
+    }
+
+    /* 6-Experience Grid */
+    .section-heading {
+      font-size: clamp(1.2rem, 1.05rem + 0.6vw, 1.5rem);
+      margin: 0 0 1rem;
+      color: var(--ink);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-block-end: 1px solid var(--line);
+      padding-block-end: 0.45rem;
+    }
+
+    .exp-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(21rem, 1fr));
+      gap: 1.15rem;
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .exp-card {
+      background: var(--card);
+      border: 1.5px solid var(--line);
+      border-radius: 1rem;
+      padding: 1.35rem;
+      display: flex;
+      flex-direction: column;
+      transition: border-color 0.15s ease, transform 0.15s ease;
+    }
+
+    .exp-card:hover {
+      border-color: var(--acc-cyan);
+    }
+
+    .exp-card.featured {
+      border-color: var(--acc-gold);
+      background: linear-gradient(180deg, rgba(22, 34, 66, 0.95) 0%, rgba(16, 24, 48, 0.95) 100%);
+    }
+
+    .exp-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-block-end: 0.55rem;
+    }
+
+    .exp-icon {
+      font-size: 2.1rem;
+      line-height: 1;
+    }
+
+    .exp-pill {
+      font-size: 0.74rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 0.2rem 0.6rem;
+      border-radius: 999px;
+      background: rgba(56, 189, 248, 0.14);
+      color: var(--acc-cyan);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+    }
+
+    .exp-card h3 {
+      margin: 0 0 0.25rem;
+      font-size: 1.3rem;
+    }
+
+    .exp-tag {
+      margin: 0 0 0.65rem;
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: var(--acc-gold);
+    }
+
+    .exp-desc {
+      margin: 0 0 0.9rem;
+      font-size: 0.94rem;
+      color: var(--dim);
+    }
+
+    .exp-tech {
+      margin: auto 0 1rem;
+      padding-block-start: 0.5rem;
+      font-size: 0.8rem;
+      color: #94a3b8;
+      border-block-start: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .exp-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.35rem;
+      min-block-size: 2.45rem;
+      padding: 0.5rem 1.05rem;
+      border-radius: 999px;
+      border: 1.5px solid transparent;
+      font-size: 0.9rem;
+      font-weight: 800;
+      text-decoration: none;
+      cursor: pointer;
+    }
+
+    .btn-gold {
+      background: var(--acc-gold);
+      color: #111827;
+    }
+
+    .btn-cyan {
+      background: var(--acc-cyan);
+      color: #061326;
+    }
+
+    .btn-green {
+      background: var(--acc-green);
+      color: #072112;
+    }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--ink);
+      border-color: var(--line);
+    }
+
+    .btn-ghost:hover {
+      border-color: var(--acc-cyan);
+      color: var(--acc-cyan);
+    }
+
+    footer {
+      margin-block-start: 3rem;
+      padding-block-start: 1.5rem;
+      border-block-start: 1px solid var(--line);
+      text-align: center;
+      color: var(--dim);
+      font-size: 0.88rem;
+    }
+
+    footer a {
+      color: var(--acc-gold);
+    }
+
+    @media (forced-colors: active) {
+      .exp-card,
+      .btn,
+      .site-menu a[aria-current="page"] {
+        border: 2px solid ButtonText;
+      }
+    }
+  </style>
 </head>
 <body>
-<header>
-  <h1>&#127756; Spatial Sequencers</h1>
-  <p class="lede">Three ways to <strong>hear</strong> Earth data &mdash; one planet, three instruments.</p>
-  <span class="badge">NASA SPACE APPS CHALLENGE 2026 &middot; SEATTLE</span>
-</header>
+  <a href="#hub-main" class="skip-link visually-hidden">Skip to experiences</a>
 
-<main class="grid">
-  <section class="card" aria-labelledby="pyroHead">
-    <div class="icon" aria-hidden="true">&#128293;</div>
-    <h2 id="pyroHead">PyroSync Observatory</h2>
-    <p class="tag">26-Year Fire-Weather &amp; H3 Hex Observatory</p>
-    <p>An interactive spatial audio-visual sequencer built on NASA POWER meteorology, EONET outbreaks, FIRMS fire detections, and Central Iowa MODIS H3 hexagons &mdash; hear harmonic tension shift from consonance into dissonance as anomalies depart from the 1991&ndash;2020 norm.</p>
-    <p class="tech">NASA FIRMS &amp; POWER &middot; D3 &middot; Tone.js &middot; d3-audio &middot; H3</p>
-    <a class="btn" href="./pyrosync/">Open PyroSync &rarr;</a>
-  </section>
+  <header class="hub-header is-wide">
+    <div class="hub-header-inner">
+      <a class="hub-brand" href="./">
+        <span aria-hidden="true">🪐</span>
+        <span>Spatial Sequencers Hub</span>
+      </a>
 
-  <section class="card featured" aria-labelledby="flybyHead">
-    <div class="icon" aria-hidden="true">&#128640;</div>
-    <h2 id="flybyHead">Combined Spaceship Flyby</h2>
-    <p class="tag">3D Fire Flight &times; PyroSync Sound Landscape</p>
-    <p>Pilot or tour a spacecraft around a 3D Earth uniting both soundscapes: continuous detuned thermal violin, stereo hotspot proximity bells, and spoken region narration combined with PyroSync harmonic tension chords, Euclidean wind-ember pulses, 26-year spiral towers, and Iowa H3 hex plucks.</p>
-    <p class="tech">Three.js &middot; Web Audio Synth &amp; Mixer &middot; Speech Synthesis &middot; H3</p>
-    <a class="btn cyan" href="./spaceship-flyby/">Launch Spaceship Flyby &rarr;</a>
-  </section>
+      <nav class="site-nav" aria-label="Experiences">
+        <button
+          class="menu-button"
+          type="button"
+          popovertarget="site-menu"
+          popovertargetaction="toggle"
+          aria-controls="site-menu"
+        >
+          <span aria-hidden="true">☰</span>
+          <span>Experiences</span>
+        </button>
 
-  <section class="card" aria-labelledby="jukeHead">
-    <div class="icon" aria-hidden="true">&#127925;</div>
-    <h2 id="jukeHead">Space Jukebox</h2>
-    <p class="tag">Hear the Planet Changing</p>
-    <p>NASA temperature and CO&#8322; records turned into melody &mdash; 146 years of warming as one rising violin line. Designed audio-first for blind and low-vision listeners: spoken guides, a home tone, and full keyboard control. Eyes optional.</p>
-    <p class="tech">NASA GISTEMP &middot; NOAA Mauna Loa &middot; Web Audio</p>
-    <a class="btn green" href="./space-jukebox/">Listen to the Jukebox &rarr;</a>
-  </section>
-</main>
+        <ul id="site-menu" class="site-menu" role="list">
+          <li><a href="./" data-exp="hub" aria-current="page">🪐 All Experiences</a></li>
+          <li><a href="./pyrosync/#spiral" data-exp="spiral">🌀 Wildfire Spiral</a></li>
+          <li><a href="./pyrosync/#iowa-map" data-exp="iowa-map">⬡ Iowa Hex Map</a></li>
+          <li><a href="./spaceship-flyby/" data-exp="combined-flyby">🚀 Combined Flyby</a></li>
+          <li><a href="./pyrosync/#flyby" data-exp="pyrosat-flyby">🛰️ PyroSat-1 3D</a></li>
+          <li><a href="./space-jukebox/" data-exp="space-jukebox">🎵 Space Jukebox</a></li>
+          <li><a href="./space-jukebox/fly.html" data-exp="fire-flight">🔥 3D Fire Flight</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
 
-<footer>
-  <p>Team workspace: <a href="https://github.com/dmuldrew/spatial_sequencers">github.com/dmuldrew/spatial_sequencers</a> &middot; <a href="https://github.com/lanly-dev/spatial_sequencers">lanly-dev/spatial_sequencers</a><br>
-  Built in one weekend at F5 Tower, Seattle &mdash; Space Apps Challenge 2026.</p>
-</footer>
+  <main id="hub-main" tabindex="-1" class="hub-container">
+    <div class="hero">
+      <h1>🪐 Spatial Sequencers — Experience Hub</h1>
+      <p class="hero-lede">
+        One centralized launchpad for all <strong>six visual &amp; auditory Earth-science experiences</strong> — from 26-year wildfire harmonic spirals and MODIS H3 hexagons to 3D spacecraft flybys and blind-accessible climate sonification.
+      </p>
+      <div class="badge-row">
+        <span class="badge">NASA SPACE APPS CHALLENGE 2026 · SEATTLE</span>
+        <span class="badge">6 INTERACTIVE EXPERIENCES</span>
+      </div>
+    </div>
+
+    <!-- Expandable In-Hub Stage Dock -->
+    <section id="hub-stage-dock" class="stage-dock" aria-labelledby="dock-title" hidden>
+      <div class="stage-dock-bar">
+        <span id="dock-title" class="stage-dock-title">Active Experience Preview</span>
+        <div class="stage-dock-actions">
+          <a id="dock-open-full" class="btn btn-cyan" href="./pyrosync/">Open Full Screen ↗</a>
+          <button type="button" id="dock-close-btn" class="btn btn-ghost">✕ Close Dock</button>
+        </div>
+      </div>
+      <iframe id="dock-iframe" class="stage-frame" title="Embedded Spatial Sequencers experience stage"></iframe>
+    </section>
+
+    <h2 class="section-heading">
+      <span>Choose an Experience</span>
+      <span style="font-size: 0.82rem; color: var(--dim); font-weight: 600;">Launch full page or preview directly in the Hub stage</span>
+    </h2>
+
+    <ul class="exp-grid" role="list">
+      <!-- 1. Combined Spaceship Flyby -->
+      <li class="exp-card featured">
+        <div class="exp-top">
+          <span class="exp-icon" aria-hidden="true">🚀</span>
+          <span class="exp-pill">Combined Soundscape</span>
+        </div>
+        <h3>Combined Spaceship Flyby</h3>
+        <p class="exp-tag">3D Fire Flight × PyroSync Observatory</p>
+        <p class="exp-desc">
+          Pilot or tour a spacecraft around a 3D Earth uniting both sound landscapes: continuous detuned thermal violin, stereo hotspot proximity bells, and spoken region narration combined with PyroSync harmonic tension chords, Euclidean wind rhythms, 26-year spiral towers, and Iowa H3 hex plucks.
+        </p>
+        <p class="exp-tech">Three.js · 5-Layer Web Audio Mixer · Speech Synthesis · H3 &amp; FIRMS</p>
+        <div class="exp-actions">
+          <a class="btn btn-cyan" href="./spaceship-flyby/">Launch Combined Flyby →</a>
+          <button type="button" class="btn btn-ghost" data-preview-url="./spaceship-flyby/" data-preview-title="Combined Spaceship Flyby">Preview in Hub</button>
+        </div>
+      </li>
+
+      <!-- 2. 26-Year Wildfire Spiral -->
+      <li class="exp-card">
+        <div class="exp-top">
+          <span class="exp-icon" aria-hidden="true">🌀</span>
+          <span class="exp-pill">PyroSync Observatory</span>
+        </div>
+        <h3>26-Year Wildfire Spiral</h3>
+        <p class="exp-tag">Harmonic Tension &amp; 3D Globe Locator</p>
+        <p class="exp-desc">
+          Unrolls 309 monthly steps (2001–2026) benchmarked against the 1991–2020 NASA POWER seasonal normal across six global biomes. As dryness and fire danger depart from norm (+σ), <code>d3-audio</code> shifts chords from warm C-major consonance into tritone dissonance.
+        </p>
+        <p class="exp-tech">NASA POWER v2 · EONET v3 · FIRMS MODIS · D3.js · Tone.js · d3-audio</p>
+        <div class="exp-actions">
+          <a class="btn btn-gold" href="./pyrosync/#spiral">Open Wildfire Spiral →</a>
+          <button type="button" class="btn btn-ghost" data-preview-url="./pyrosync/#spiral" data-preview-title="26-Year Wildfire Spiral">Preview in Hub</button>
+        </div>
+      </li>
+
+      <!-- 3. Central Iowa MODIS Hex Map -->
+      <li class="exp-card">
+        <div class="exp-top">
+          <span class="exp-icon" aria-hidden="true">⬡</span>
+          <span class="exp-pill">Earth Atlas · H3</span>
+        </div>
+        <h3>Central Iowa MODIS Hex Map</h3>
+        <p class="exp-tag">Surface Temperature Meets Vegetation (NDVI)</p>
+        <p class="exp-desc">
+          Explore 7,443 H3 hexagons across a 180 × 120 mile Central Iowa study area prepared with <code>raster_h3</code>. MOD11A2 daytime land surface temperature (°C) drives hue from green to brown while MOD13Q1 NDVI controls color saturation.
+        </p>
+        <p class="exp-tech">MODIS Terra · H3 v4 · Leaflet · raster_h3 Pipeline</p>
+        <div class="exp-actions">
+          <a class="btn btn-gold" href="./pyrosync/#iowa-map">Open in PyroSync →</a>
+          <a class="btn btn-ghost" href="./pyrosync/midwest/map.html">Standalone Map ↗</a>
+          <button type="button" class="btn btn-ghost" data-preview-url="./pyrosync/midwest/map.html" data-preview-title="Central Iowa MODIS Hex Map">Preview in Hub</button>
+        </div>
+      </li>
+
+      <!-- 4. PyroSat-1 6-DOF Orbital Flyby -->
+      <li class="exp-card">
+        <div class="exp-top">
+          <span class="exp-icon" aria-hidden="true">🛰️</span>
+          <span class="exp-pill">PyroSync 3D Deck</span>
+        </div>
+        <h3>PyroSat-1 Orbital Flyby (3D)</h3>
+        <p class="exp-tag">6-DOF Spacecraft &amp; Planetary Hex Scanner</p>
+        <p class="exp-desc">
+          Full flight-deck simulation inside PyroSync with manual thrusters (WASD / Q / E / Shift Boost), autopilot biome slingshots, H3 geodesic survey grids, 3D extruded MODIS fire columns, and synced 2001–2026 spiral towers.
+        </p>
+        <p class="exp-tech">Three.js · H3 Res-2/3/7 · Tone.js Spatial Scanner</p>
+        <div class="exp-actions">
+          <a class="btn btn-cyan" href="./pyrosync/#flyby">Open PyroSat-1 Deck →</a>
+          <button type="button" class="btn btn-ghost" data-preview-url="./pyrosync/#flyby" data-preview-title="PyroSat-1 Orbital Flyby (3D)">Preview in Hub</button>
+        </div>
+      </li>
+
+      <!-- 5. Space Jukebox (2D Accessible Player) -->
+      <li class="exp-card">
+        <div class="exp-top">
+          <span class="exp-icon" aria-hidden="true">🎵</span>
+          <span class="exp-pill">Audio-First · Accessible</span>
+        </div>
+        <h3>Space Jukebox (2D Player)</h3>
+        <p class="exp-tag">Hear 146 Years of Planetary Change</p>
+        <p class="exp-desc">
+          Turns NASA GISS global temperature anomalies (1880–2025) and NOAA Mauna Loa CO₂ (1959–2025) into continuous violin and pentatonic pluck melodies. Built for blind and low-vision listeners with spoken guides, a home tone, and sound-first mode.
+        </p>
+        <p class="exp-tech">NASA GISTEMP v4 · NOAA Mauna Loa · Web Audio · Speech Synthesis</p>
+        <div class="exp-actions">
+          <a class="btn btn-green" href="./space-jukebox/">Open Space Jukebox →</a>
+          <button type="button" class="btn btn-ghost" data-preview-url="./space-jukebox/" data-preview-title="Space Jukebox (2D Player)">Preview in Hub</button>
+        </div>
+      </li>
+
+      <!-- 6. Space Jukebox — 3D Fire Flight -->
+      <li class="exp-card">
+        <div class="exp-top">
+          <span class="exp-icon" aria-hidden="true">🔥</span>
+          <span class="exp-pill">Space Jukebox 3D</span>
+        </div>
+        <h3>3D Fire Flight</h3>
+        <p class="exp-tag">The Ship Is the Playhead, the Map Is the Score</p>
+        <p class="exp-desc">
+          An auto-piloted tour of six global fire regions over a 1.5° Natural Earth dot globe with 330 NASA FIRMS hotspots. Continuous sawtooth pitch tracks nearby fire power while spoken narration announces each biome eyes-closed.
+        </p>
+        <p class="exp-tech">Three.js · Web Audio Sawtooth &amp; Bell Pings · Speech Synthesis</p>
+        <div class="exp-actions">
+          <a class="btn btn-green" href="./space-jukebox/fly.html">Open 3D Fire Flight →</a>
+          <button type="button" class="btn btn-ghost" data-preview-url="./space-jukebox/fly.html" data-preview-title="Space Jukebox — 3D Fire Flight">Preview in Hub</button>
+        </div>
+      </li>
+    </ul>
+
+    <footer>
+      <p>
+        Team Workspace: <a href="https://github.com/dmuldrew/spatial_sequencers">github.com/dmuldrew/spatial_sequencers</a> ·
+        Built for the 2026 NASA International Space Apps Challenge (Seattle).
+      </p>
+    </footer>
+  </main>
+
+  <script type="module">
+    import './pyrosync/js/hub-nav.js';
+
+    // Redirect legacy PyroSync hash links (#spiral, #iowa-map, #flyby) if opened on root /
+    const legacyHashes = new Set(['#spiral', '#iowa-map', '#flyby', '#tab-spiral', '#tab-iowa', '#tab-flyby']);
+    if (legacyHashes.has(window.location.hash)) {
+      window.location.replace(`./pyrosync/${window.location.hash}`);
+    }
+
+    // Interactive Hub Stage Dock preview buttons
+    const dock = document.getElementById('hub-stage-dock');
+    const iframe = document.getElementById('dock-iframe');
+    const titleEl = document.getElementById('dock-title');
+    const openFull = document.getElementById('dock-open-full');
+    const closeBtn = document.getElementById('dock-close-btn');
+
+    document.querySelectorAll('[data-preview-url]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const url = btn.dataset.previewUrl;
+        const title = btn.dataset.previewTitle;
+        titleEl.textContent = `Stage Preview: ${title}`;
+        openFull.href = url;
+        iframe.src = url;
+        dock.hidden = false;
+        dock.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    });
+
+    closeBtn.addEventListener('click', () => {
+      dock.hidden = true;
+      iframe.src = 'about:blank';
+    });
+  </script>
 </body>
 </html>

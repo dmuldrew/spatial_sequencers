@@ -79,6 +79,7 @@ REQUIRED_FILES=(
   "index.html"
   "styles.css"
   "js/app.js"
+  "js/hub-nav.js"
   "js/flyby.js"
   "js/enable-audio.js"
   "data/fire_weather_data.json"

@@ -14,14 +14,39 @@
 <body>
   <a href="#main-heading" class="skip-link visually-hidden">Skip to main content</a>
 
+  <header class="hub-header is-wide">
+    <div class="hub-header-inner">
+      <a class="hub-brand" href="../">
+        <span aria-hidden="true">🪐</span>
+        <span>Spatial Sequencers Hub</span>
+      </a>
+
+      <nav class="site-nav" aria-label="Experiences">
+        <button
+          class="menu-button"
+          type="button"
+          popovertarget="site-menu"
+          popovertargetaction="toggle"
+          aria-controls="site-menu"
+        >
+          <span aria-hidden="true">☰</span>
+          <span>Experiences</span>
+        </button>
+
+        <ul id="site-menu" class="site-menu" role="list">
+          <li><a href="../" data-exp="hub">🪐 All Experiences</a></li>
+          <li><a href="#spiral" data-exp="spiral" aria-current="page">🌀 Wildfire Spiral</a></li>
+          <li><a href="#iowa-map" data-exp="iowa-map">⬡ Iowa Hex Map</a></li>
+          <li><a href="../spaceship-flyby/" data-exp="combined-flyby">🚀 Combined Flyby</a></li>
+          <li><a href="#flyby" data-exp="pyrosat-flyby">🛰️ PyroSat-1 3D</a></li>
+          <li><a href="../space-jukebox/" data-exp="space-jukebox">🎵 Space Jukebox</a></li>
+          <li><a href="../space-jukebox/fly.html" data-exp="fire-flight">🔥 3D Fire Flight</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
   <div class="container">
-    <nav class="website-choice-bar" aria-label="Website choices">
-      <span class="website-choice-label">🌐 Website Choices:</span>
-      <a class="website-choice-pill" href="./hub/">🪐 All Websites Hub</a>
-      <a class="website-choice-pill" href="./" aria-current="page">🔥 PyroSync Observatory</a>
-      <a class="website-choice-pill is-highlight" href="./spaceship-flyby/">🚀 Combined Spaceship Flyby</a>
-      <a class="website-choice-pill" href="./space-jukebox/">🎵 Space Jukebox</a>
-    </nav>
 
     <header class="site-header">
       <div>
@@ -445,6 +470,7 @@
   </div>
 
   <script src="./js/enable-audio.js"></script>
+  <script type="module" src="./js/hub-nav.js"></script>
   <script type="module" src="./js/app.js"></script>
 </body>
 </html>

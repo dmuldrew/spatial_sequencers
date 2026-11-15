@@ -1379,6 +1379,7 @@ function activatePageTab(tabId, { focusTab = false, updateHash = true } = {}) {
     else if (targetTab.id === 'tab-flyby') hash = '#flyby';
     window.history.replaceState(null, '', hash);
   }
+  window.dispatchEvent(new CustomEvent('pyrosync:tabchange'));
 }
 
 function wirePageTabs() {
