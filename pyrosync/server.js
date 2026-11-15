@@ -28,6 +28,12 @@ const VENDOR_ROUTES = {
   '/vendor/Tone.js': path.join(__dirname, 'node_modules/tone/build/Tone.js'),
   '/vendor/d3-audio.js': path.join(__dirname, 'node_modules/d3-audio/dist/d3-audio.js'),
   '/vendor/three.module.min.js': path.join(__dirname, 'node_modules/three/build/three.module.min.js'),
+  '/vendor/arrow.min.js': path.join(__dirname, 'node_modules/apache-arrow/Arrow.esnext.min.js'),
+  // MapLibre's main module loads its worker from the same directory.
+  '/vendor/maplibre/maplibre-gl.mjs': path.join(__dirname, 'node_modules/maplibre-gl/dist/maplibre-gl.mjs'),
+  '/vendor/maplibre/maplibre-gl-worker.mjs': path.join(__dirname, 'node_modules/maplibre-gl/dist/maplibre-gl-worker.mjs'),
+  '/vendor/maplibre/maplibre-gl.css': path.join(__dirname, 'node_modules/maplibre-gl/dist/maplibre-gl.css'),
+  '/vendor/pmtiles.js': path.join(__dirname, 'node_modules/pmtiles/dist/pmtiles.js'),
   '/vendor/topojson-client.min.js': path.join(__dirname, 'node_modules/topojson-client/dist/topojson-client.min.js'),
   '/vendor/countries-110m.json': path.join(__dirname, 'node_modules/world-atlas/countries-110m.json')
 };
@@ -50,8 +56,32 @@ function serveFile(filePath, res) {
       res.end(err.code === 'ENOENT' ? '404 Not Found' : '500 Internal Server Error');
       return;
     }
+    // Single byte ranges (HTTP 206), as PMTiles readers fetch tiles with Range requests.
+    const range = res.req?.headers?.range;
+    const match = range && /^bytes=(\d*)-(\d*)$/.exec(range.trim());
+    if (match && (match[1] || match[2])) {
+      const size = data.length;
+      let start = match[1] ? Number(match[1]) : Math.max(0, size - Number(match[2]));
+      let end = match[1] && match[2] ? Math.min(Number(match[2]), size - 1) : size - 1;
+      if (start >= size || start > end) {
+        res.writeHead(416, { 'Content-Range': `bytes */${size}` });
+        res.end();
+        return;
+      }
+      res.writeHead(206, {
+        'Content-Type': contentType,
+        'Content-Range': `bytes ${start}-${end}/${size}`,
+        'Content-Length': end - start + 1,
+        'Accept-Ranges': 'bytes',
+        'Cache-Control': 'no-cache'
+      });
+      res.end(data.subarray(start, end + 1));
+      return;
+    }
     res.writeHead(200, {
       'Content-Type': contentType,
+      'Content-Length': data.length,
+      'Accept-Ranges': 'bytes',
       'Cache-Control': 'no-cache'
     });
     res.end(data);

@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Global Fire History · H3 Map</title>
+    <link rel="stylesheet" href="../vendor/maplibre/maplibre-gl.css">
+    <link rel="stylesheet" href="map.css">
+  </head>
+  <body>
+    <header class="gf-header">
+      <strong>🌍 Global Fire History</strong>
+      <nav aria-label="Experiences">
+        <a href="../../">🪐 All Experiences Hub</a>
+        <a href="../#flyby">🚀 Orbital Flyby</a>
+        <a href="https://firms.modaps.eosdis.nasa.gov/" target="_blank" rel="noopener">NASA FIRMS ↗</a>
+      </nav>
+    </header>
+
+    <div class="gf-layout">
+      <aside class="gf-panel" aria-label="Map controls and details">
+        <p class="gf-eyebrow">NASA FIRMS MODIS × H3</p>
+        <h1>Where the world burns</h1>
+        <p id="gf-period" class="gf-intro">Vegetation-fire detections on a hexagonal grid. Hexagons get finer as you zoom.</p>
+
+        <fieldset class="gf-modes">
+          <legend>Colour hexagons by</legend>
+          <label><input type="radio" name="gf-mode" value="density" checked> Fire density</label>
+          <label><input type="radio" name="gf-mode" value="trend"> Trend (last vs first decade)</label>
+          <label><input type="radio" name="gf-mode" value="season"> Peak fire month</label>
+        </fieldset>
+
+        <div class="gf-row">
+          <button type="button" id="gf-projection" class="gf-btn" aria-pressed="true">🌐 Globe view</button>
+          <button type="button" id="gf-reset" class="gf-btn">⟲ Reset view</button>
+        </div>
+
+        <section aria-labelledby="gf-legend-title">
+          <h2 id="gf-legend-title" class="gf-h2">Legend</h2>
+          <div id="gf-legend" class="gf-legend"></div>
+          <p id="gf-legend-note" class="gf-note"></p>
+        </section>
+
+        <section aria-labelledby="gf-details-title">
+          <h2 id="gf-details-title" class="gf-h2">Selected hexagon</h2>
+          <div id="gf-details" class="gf-details" aria-live="polite">Click a hexagon to see its fire history.</div>
+        </section>
+
+        <p id="gf-status" class="gf-note" role="status">Loading map…</p>
+      </aside>
+
+      <div class="gf-map-wrap">
+        <div id="gf-map" class="gf-map" role="region" aria-label="Global fire history map. Drag to pan, scroll or use plus and minus to zoom, click a hexagon for details."></div>
+      </div>
+    </div>
+
+    <script src="../vendor/pmtiles.js"></script>
+    <script src="../vendor/topojson-client.min.js"></script>
+    <script type="module" src="map.js"></script>
+  </body>
+</html>

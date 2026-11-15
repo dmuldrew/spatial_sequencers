@@ -1342,6 +1342,7 @@
 
     /* ============================== Flight & Footprint Simulation ============================== */
     let flying = false;
+    let flightTime = 0; // advances only while flying, including the selected speed
     let tourMode = true; // true = Catmull-Rom guided tour, false = manual/waypoint steer
     let activeWaypoint = 'tour';
     let u = 0;
@@ -1411,9 +1412,13 @@
       const nowMs = performance.now();
 
       // Advance ship position
+      if (flying) flightTime += dt * speedMul;
       let aheadPos;
-      if (tourMode && activeWaypoint === 'tour') {
-        if (flying) u = (u + (dt * speedMul) / LOOP_SECONDS) % 1;
+      if (!flying) {
+        // Keep the ship and its heading fixed in every flight mode.
+        aheadPos = shipPos.clone().add(shipFwd);
+      } else if (tourMode && activeWaypoint === 'tour') {
+        u = (u + (dt * speedMul) / LOOP_SECONDS) % 1;
         const p = tourCurve.getPointAt(u);
         if (p.length() < 1.17) p.setLength(1.17);
         aheadPos = tourCurve.getPointAt((u + 0.012) % 1);
@@ -1430,7 +1435,7 @@
           const target = activeWaypoint === 'iowa'
             ? IOWA_WAYPOINT
             : (BIOMES.find((b) => b.id === activeWaypoint) || BIOMES[0]);
-          const orbitAng = t * 0.45 * speedMul;
+          const orbitAng = flightTime * 0.45;
           const targetLat = target.lat + Math.sin(orbitAng) * 5.2;
           const targetLon = target.lon + Math.cos(orbitAng) * 6.8;
           manualLat += (targetLat - manualLat) * Math.min(1, dt * 2.4);
@@ -1440,7 +1445,7 @@
           shipPos.copy(latLonToVec3(manualLat, manualLon, EARTH_R + manualAlt));
           aheadPos = latLonToVec3(nextLat, nextLon, EARTH_R + manualAlt);
         } else {
-          const stepDeg = (flying ? 12 : 4) * speedMul * dt;
+          const stepDeg = 12 * speedMul * dt;
           manualLat = clamp(manualLat + Math.sin(manualHeading) * stepDeg, -78, 78);
           manualLon = ((manualLon + Math.cos(manualHeading) * stepDeg + 540) % 360) - 180;
           shipPos.copy(latLonToVec3(manualLat, manualLon, EARTH_R + manualAlt));
@@ -1471,12 +1476,14 @@
 
       // Update camera (Chase, Cockpit, or Orbit)
       const radial = shipPos.clone().normalize();
+      // Iowa's local tour looks at the surface beneath the ship.
+      const groundBelow = activeWaypoint === 'iowa' ? radial.clone().multiplyScalar(EARTH_R) : null;
       if (camMode === 'cockpit') {
         ship.visible = false;
         const eye = shipPos.clone().addScaledVector(radial, 0.02);
-        const look = aheadPos.clone().addScaledVector(radial, -0.09);
+        const look = groundBelow || aheadPos.clone().addScaledVector(radial, -0.09);
         camera.position.copy(eye);
-        camera.up.copy(radial);
+        camera.up.copy(groundBelow ? shipFwd : radial);
         camera.lookAt(look);
       } else if (camMode === 'orbit') {
         ship.visible = true;
@@ -1491,7 +1498,7 @@
         camTargetPos.lerp(desired, 0.06);
         camera.position.copy(camTargetPos);
         camera.up.lerp(radial, 0.08);
-        camera.lookAt(shipPos.clone().addScaledVector(shipFwd, 0.65));
+        camera.lookAt(groundBelow || shipPos.clone().addScaledVector(shipFwd, 0.65));
       }
 
       // Scan Earth footprint beneath the spacecraft
