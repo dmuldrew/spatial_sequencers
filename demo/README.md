@@ -18,4 +18,4 @@ to 7 slides — public link, no login required.
   team icon.
 
 Live project: <https://dmuldrew.github.io/spatial_sequencers/> ·
-Original repo: <https://github.com/dmuldrew/spatial_sequencers>
+Project repository: <https://github.com/dmuldrew/spatial_sequencers>
