@@ -77,10 +77,10 @@ def paired_bands(folder, product, date, tile, band, quality_band, bounds, source
     return raw, quality, grid, crs
 
 
-def temperature(folder, tile, bounds, source_items):
+def temperature(folder, tile, bounds, source_items, dates):
     parts = [
         paired_bands(folder, 'MOD11A2', date, tile, 'LST_Day_1km', 'QC_Day', bounds, source_items)
-        for date in TEMPERATURE_DATES
+        for date in dates
     ]
     raw, _, grid, crs = parts[0]
     sums = np.zeros(raw.shape, dtype=np.float64)
@@ -97,9 +97,9 @@ def temperature(folder, tile, bounds, source_items):
     return means, grid, crs
 
 
-def vegetation(folder, tile, bounds, source_items):
+def vegetation(folder, tile, bounds, source_items, dates):
     raw, quality, grid, crs = paired_bands(
-        folder, 'MOD13Q1', VEGETATION_DATE, tile, '250m_16_days_NDVI',
+        folder, 'MOD13Q1', dates[0], tile, '250m_16_days_NDVI',
         '250m_16_days_pixel_reliability', bounds, source_items,
     )
     # Reliability class 0 identifies good observations.
@@ -107,10 +107,9 @@ def vegetation(folder, tile, bounds, source_items):
     return np.where(valid, raw * 0.0001, np.nan), grid, crs
 
 
-def project_for_aggregation(raster, grid, crs, path):
+def project_for_aggregation(raster, grid, crs, path, target_crs):
     # raster_h3 v0.7.0 cannot read the MODIS sinusoidal CRS. Use a common
     # CONUS equal-area grid at each input's native pixel spacing.
-    target_crs = 'EPSG:5070'
     height, width = raster.shape
     bounds = array_bounds(height, width, grid)
     pixel_size = (abs(grid.a), abs(grid.e))
@@ -130,9 +129,9 @@ def project_for_aggregation(raster, grid, crs, path):
         )
 
 
-def accumulate(totals, path, bounds, resolution):
+def accumulate(totals, path, bounds, resolution, crs):
     rows = raster_h3.RasterH3ArrowStream(
-        path, resolution, crs='EPSG:5070', bbox=bounds, sampling='center',
+        path, resolution, crs=crs, bbox=bounds, sampling='center',
         columns=['h3_hex', 'sum', 'count'], strict_transforms=True,
     ).to_dict()
     for cell, value, count in zip(rows['h3_hex'], rows['sum'], rows['count'], strict=True):
@@ -140,7 +139,8 @@ def accumulate(totals, path, bounds, resolution):
         totals[cell] = previous_sum + value, previous_count + count
 
 
-def prepare(folder, bounds=None, tiles=TILES, *, allow_empty=False):
+def prepare(folder, bounds=None, tiles=TILES, *, allow_empty=False,
+            bands_by_tile=None, crs='EPSG:5070'):
     bounds = bounds or study_bounds()
     coarsest_pixel = max(item['resolutionMeters'] for item in INPUTS.values())
     resolution = max(index for index in range(11)
@@ -150,19 +150,23 @@ def prepare(folder, bounds=None, tiles=TILES, *, allow_empty=False):
     preparation_seconds = 0.0
     aggregation_seconds = 0.0
     with TemporaryDirectory(prefix='modis-h3-') as scratch:
-        for key, read in (('A1', temperature), ('A2', vegetation)):
+        for key, read, dates in (('A1', temperature, TEMPERATURE_DATES),
+                                 ('A2', vegetation, (VEGETATION_DATE,))):
             for tile in tiles:
+                tile_dates = bands_by_tile[tile][key] if bands_by_tile is not None else dates
+                if not tile_dates:
+                    continue
                 start = perf_counter()
                 try:
-                    raster, grid, crs = read(folder, tile, bounds, source_items)
+                    raster, grid, source_crs = read(folder, tile, bounds, source_items, tile_dates)
                 except rasterio.errors.WindowError:
                     continue
                 projected = Path(scratch) / f'{key}-{tile}.tif'
-                project_for_aggregation(raster, grid, crs, projected)
+                project_for_aggregation(raster, grid, source_crs, projected, crs)
                 preparation_seconds += perf_counter() - start
 
                 start = perf_counter()
-                accumulate(observations[key], projected, bounds, resolution)
+                accumulate(observations[key], projected, bounds, resolution, crs)
                 aggregation_seconds += perf_counter() - start
     print(f'Crop, QA and reproject: {preparation_seconds:.2f}s; raster_h3: {aggregation_seconds:.2f}s')
     cell_ids = sorted(observations['A1'].keys() | observations['A2'].keys())

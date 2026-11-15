@@ -10,6 +10,7 @@ export class MapView {
     );
     this.map = L.map(element, {
       preferCanvas: true,
+      dragging: false,
       scrollWheelZoom: false,
       zoomControl: false,
       doubleClickZoom: false,
@@ -21,14 +22,7 @@ export class MapView {
       maxBounds: this.bounds,
       maxBoundsViscosity: 1,
     }).setView(this.bounds.getCenter(), 8);
-    // Match the study box's projected aspect ratio to show the whole box
-    // at minimum zoom without adding a margin beyond the study area.
-    this.projectedSize = L.bounds(
-      this.map.project(this.bounds.getSouthWest(), 0),
-      this.map.project(this.bounds.getNorthEast(), 0),
-    ).getSize();
-    this.map.getContainer().parentElement.style.aspectRatio =
-      this.projectedSize.x / this.projectedSize.y;
+    this.setStudyBounds(bounds);
 
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxNativeZoom: 19,
@@ -41,6 +35,16 @@ export class MapView {
     this.fires = L.layerGroup().addTo(this.map);
     this.fireMarkers = new Map();
     this.map.on('moveend', onViewChange);
+  }
+
+  setStudyBounds(bounds) {
+    this.bounds = L.latLngBounds([bounds.south, bounds.west], [bounds.north, bounds.east]);
+    // Match the projected study box without adding margins at minimum zoom.
+    this.projectedSize = L.bounds(
+      this.map.project(this.bounds.getSouthWest(), 0),
+      this.map.project(this.bounds.getNorthEast(), 0),
+    ).getSize();
+    this.map.getContainer().style.aspectRatio = this.projectedSize.x / this.projectedSize.y;
   }
 
   setPanBounds(bounds, roaming) {
@@ -109,28 +113,44 @@ export class MapView {
     return this.map.distance([latitude, bounds.west], [latitude, bounds.east]) / 1609.344;
   }
 
-  renderFires(points) {
+  renderFires(points, minute = null, briefing) {
     const next = new Set(points);
-    for (const [point, marker] of this.fireMarkers) {
+    for (const [point, { marker }] of this.fireMarkers) {
       if (!next.has(point)) {
         this.fires.removeLayer(marker);
         this.fireMarkers.delete(point);
       }
     }
     for (const point of points) {
-      if (this.fireMarkers.has(point)) continue;
-      const description = document.createElement('div');
-      const time = `${point.time.slice(0, 2)}:${point.time.slice(2)} UTC`;
-      description.textContent = `MODIS ${point.satellite} · ${point.date} ${time} · ${point.power} MW · confidence ${point.confidence}%`;
+      const age = minute === null ? 0 : minute - point.minute;
+      const opacity = age < 360 ? 1 : age < 1440 ? 0.72 : 0.48;
+      const existing = this.fireMarkers.get(point);
+      if (existing) {
+        if (existing.opacity !== opacity) {
+          existing.marker.setStyle({ fillOpacity: opacity, opacity });
+          existing.opacity = opacity;
+        }
+        continue;
+      }
       const marker = L.circleMarker([point.latitude, point.longitude], {
         pane: 'hotspots',
         radius: 5,
         color: '#ffffff',
         weight: 2,
         fillColor: '#e00023',
-        fillOpacity: 1,
-      }).bindPopup(description, { autoPan: false }).addTo(this.fires);
-      this.fireMarkers.set(point, marker);
+        fillOpacity: opacity,
+        opacity,
+      }).bindPopup(() => {
+        const description = document.createElement('div');
+        description.className = 'hotspot-brief';
+        const header = document.createElement('strong');
+        const time = `${point.time.slice(0, 2)}:${point.time.slice(2)} UTC`;
+        header.textContent = `MODIS ${point.satellite} · ${point.date} ${time} · ${point.power} MW · confidence ${point.confidence}%`;
+        description.append(header);
+        briefing?.(description, point);
+        return description;
+      }, { autoPan: false, maxWidth: 360 }).addTo(this.fires);
+      this.fireMarkers.set(point, { marker, opacity });
     }
   }
 
@@ -144,7 +164,7 @@ export class MapView {
         weight: 0.4,
         fillColor: appearance.color,
         fillOpacity: appearance.missing ? 0.25 : 1,
-      }).bindPopup(() => popupFor(cell, appearance), { autoPan: false }).addTo(this.cells);
+      }).bindPopup(() => popupFor(cell), { autoPan: false }).addTo(this.cells);
     }
   }
 }

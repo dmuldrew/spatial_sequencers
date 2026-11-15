@@ -1,5 +1,6 @@
 """Read only the COG bytes needed by a MODIS block."""
 from concurrent.futures import ThreadPoolExecutor
+from datetime import date, timedelta
 from functools import lru_cache
 from hashlib import sha256
 from io import BytesIO
@@ -25,11 +26,25 @@ MAX_RAW_BYTES = 24_000_000
 MAX_CACHE_BYTES = 120_000_000
 HEADER_BYTES = 32_768
 SINUSOIDAL = CRS.from_proj4('+proj=sinu +R=6371007.181 +units=m +no_defs')
-BANDS = {
-    ('MOD11A2', 'A2024193'): ('LST_Day_1km', 'QC_Day'),
-    ('MOD11A2', 'A2024201'): ('LST_Day_1km', 'QC_Day'),
-    ('MOD13Q1', 'A2024193'): ('250m_16_days_NDVI', '250m_16_days_pixel_reliability'),
+PRODUCTS = {
+    'MOD11A2': ('A1', 'LST_Day_1km', 'QC_Day'),
+    'MOD13Q1': ('A2', '250m_16_days_NDVI', '250m_16_days_pixel_reliability'),
 }
+
+
+def composite_window(start):
+    jan1 = date(start.year, 1, 1)
+    first = jan1 + timedelta(days=(start - jan1).days // 16 * 16)
+    last = min(first + timedelta(days=15), date(start.year, 12, 31))
+    return first, last
+
+
+def composite_bands(first, last):
+    second = first + timedelta(days=8)
+    return {
+        *(('MOD11A2', day.strftime('A%Y%j')) for day in (first, second) if day <= last),
+        ('MOD13Q1', first.strftime('A%Y%j')),
+    }
 
 
 def retrieve(url, limit, byte_range=None, canceled=None):
@@ -113,27 +128,32 @@ class Archive:
                 path.unlink()
 
     @lru_cache(maxsize=96)
-    def catalog(self, bounds):
+    def catalog(self, bounds, first, last):
         query = urlencode({
             'collections': 'modis-11A2-061,modis-13Q1-061',
             'bbox': ','.join(map(str, bounds)),
-            'datetime': '2024-07-11/2024-07-20',
+            'datetime': f'{first}T00:00:00Z/{last}T23:59:59Z',
             'limit': 80,
         })
         return json.loads(retrieve(f'{CATALOG}?{query}', 1_000_000))['features']
 
-    def plan(self, bounds, canceled):
-        grouped = {}
-        for feature in self.catalog(bounds):
+    def plan(self, bounds, start, canceled):
+        first, last = composite_window(start)
+        wanted = composite_bands(first, last)
+        dates_by_tile = {}
+        assets = []
+        for feature in self.catalog(bounds, first, last):
             product, day, tile, *_ = feature['id'].split('.')
-            if (product, day) in BANDS:
-                grouped.setdefault(tile, {})[product, day] = feature
-        tiles = [tile for tile, products in grouped.items() if all(key in products for key in BANDS)]
-        assets = [
-            (feature['id'], band, feature['assets'][band]['href'])
-            for tile in tiles for key, feature in grouped[tile].items()
-            for band in BANDS[key]
-        ]
+            if (product, day) not in wanted:
+                continue
+            key, *bands = PRODUCTS[product]
+            if not all(band in feature['assets'] for band in bands):
+                continue
+            dates = dates_by_tile.setdefault(tile, {'A1': [], 'A2': []})[key]
+            if day in dates:
+                continue
+            dates.append(day)
+            assets.extend((feature['id'], band, feature['assets'][band]['href']) for band in bands)
         if len(assets) * HEADER_BYTES > 1_000_000:
             raise ValueError('This block has too many source rasters to plan safely.')
         projected = transform_bounds('EPSG:4326', SINUSOIDAL, *bounds, densify_pts=41)
@@ -143,7 +163,7 @@ class Archive:
         missing = sum(size for href, start, size in set(ranges) if not self.cached(href, start, size))
         if missing > MAX_RAW_BYTES:
             raise ValueError('This map block exceeds the 24 MB source-download limit.')
-        return tiles, sources, missing
+        return dates_by_tile, sources, missing
 
     def band_plan(self, asset, projected, canceled):
         item, band, href = asset

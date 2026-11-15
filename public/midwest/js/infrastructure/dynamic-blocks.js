@@ -39,7 +39,7 @@ export function extendManifest(manifest, coverage) {
       };
     }
   }
-  return { ...manifest, coverage, blocks, cacheKey: `${manifest.cacheKey}-dynamic-v1` };
+  return { ...manifest, coverage, blocks, dynamic: true, cacheKey: `${manifest.cacheKey}-dynamic-v1` };
 }
 
 export async function enableDynamicBlocks(manifest, signal) {
@@ -57,8 +57,46 @@ export async function enableDynamicBlocks(manifest, signal) {
   return manifest;
 }
 
-export async function planRemoteBlock(id, signal) {
-  const response = await fetch(new URL(`blocks/${id}/plan`, ENDPOINT), { signal });
+export function regionalManifest(manifest, bounds, date) {
+  const dx = (bounds.east - bounds.west) / 2;
+  const dy = (mercator(bounds.north) - mercator(bounds.south)) / 2;
+  const x0 = (bounds.east + bounds.west - dx) / 2;
+  const y0 = (mercator(bounds.north) + mercator(bounds.south) - dy) / 2;
+  const coverage = {
+    west: Math.max(-180, x0 - 4 * dx), east: Math.min(180, x0 + 5 * dx),
+    south: Math.max(-85, latitudeAt(y0 - 4 * dy)), north: Math.min(85, latitudeAt(y0 + 5 * dy)),
+  };
+  const blocks = {};
+  for (let x = -4; x <= 4; x += 1) {
+    for (let y = -4; y <= 4; y += 1) {
+      const west = Math.max(coverage.west, x0 + x * dx);
+      const east = Math.min(coverage.east, x0 + (x + 1) * dx);
+      const south = Math.max(coverage.south, latitudeAt(y0 + y * dy));
+      const north = Math.min(coverage.north, latitudeAt(y0 + (y + 1) * dy));
+      if (west >= east || south >= north) continue;
+      blocks[`${x}-${y}`] = { dynamic: true, custom: true, bytes: 1_000_000,
+        bounds: { west, south, east, north } };
+    }
+  }
+  return {
+    ...manifest, coverage, blocks, date,
+    cacheKey: `regional-v1:${Object.values(bounds).join(',')}:${date}`,
+    unavailable: !manifest.dynamic,
+  };
+}
+
+function blockURL(id, entry, date, suffix = '') {
+  const url = new URL(`blocks/${id}${suffix}`, ENDPOINT);
+  if (date) url.searchParams.set('date', date);
+  if (entry.custom) {
+    const { west, south, east, north } = entry.bounds;
+    url.searchParams.set('bounds', [west, south, east, north].map(value => value.toFixed(7)).join(','));
+  }
+  return url;
+}
+
+export async function planRemoteBlock(id, entry, date, signal) {
+  const response = await fetch(blockURL(id, entry, date, '/plan'), { signal });
   const { sourceBytes } = await responseJSON(response);
   if (!Number.isSafeInteger(sourceBytes) || sourceBytes < 0 || sourceBytes > MAX_RAW_BYTES) {
     throw new Error('Invalid MODIS download estimate.');
@@ -66,6 +104,8 @@ export async function planRemoteBlock(id, signal) {
   return sourceBytes;
 }
 
-export function fetchRemoteBlock(id, budget, signal) {
-  return fetch(new URL(`blocks/${id}?budget=${budget}`, ENDPOINT), { signal });
+export function fetchRemoteBlock(id, entry, date, budget, signal) {
+  const url = blockURL(id, entry, date);
+  url.searchParams.set('budget', budget);
+  return fetch(url, { signal });
 }

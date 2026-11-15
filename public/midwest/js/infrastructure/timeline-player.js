@@ -21,25 +21,28 @@ export class TimelinePlayer {
   }
 
   install(timeline) {
-    this.pause();
+    const sameWindow = this.timeline?.startTime === timeline.startTime
+      && this.timeline.lastMinute === timeline.lastMinute;
     this.timeline = timeline;
-    this.slider.max = timeline.lastMinute;
-    this.seek(timeline.lastMinute);
-  }
-
-  setAvailable(available) {
-    this.slider.disabled = this.replayButton.disabled = !available;
-    if (!available) this.pause();
-  }
-
-  showAll() {
-    this.pause();
-    if (this.timeline && this.minute !== this.timeline.lastMinute) {
-      this.seek(this.timeline.lastMinute);
+    if (!sameWindow) {
+      this.pause();
+      this.slider.max = timeline.lastMinute;
     }
+    this.slider.disabled = this.replayButton.disabled = false;
+    this.seek(sameWindow ? this.minute : timeline.lastMinute);
   }
 
-  seek(minute) {
+  clear() {
+    this.pause();
+    this.timeline = null;
+    this.slider.disabled = this.replayButton.disabled = true;
+    this.slider.max = this.slider.value = 0;
+    this.slider.removeAttribute('aria-valuetext');
+    this.clock.removeAttribute('datetime');
+    this.clock.textContent = '';
+  }
+
+  seek(minute, playback = false, previousMinute = this.minute) {
     if (!this.timeline) return;
     this.minute = Math.max(0, Math.min(this.timeline.lastMinute, minute));
     const time = timeAt(this.timeline, this.minute);
@@ -48,19 +51,19 @@ export class TimelinePlayer {
     this.slider.setAttribute('aria-valuetext', text);
     this.clock.dateTime = time.toISOString();
     this.clock.textContent = text;
-    this.onSeek();
+    this.onSeek({ playback, previousMinute });
   }
 
   replay() {
-    if (!this.timeline) return;
+    if (this.replayButton.disabled || !this.timeline) return;
     this.pause();
     this.onPlay();
-    this.seek(0);
+    this.seek(0, true, -1);
     const start = performance.now();
     const step = now => {
       const minute = Math.min(this.timeline.lastMinute,
         Math.floor((now - start) * MINUTES_PER_SECOND / 1000));
-      if (minute !== this.minute) this.seek(minute);
+      if (minute !== this.minute) this.seek(minute, true);
       if (minute < this.timeline.lastMinute) this.frame = requestAnimationFrame(step);
       else this.pause();
     };

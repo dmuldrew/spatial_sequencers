@@ -1,7 +1,10 @@
 """Serve bounded, date-specific MODIS/H3 blocks for the Docker map."""
 from collections import OrderedDict
+from datetime import date
+from hashlib import sha256
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -11,10 +14,12 @@ from urllib.parse import parse_qs, urlsplit
 
 import h3
 
-from midwest_archive import Archive, MAX_RAW_BYTES
+from midwest_archive import Archive, MAX_RAW_BYTES, composite_window
+from fire_context import lookup_context
 from prepare_midwest import latitude_at, mercator_y, prepare, study_bounds
 
 COVERAGE = {'west': -124.8, 'south': 24.5, 'east': -66.9, 'north': 49.3}
+DEFAULT_DATE = date(2024, 7, 11)
 BLOCK_ROUTE = re.compile(r'/blocks/(-?\d{1,2})-(-?\d{1,2})(/plan)?')
 JOB_ROUTE = re.compile(r'/cancel/([a-f0-9-]{36})')
 CACHE_ROOT = Path(os.environ.get('MIDWEST_CACHE', '/tmp/midwest-cache'))
@@ -44,7 +49,7 @@ def bounds_for(x, y):
 def expanded(bounds):
     # Include the entire source area for H3 cells that cross a block edge.
     west, south, east, north = bounds
-    return west - 0.08, south - 0.08, east + 0.08, north + 0.08
+    return max(-180, west - 0.08), max(-85, south - 0.08), min(180, east + 0.08), min(85, north + 0.08)
 
 
 def overlaps(cell, bounds):
@@ -57,9 +62,9 @@ def result_path(key):
     return RESULTS / f'{key}.json'
 
 
-def save_result(key, cells):
+def save_result(key, block_id, cells):
     path = result_path(key)
-    payload = json.dumps({'id': key, 'cells': cells}, separators=(',', ':')).encode()
+    payload = json.dumps({'id': block_id, 'cells': cells}, separators=(',', ':')).encode()
     if len(payload) > 1_000_000:
         raise ValueError('The prepared map block exceeds its size limit.')
     temp = path.with_suffix('.tmp')
@@ -71,18 +76,34 @@ def save_result(key, cells):
     return payload
 
 
-def plan_block(key, bounds, canceled):
+def parse_bounds(value, max_width=5, max_height=5):
+    west, south, east, north = map(float, value.split(','))
+    width = (east - west) * math.cos(math.radians((south + north) / 2))
+    if not (-180 <= west < east <= 180 and -85 <= south < north <= 85
+            and 0 < width <= max_width and north - south <= max_height):
+        raise ValueError('Invalid map data bounds.')
+    return west, south, east, north
+
+
+def request_date(options):
+    day = date.fromisoformat(options.get('date', [DEFAULT_DATE.isoformat()])[0])
+    if not date(2000, 2, 18) <= day <= date.today():
+        raise ValueError('Date is outside the MODIS observation period.')
+    return day
+
+
+def plan_block(key, bounds, start, canceled):
     if result_path(key).exists():
         return {'sourceBytes': 0}
-    tiles, sources, missing = ARCHIVE.plan(expanded(bounds), canceled)
-    PLANS[key] = (tiles, sources)
+    dates_by_tile, sources, missing = ARCHIVE.plan(expanded(bounds), start, canceled)
+    PLANS[key] = (dates_by_tile, sources)
     PLANS.move_to_end(key)
     if len(PLANS) > 24:
         PLANS.popitem(last=False)
     return {'sourceBytes': missing}
 
 
-def build_block(key, bounds, budget, canceled):
+def build_block(key, block_id, bounds, budget, canceled):
     path = result_path(key)
     if path.exists():
         path.touch()
@@ -90,16 +111,23 @@ def build_block(key, bounds, budget, canceled):
     plan = PLANS.get(key)
     if plan is None:
         raise ValueError('The download plan expired. Retry the map update.')
-    tiles, sources = plan
+    dates_by_tile, sources = plan
+    west, south, east, north = bounds
+    latitude, longitude = (south + north) / 2, (west + east) / 2
+    zone = min(60, math.floor((longitude + 180) / 6) + 1)
+    conus = (COVERAGE['west'] <= longitude <= COVERAGE['east']
+             and COVERAGE['south'] <= latitude <= COVERAGE['north'])
+    crs = 'EPSG:5070' if conus else f'EPSG:{(32600 if latitude >= 0 else 32700) + zone}'
     with TemporaryDirectory(prefix='roaming-modis-') as scratch:
         directory = Path(scratch)
         ARCHIVE.materialize(sources, directory, budget, canceled)
         if canceled.is_set():
             raise ValueError('Download canceled.')
-        data = prepare(directory, expanded(bounds), tiles, allow_empty=True)
+        data = prepare(directory, expanded(bounds), dates_by_tile, allow_empty=True,
+                       bands_by_tile=dates_by_tile, crs=crs)
     if canceled.is_set():
         raise ValueError('Download canceled.')
-    return save_result(key, [cell for cell in data['cells'] if overlaps(cell, bounds)])
+    return save_result(key, block_id, [cell for cell in data['cells'] if overlaps(cell, bounds)])
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -127,12 +155,19 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         url = urlsplit(self.path)
+        options = parse_qs(url.query)
         if url.path == '/config':
             return self.respond(200, {'coverage': COVERAGE})
+        if url.path in ('/fires', '/weather', '/perimeters', '/nearby'):
+            try:
+                bounds = parse_bounds(options['bounds'][0])
+                return self.respond(200, lookup_context(url.path, bounds, request_date(options)))
+            except (ValueError, KeyError, OSError) as error:
+                return self.respond(502, {'error': str(error) if isinstance(error, ValueError)
+                                          else 'The map context provider is unavailable.'})
         match = BLOCK_ROUTE.fullmatch(url.path)
         if not match:
             return self.respond(404, {'error': 'Unknown map endpoint.'})
-        options = parse_qs(url.query)
         job = options.get('job', [''])[0]
         if not re.fullmatch(r'[a-f0-9-]{36}', job):
             return self.respond(400, {'error': 'Missing map job identifier.'})
@@ -141,18 +176,23 @@ class Handler(BaseHTTPRequestHandler):
             JOBS[job] = canceled
         try:
             x, y = int(match[1]), int(match[2])
-            bounds = bounds_for(x, y)
-            key = f'{x}-{y}'
+            block_id = f'{x}-{y}'
+            requested = request_date(options)
+            custom = options.get('bounds', [None])[0]
+            bounds = parse_bounds(custom, 1.6, 1.3) if custom else bounds_for(x, y)
+            composite, _ = composite_window(requested)
+            key = block_id if custom is None and composite == DEFAULT_DATE else sha256(
+                f'{block_id}:{bounds}:{composite}'.encode()).hexdigest()
             with WORK:
                 if canceled.is_set():
                     raise ValueError('Download canceled.')
                 if match[3]:
-                    response = plan_block(key, bounds, canceled)
+                    response = plan_block(key, bounds, requested, canceled)
                 else:
                     budget = int(options.get('budget', ['0'])[0])
                     if not 0 <= budget <= MAX_RAW_BYTES:
                         raise ValueError('Invalid source download budget.')
-                    response = build_block(key, bounds, budget, canceled)
+                    response = build_block(key, block_id, bounds, budget, canceled)
             self.respond(200, response)
         except (ValueError, OSError, RuntimeError, KeyError) as error:
             self.respond(502, {'error': str(error) if isinstance(error, ValueError)

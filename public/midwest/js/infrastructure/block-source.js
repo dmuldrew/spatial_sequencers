@@ -90,7 +90,7 @@ export class BlockSource {
   async fetchBlock(id, signal, sourceBytes = 0) {
     const entry = this.manifest.blocks[id];
     const response = entry.dynamic
-      ? await fetchRemoteBlock(id, sourceBytes, signal)
+      ? await fetchRemoteBlock(id, entry, this.manifest.date, sourceBytes, signal)
       : await fetch(new URL(entry.url, MANIFEST), { signal, cache: 'no-store' });
     const block = await readJSON(response, entry.bytes);
     if (block.id !== id) throw new Error('The map block does not match the requested area.');
@@ -105,7 +105,8 @@ export class BlockSource {
     let remaining = PREVIEW_BYTES;
     for (const id of ids.slice(0, 2)) {
       try {
-        const cost = this.manifest.blocks[id].dynamic ? await planRemoteBlock(id, signal) : 0;
+        const entry = this.manifest.blocks[id];
+        const cost = entry.dynamic ? await planRemoteBlock(id, entry, this.manifest.date, signal) : 0;
         if (cost > remaining) continue;
         remaining -= cost;
         const cells = await this.fetchBlock(id, signal, cost);
@@ -118,12 +119,13 @@ export class BlockSource {
   }
 
   async update(bounds, retry = false) {
+    if (this.manifest.unavailable) return;
     const required = blocksInView(this.manifest.blocks, bounds);
     const key = required.join(',');
     if (key === this.requestKey && !retry) return;
     this.stop();
     this.requestKey = key;
-    if ((this.cache.blocks.size === 9 || this.manifest.cacheKey.endsWith('-dynamic-v1'))
+    if ((this.cache.blocks.size === 9 || this.manifest.dynamic)
       && required.every(id => this.cache.blocks.has(id))) {
       this.status('', false);
       return;
@@ -146,7 +148,8 @@ export class BlockSource {
       for (const id of missing) {
         const entry = this.manifest.blocks[id];
         const delivery = entry.dynamic ? 150_000 : entry.bytes;
-        const rawBytes = entry.dynamic ? await planRemoteBlock(id, gate.signal) : 0;
+        const rawBytes = entry.dynamic
+          ? await planRemoteBlock(id, entry, this.manifest.date, gate.signal) : 0;
         if (rawBytes) gate.addEstimate(rawBytes);
         await gate.beforeBlock(delivery + rawBytes);
         downloaded.set(id, await this.fetchBlock(id, gate.signal, rawBytes));

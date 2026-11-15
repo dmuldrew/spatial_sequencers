@@ -17,6 +17,8 @@ services:
       context: .
       dockerfile: Dockerfile.midwest
     image: spatial-sequencers-midwest-data:latest
+    environment:
+      - FIRMS_MAP_KEY
     volumes:
       - midwest-cache:/cache
     restart: unless-stopped

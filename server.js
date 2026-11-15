@@ -18,7 +18,9 @@ const MIME_TYPES = {
   '.json': 'application/json; charset=utf-8',
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
-  '.ico': 'image/x-icon'
+  '.ico': 'image/x-icon',
+  '.wav': 'audio/wav',
+  '.txt': 'text/plain; charset=utf-8'
 };
 
 const VENDOR_ROUTES = {
@@ -106,7 +108,8 @@ async function serveMidwest(requestPath, requestUrl, res) {
   const endpoint = process.env.MIDWEST_SERVICE;
   if (!endpoint) return sendJson(res, 404, { error: 'Dynamic map data is unavailable.' });
   const route = requestPath.slice('/api/midwest'.length);
-  if (route !== '/config' && !/^\/blocks\/-?\d{1,2}--?\d{1,2}(\/plan)?$/.test(route)) {
+  if (!['/config', '/fires', '/weather', '/perimeters', '/nearby'].includes(route)
+      && !/^\/blocks\/-?\d{1,2}--?\d{1,2}(\/plan)?$/.test(route)) {
     return sendJson(res, 404, { error: 'Unknown map endpoint.' });
   }
   const worker = new URL(route, endpoint);
@@ -115,6 +118,10 @@ async function serveMidwest(requestPath, requestUrl, res) {
   const params = new URL(requestUrl, 'http://localhost').searchParams;
   const budget = params.get('budget');
   if (budget && /^\d{1,8}$/.test(budget)) worker.searchParams.set('budget', budget);
+  for (const name of ['date', 'bounds']) {
+    const value = params.get(name);
+    if (value && value.length <= 100) worker.searchParams.set(name, value);
+  }
   const controller = new AbortController();
   const cancel = () => {
     controller.abort();

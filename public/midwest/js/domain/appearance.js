@@ -11,10 +11,9 @@ export const APPEARANCE = Object.freeze({
 
 export const CLASSIFIED = 'classified';
 export const FIRE_TIMELINE = 'fire-timeline';
-export const NDVI_RANGE = Object.freeze({ min: 0.45, max: 0.95 });
 
-export function ndviAppearance(value) {
-  const amount = normalize(value, NDVI_RANGE);
+export function ndviAppearance(value, range) {
+  const amount = normalize(value, range);
   return {
     color: amount === null ? APPEARANCE.missingColor : `hsl(141, 52%, ${90 - amount * 64}%)`,
     missing: amount === null,
@@ -35,30 +34,27 @@ function quantile(sorted, fraction) {
   return sorted[lower] + (sorted[upper] - sorted[lower]) * (position - lower);
 }
 
-export function rangeOf(values) {
-  const valid = values.filter(Number.isFinite).sort((a, b) => a - b);
-  if (!valid.length) return null;
-
-  // Clip the tails for contrast. Small views use the observed range because
-  // a few cells are too few to estimate stable percentile cutoffs.
-  const clip = valid.length >= 20 ? 0.05 : 0;
-  const min = quantile(valid, clip);
-  const max = quantile(valid, 1 - clip);
-  return min < max ? { min, max } : { min: valid[0], max: valid.at(-1) };
-}
-
 export function normalize(value, range) {
   if (!Number.isFinite(value) || !range) return null;
   if (range.max === range.min) return 0.5;
-  return Math.max(0, Math.min(1, (value - range.min) / (range.max - range.min)));
+  const fraction = Math.max(0, Math.min(1, (value - range.min) / (range.max - range.min)));
+  const centered = 2 * fraction - 1;
+  // Double the slope at the midpoint and keep the full observed range distinct.
+  return 0.5 + centered / (1 + Math.abs(centered));
 }
 
-export function viewportRanges(cells) {
-  // Each named input has its own range; missing values do not become zero.
-  return {
-    A1: rangeOf(cells.map(cell => cell.A1)),
-    A2: rangeOf(cells.map(cell => cell.A2)),
-  };
+export function observedRanges(cells) {
+  const ranges = { A1: null, A2: null };
+  for (const cell of cells) {
+    for (const key of ['A1', 'A2']) {
+      const value = cell[key];
+      if (!Number.isFinite(value)) continue;
+      const range = ranges[key] ??= { min: value, max: value };
+      range.min = Math.min(range.min, value);
+      range.max = Math.max(range.max, value);
+    }
+  }
+  return ranges;
 }
 
 export function datasetBreaks(cells) {

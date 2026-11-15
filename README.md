@@ -198,23 +198,41 @@ areas for roaming. Use `/#iowa-map` to jump to the map or `/midwest/map.html` to
   quality-filtered 8-day composites. **MOD13Q1 NDVI** comes from one
   quality-filtered 16-day composite.
 - **Green–brown (continuous):** Temperature controls hue. Higher NDVI
-  increases saturation from 5% to 95% and darkens the fill. Each color scale
-  uses the visible 5th–95th percentiles, or the full range for fewer than
-  20 observations.
+  increases saturation from 5% to 95% and darkens the fill. The continuous
+  colors use the current cache's observed ranges, with more contrast
+  near the middle. The vegetation view uses the same NDVI scale.
 - **Blue–orange (3 × 3):** Cool, greener cells are blue and warm, less green
   cells are orange. Each measurement uses thirds of the paired dataset.
   Breaks stay fixed while panning and zooming.
-- Gray cells lack one or both inputs. Click a hexagon for measurements and
-  color encoding details. The closest zoom depends on the coarser source. The hex overlay is fixed at 50% opacity so basemap features remain visible.
+- Gray cells are missing the measurements used in the selected view. Click
+  a hexagon for its temperature and NDVI. The closest zoom depends on the
+  coarser source, and the hex overlay is fixed at 50% opacity.
 
 The map's input definitions, appearance, zoom policy, and sonification extension
 point live in `public/midwest/js/domain/`. The data manifest and prepared blocks
 live under `public/midwest/data/`. The PyroSync spiral handles its own audio.
 
-The map opens in a 60-mile view near Sioux City with **Fire timeline · NDVI**
-selected. Panning or zooming returns the timeline to the end, showing all
-hotspots in view. Select **Replay** to start the period from the beginning, or
-scrub to an exact UTC minute. Red dots accumulate at their recorded detection times.
+The map opens in a 60-mile view near Sioux City with **Vegetation (NDVI)**
+selected and the timeline at the end of the observation period. Select **Replay**
+to start from the beginning, or scrub to an exact UTC minute. Red dots appear at
+their recorded detection times in every map view, and panning or changing the
+color view keeps the current time.
+
+Enter latitude, longitude, and a UTC start date, then select **Update map**. A new
+center repositions the map. A date-only change keeps the current view and loads a
+new timeline of up to 16 days. MODIS temperature and NDVI use the satellite composite
+window containing that date. Dynamic composite requests need the Docker service.
+For timed fire detections beyond the bundled July 2024 U.S. FIRMS archive, pass
+`FIRMS_MAP_KEY` to Docker Compose through the shell environment or a local
+Compose environment file.
+
+Select a hotspot for detection-time wind and nearby mapped access and water.
+ERA5 weather, global hillshade, and OpenStreetMap provide coverage outside the
+U.S. The perimeter overlay uses NIFC for the contiguous U.S. For future regional
+perimeters, prefer the local fire agency's timestamped boundaries and show
+coverage gaps explicitly. For regions without a perimeter provider, keep the
+FIRMS hotspot layer available.
+
 The MOD13Q1 vegetation composite and color scale stay fixed during playback.
 Select another map view for the temperature comparisons. Red markers show presumed
 vegetation fire detections from the [NASA FIRMS 2024 US MODIS archive](https://firms.modaps.eosdis.nasa.gov/data/country/modis_2024_United_States.csv)

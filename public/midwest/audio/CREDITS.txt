@@ -1,0 +1,20 @@
+Map instruments: CC0 1.0 public-domain sample recordings.
+
+Guitar: FreePats Spanish Classical Guitar (2019-06-18), Roberto.
+Source: https://github.com/freepats/spanish-classical-guitar
+Original: samples/C4.flac
+License: https://github.com/freepats/spanish-classical-guitar/blob/main/LICENSE
+
+Trumpet: VS Chamber Orchestra 2 Community Edition, Sam Gossner & Simon Dalzell;
+sample cutting by Elan Hickler / Soundemote.
+Source: https://github.com/sgossner/VSCO-2-CE
+Original: Brass/Trumpet/sus/Sum_SHTrumpet_sus_C3_v1_rr1.wav
+License: https://github.com/sgossner/VSCO-2-CE/blob/master/LICENSE
+
+Both files converted to mono PCM WAV, onset-trimmed, shortened and level-adjusted.
+Melody: “The Rakes of Mallow,” traditional Irish tune, O’Neill’s Music of
+Ireland (1903), no. 1814. ABC transcription by Bob Safranek:
+https://abcnotation.com/tunePage?a=trillian.mit.edu%2F~jc%2Fmusic%2Fbook%2FONeills%2F_1850%2FX%2F1814_bs%2F0000
+The eight-bar opening is arranged in 4/4 at 122 BPM with a root–fifth vamp.
+The tune is played from the instrument samples above.
+Fire pops are synthesized locally with a 1.5-second decay.

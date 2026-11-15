@@ -1,6 +1,6 @@
 const MINUTE_MS = 60_000;
 const DAY_MINUTES = 1_440;
-export const MINUTES_PER_SECOND = 720;
+export const MINUTES_PER_SECOND = 1440;
 
 export function fireTimeline({ start, end, points }) {
   const startTime = Date.parse(`${start}T00:00:00Z`);
