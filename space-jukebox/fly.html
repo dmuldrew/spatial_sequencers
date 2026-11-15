@@ -17,7 +17,7 @@
   #hud{position:fixed;left:20px;bottom:96px;z-index:5;background:rgba(13,20,43,.88);border:2px solid var(--line);border-radius:14px;padding:14px 18px;min-width:280px}
   #hud .region{font-size:24px;font-weight:800;margin:0}
   #hud .sub{color:var(--dim);margin:2px 0 8px;font-size:16px}
-  #meterWrap{height:14px;background:#1b2547;border-radius:7px;overflow:hidden}
+  #meterWrap{height:14px;background:#1b2547;border-radius:7px;overflow:hidden;transition:height .18s}
   #meter{height:100%;width:0%;background:linear-gradient(90deg,var(--acc),var(--hot),#ff3d3d);transition:width .18s}
   #hud .lab{font-size:13.5px;color:var(--dim);letter-spacing:.06em;margin-top:6px}
   #tourDots{display:flex;gap:7px;margin-top:10px}
@@ -71,10 +71,11 @@
   <button id="btnFly" aria-pressed="false">&#9654; Start flight</button>
   <button id="btnNarrate" aria-pressed="true">Narration: on</button>
   <button id="btnMute" aria-pressed="false">Sound: on</button>
+  <button id="btnTimbre" aria-pressed="false">Timbre: synth</button>
   <button id="btnCam" aria-pressed="false">Camera: chase</button>
   <button id="btnSpeed" aria-pressed="false">Speed: 1&times;</button>
   <button id="btnPilot" aria-pressed="false">Pilot: auto tour</button>
-  <span class="keys">Keys: Space fly &middot; S whereabouts &middot; N narration &middot; M mute &middot; G pilot &middot; C camera &middot; &uarr;&darr; speed / throttle</span>
+  <span class="keys">Keys: Space fly &middot; S whereabouts &middot; N narration &middot; M mute &middot; V violin &middot; G pilot &middot; C camera &middot; &uarr;&darr; speed / throttle</span>
 </div>
 
 <div id="startOverlay">
@@ -122,6 +123,30 @@ const ORDINALS = ["strongest", "second strongest", "third strongest", "fourth st
 
 /* ============================== helpers ============================== */
 const $ = id => document.getElementById(id);
+/* land/ocean from the same Natural Earth mask that draws the dot
+   continents — a cell lookup, so narration can name open water      */
+const MASK_BYTES = Uint8Array.from(atob(MASK.b64), c => c.charCodeAt(0));
+function isLand(lat, lon){
+  const r = Math.max(0, Math.min(MASK.rows - 1, Math.floor((90 - lat) / MASK.step)));
+  const c = Math.max(0, Math.min(MASK.cols - 1, Math.floor((lon + 180) / MASK.step)));
+  const i = r * MASK.cols + c;
+  return (MASK_BYTES[i >> 3] & (1 << (7 - (i & 7)))) !== 0;
+}
+function oceanName(lat, lon){
+  if (isLand(lat, lon)) return null;
+  if (lat < -58) return "Southern Ocean";
+  if (lon >= -6 && lon <= 36 && lat >= 30 && lat <= 46) return "Mediterranean Sea";
+  if (lon >= -98 && lon <= -60 && lat >= 5 && lat <= 32) return "Caribbean Sea";
+  if (lon >= 142 || lon <= -78) return "Pacific Ocean";
+  if (lon >= 20 && lat < 28) return "Indian Ocean";
+  if (lon > -78 && lon < 20) return "Atlantic Ocean";
+  return null;
+}
+const COMPASS8 = ["north", "northeast", "east", "southeast", "south", "southwest", "west", "northwest"];
+function compass8(rad){
+  let d = rad * 180 / Math.PI; if (d < 0) d += 360;
+  return COMPASS8[Math.round(d / 45) % 8];
+}
 function latLonToVec3(lat, lon, r){
   const phi = (90 - lat) * Math.PI / 180, theta = (lon + 180) * Math.PI / 180;
   return new THREE.Vector3(-r * Math.sin(phi) * Math.cos(theta), r * Math.cos(phi), r * Math.sin(phi) * Math.sin(theta));
@@ -410,7 +435,8 @@ function nextStopIdx(uNow){
 
 /* ============================== audio ============================== */
 let AC = null, toneOsc = [], toneFilter, toneGain, noiseGain, master, outGain;
-let muted = false;
+let violinFilter = null, lfoGain = null, noiseFilter = null;
+let muted = false, violinMode = false;
 function initAudio(){
   if (AC) return; /* re-entry used to stack a second set of oscillators */
   AC = new (window.AudioContext || window.webkitAudioContext)();
@@ -426,13 +452,23 @@ function initAudio(){
     const o = AC.createOscillator(); o.type = "sawtooth"; o.frequency.value = 110; o.detune.value = det;
     o.connect(toneFilter); o.start(); toneOsc.push(o);
   }
-  toneFilter.connect(toneGain); toneGain.connect(master);
+  /* the violin voice, wired in but silent until Timbre: violin — a
+     formant peak in the tone chain, and a vibrato LFO on the
+     oscillators' detune                                              */
+  violinFilter = AC.createBiquadFilter(); violinFilter.type = "peaking";
+  violinFilter.frequency.value = 2900; violinFilter.Q.value = 1.1; violinFilter.gain.value = 0;
+  toneFilter.connect(violinFilter); violinFilter.connect(toneGain); toneGain.connect(master);
+  const lfo = AC.createOscillator(); lfo.type = "sine"; lfo.frequency.value = 5.4;
+  lfoGain = AC.createGain(); lfoGain.gain.value = 0;
+  lfo.connect(lfoGain);
+  for (const o of toneOsc) lfoGain.connect(o.detune);
+  lfo.start();
   const len = AC.sampleRate * 2, buf = AC.createBuffer(1, len, AC.sampleRate), d = buf.getChannelData(0);
   for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
   const noise = AC.createBufferSource(); noise.buffer = buf; noise.loop = true;
-  const bp = AC.createBiquadFilter(); bp.type = "bandpass"; bp.frequency.value = 480; bp.Q.value = 0.8;
+  noiseFilter = AC.createBiquadFilter(); noiseFilter.type = "bandpass"; noiseFilter.frequency.value = 480; noiseFilter.Q.value = 0.8;
   noiseGain = AC.createGain(); noiseGain.gain.value = 0.012;
-  noise.connect(bp); bp.connect(noiseGain); noiseGain.connect(master); noise.start();
+  noise.connect(noiseFilter); noiseFilter.connect(noiseGain); noiseGain.connect(master); noise.start();
 }
 const PING_MIN_GAP = 0.09;
 let lastPingAt = -1;
@@ -443,12 +479,14 @@ function ping(frp, pan){
   if (AC.currentTime - lastPingAt < PING_MIN_GAP) return;
   lastPingAt = AC.currentTime;
   const o = AC.createOscillator(), g = AC.createGain();
-  o.type = "sine";
+  /* in violin mode the pings turn pizzicato: triangle, short and plucked */
+  o.type = violinMode ? "triangle" : "sine";
   o.frequency.value = 620 + Math.min(1, frp / 5000) * 880;
   const peak = (0.05 + Math.min(1, frp / 5000) * 0.13) * (speaking ? 0.45 : 1);
+  const dur = violinMode ? 0.3 : 0.5;
   g.gain.setValueAtTime(0, AC.currentTime);
   g.gain.linearRampToValueAtTime(peak, AC.currentTime + 0.015);
-  g.gain.exponentialRampToValueAtTime(0.0001, AC.currentTime + 0.5);
+  g.gain.exponentialRampToValueAtTime(0.0001, AC.currentTime + dur);
   o.connect(g);
   let out = g; /* pan the ping toward the side the hotspot is on */
   if (AC.createStereoPanner){
@@ -456,7 +494,7 @@ function ping(frp, pan){
     p.pan.value = Math.max(-0.85, Math.min(0.85, pan || 0));
     g.connect(p); out = p;
   }
-  out.connect(master); o.start(); o.stop(AC.currentTime + 0.55);
+  out.connect(master); o.start(); o.stop(AC.currentTime + (violinMode ? 0.35 : 0.55));
 }
 
 /* ============================== speech ============================== */
@@ -478,7 +516,7 @@ function announce(text, force){
 
 /* ============================== flight state ============================== */
 let flying = false, u = 0, speedMul = 1, camMode = "chase", camAngle = 0;
-let lastBiomeId = null, intensitySmooth = 0, peakBiomeId = null;
+let lastBiomeId = null, intensitySmooth = 0, peakBiomeId = null, lastOcean = null;
 const pingCooldown = new Map();
 const LOOP_SECONDS = 80;
 const TOTAL_LABEL = TOTAL_7D.toLocaleString();
@@ -487,7 +525,7 @@ const TOTAL_LABEL = TOTAL_7D.toLocaleString();
    it used to rewrite four text nodes and the meter width on every frame.   */
 let hudAt = 0, hudPct = -1;
 const hudRegionEl = $("hudRegion"), hudSubEl = $("hudSub");
-const hudPosEl = $("hudPos"), meterEl = $("meter"), hudNextEl = $("hudNext");
+const hudPosEl = $("hudPos"), meterEl = $("meter"), hudNextEl = $("hudNext"), meterWrapEl = $("meterWrap");
 function setText(el, value){
   if (el.__text === value) return;
   el.__text = value; el.textContent = value;
@@ -757,7 +795,12 @@ function animate(){
     const duck = speaking ? 0.35 : 1; /* get out of the narrator's way */
     const freq = 110 * Math.pow(2, norm * 2.1);
     for (const o of toneOsc) o.frequency.setTargetAtTime(freq, AC.currentTime, 0.08);
-    toneFilter.frequency.setTargetAtTime(500 + norm * 2600, AC.currentTime, 0.1);
+    /* a violin's brightness tracks the string being played; the synth's
+       filter just opens with intensity                                */
+    toneFilter.frequency.setTargetAtTime(violinMode
+      ? Math.min(5200, Math.max(700, freq * 5.5))
+      : 500 + norm * 2600, AC.currentTime, 0.1);
+    if (noiseFilter) noiseFilter.frequency.setTargetAtTime(violinMode ? freq * 2 : 480, AC.currentTime, 0.15);
     toneGain.gain.setTargetAtTime(flying ? (0.025 + norm * 0.12) * duck : 0, AC.currentTime, 0.12);
     /* the engine hiss used to keep playing at 0.004 while the flight was paused */
     if (noiseGain) noiseGain.gain.setTargetAtTime(flying ? (0.008 + speedMul * 0.006) * duck : 0, AC.currentTime, 0.2);
@@ -773,7 +816,12 @@ function animate(){
       : `Cruising between fire regions · ${TOTAL_LABEL} detections this week, planet-wide`);
     setText(hudPosEl, `${Math.abs(ll.lat).toFixed(1)}° ${ll.lat >= 0 ? "N" : "S"}, ${Math.abs(ll.lon).toFixed(1)}° ${ll.lon >= 0 ? "E" : "W"} · ${count} hotspots within reach`);
     const pct = Math.round(Math.min(1, intensitySmooth / 2600) * 100);
-    if (pct !== hudPct){ hudPct = pct; meterEl.style.width = pct + "%"; }
+    if (pct !== hudPct){
+      hudPct = pct; meterEl.style.width = pct + "%";
+      /* the bar's height carries the intensity too: a 6px sliver over
+         quiet ground, a 26px band at a region's core                 */
+      meterWrapEl.style.height = (6 + pct * 0.2) + "px";
+    }
     if (pilotMode === "manual"){
       [...dotsEl.children].forEach(el => { el.className = ""; });
       setText(hudNextEl, `Manual pilot · speed ${manualSpeed.toFixed(1)}× · Start or G for auto tour`);
@@ -798,6 +846,18 @@ function animate(){
     if (!speaking) announce(`Passing the densest fires of ${biome.name} now. Hear the tone climb — this is the region at its strongest.`);
   }
   if (!inBiome) peakBiomeId = null;
+  /* crossing narration: entering open water gets named, with the
+     heading — retried until the voice is free, like the peak callout */
+  if (flying && !inBiome){
+    const oc = oceanName(ll.lat, ll.lon);
+    if (oc && oc !== lastOcean && !speaking){
+      const brg = manual ? heading : bearingBetween(ll, vecToLatLon(ahead));
+      announce(`Crossing the ${oc}, heading ${compass8(brg)}. Open water below — the next fires are still ahead.`);
+      lastOcean = oc;
+    }
+    if (!oc) lastOcean = null;
+  }
+  if (inBiome) lastOcean = null;
   renderer.render(scene, camera);
 }
 animate();
@@ -818,24 +878,68 @@ function setFlying(on){
    fires on entry, so without this a listener who misses a sentence, joins
    mid-region, or turns narration on late has no way to ask where they are. */
 function announceHere(){
-  const ll = vecToLatLon(ship.position);
+  /* read the flight state, not the ship mesh: in manual mode the mesh
+     sits on the flat map, where a sphere lat/lon read is meaningless  */
+  const ll = pilotMode === "manual"
+    ? { lat: flatY / DEG, lon: ((flatX / DEG + 180) % 360 + 360) % 360 - 180 }
+    : vecToLatLon(curve.getPointAt(u));
+  const brg = pilotMode === "manual" ? heading
+    : bearingBetween(ll, vecToLatLon(curve.getPointAt((u + 0.01) % 1)));
   const { biome, dist } = nearestBiome(ll.lat, ll.lon);
   const pct = Math.round(Math.min(1, intensitySmooth / 2600) * 100);
+  const oc = dist >= 17 ? oceanName(ll.lat, ll.lon) : null;
   const where = dist < 17
     ? `Over ${biome.name}: ${biome.count} major hotspots below, totalling about ${Math.round(biome.totalFrp)} megawatts. Strongest fire power ${biome.maxFrp} megawatts. ${biome.rankLine}`
-    : `In transit between fire regions, at ${Math.abs(ll.lat).toFixed(0)} degrees ${ll.lat >= 0 ? "north" : "south"}, ${Math.abs(ll.lon).toFixed(0)} degrees ${ll.lon >= 0 ? "east" : "west"}. The nearest fire region is ${biome.name}.`;
-  announce(`${where} Fire intensity ${pct} percent.${flying ? "" : " Flight paused."}`, true);
+    : `In transit between fire regions, at ${Math.abs(ll.lat).toFixed(0)} degrees ${ll.lat >= 0 ? "north" : "south"}, ${Math.abs(ll.lon).toFixed(0)} degrees ${ll.lon >= 0 ? "east" : "west"}.${oc ? ` Crossing the ${oc}.` : ""} The nearest fire region is ${biome.name}.`;
+  announce(`${where} Heading ${compass8(brg)}. Fire intensity ${pct} percent.${flying ? "" : " Flight paused."}`, true);
+}
+/* ============================== start gate ==============================
+   The start screen explains the flight out loud before anyone flies.
+   While the explanation is speaking, the start button is a Skip
+   button; only when the explanation finishes — or is skipped — does
+   it become the Start button. If speech is unavailable, or an
+   utterance never reports finishing, the button still unlocks on a
+   timer, so nobody is ever trapped on this screen.                 */
+const EXPLAIN_TEXT = `Welcome to Space Jukebox, the fire flight. You are about to tour six fire regions of Earth, west to east, in a spaceship. The ship follows 330 of the largest hotspots NASA satellites recorded this week, out of ${TOTAL_7D} detections in total. A hotspot is a fire the satellites spotted from orbit, and its fire power is measured in megawatts of heat. As we fly, a tone rises and falls with the fires below. Hotter, denser fires sing higher, and the largest hotspots ping as we pass them. I will name each region as we arrive, with its fire totals, and name the oceans as we cross them. A violin mode on the control bar can make the fires sing as a bowed string instead of a synth. Press S at any time to hear where you are. After takeoff, press G to take manual control and fly the flat map yourself, with the arrow keys or a controller. Sit back, listen, and enjoy the flight.`;
+let explainDone = false, explainQueue = [], explainTimer = null;
+function nextExplainChunk(){
+  if (explainDone) return;
+  const s = explainQueue.shift();
+  if (!s){ finishExplanation(); return; }
+  $("liveRegion").textContent = s;
+  const u = new SpeechSynthesisUtterance(s);
+  u.rate = 1.04;
+  u.onend = u.onerror = () => nextExplainChunk();
+  speechSynthesis.speak(u);
+}
+function finishExplanation(){
+  if (explainDone) return;
+  explainDone = true;
+  clearTimeout(explainTimer);
+  if ("speechSynthesis" in window) speechSynthesis.cancel();
+  const btn = $("startBtn");
+  btn.innerHTML = "&#9654; Start flight";
+  btn.disabled = false;
+}
+function speakExplanation(){
+  if (!("speechSynthesis" in window)){ finishExplanation(); return; }
+  $("startBtn").textContent = "Skip explanation";
+  explainQueue = EXPLAIN_TEXT.split(/(?<=[.!?])\s+/).filter(Boolean);
+  explainTimer = setTimeout(finishExplanation, EXPLAIN_TEXT.split(/\s+/).length * 450 + 8000);
+  nextExplainChunk();
 }
 $("startBtn").addEventListener("click", () => {
+  if (!explainDone){ finishExplanation(); return; } /* skip the explanation */
   initAudio();
   $("startOverlay").style.display = "none";
   setFlying(true);
-  /* u begins on the first region, so mark it announced: otherwise the region
-     check fired on the very next frame and cancelled the intro mid-sentence. */
+  /* u begins on the first region, so mark it announced: the takeoff line
+     names the first stop, and its detail would only talk over it.      */
   lastBiomeId = tour[0].id;
-  announce(`Space Jukebox fire flight. Touring six fire regions of Earth, west to east. The ship follows 330 of the largest hotspots NASA satellites recorded this week, out of ${TOTAL_7D} detections in total. A hotspot is a fire the satellites spotted from orbit, and its fire power is measured in megawatts of heat. First stop, ${tour[0].name}. Press S at any time to hear where you are. The tone rises as the fires below grow hotter and denser.`);
+  announce(`Taking off. First stop, ${tour[0].name}.`);
   $("btnFly").focus();
 });
+if (!$("startBtn").disabled) speakExplanation();
 $("btnFly").addEventListener("click", () => {
   if (!AC){ $("startBtn").click(); return; }
   setFlying(!flying);
@@ -846,6 +950,20 @@ $("btnNarrate").addEventListener("click", () => {
   $("btnNarrate").textContent = narration ? "Narration: on" : "Narration: off";
   if (!narration && "speechSynthesis" in window) speechSynthesis.cancel();
   else announceHere(); /* turning narration on should say where you are now */
+});
+$("btnTimbre").addEventListener("click", () => {
+  violinMode = !violinMode;
+  $("btnTimbre").setAttribute("aria-pressed", String(violinMode));
+  $("btnTimbre").textContent = violinMode ? "Timbre: violin" : "Timbre: synth";
+  if (AC){
+    const t = AC.currentTime;
+    /* vibrato swells in like a bow settling; the formant peak and the
+       sharper filter give the string its body                        */
+    lfoGain.gain.setTargetAtTime(violinMode ? 22 : 0, t, 0.4);
+    violinFilter.gain.setTargetAtTime(violinMode ? 7 : 0, t, 0.2);
+    toneFilter.Q.setTargetAtTime(violinMode ? 4.5 : 2, t, 0.2);
+  }
+  announce(violinMode ? "Violin mode. The fires now sing as a bowed string." : "Synth mode.", true);
 });
 $("btnMute").addEventListener("click", () => {
   muted = !muted;
@@ -889,6 +1007,7 @@ window.addEventListener("keydown", e => {
   else if (e.key === "s" || e.key === "S") announceHere();
   else if (e.key === "n" || e.key === "N") $("btnNarrate").click();
   else if (e.key === "m" || e.key === "M") $("btnMute").click();
+  else if (e.key === "v" || e.key === "V") $("btnTimbre").click();
   else if (e.key === "c" || e.key === "C") $("btnCam").click();
   else if (e.key === "g" || e.key === "G"){ if (!e.repeat) $("btnPilot").click(); }
   else if (pilotMode === "manual" && ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.code)) e.preventDefault();
