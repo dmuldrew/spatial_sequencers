@@ -1,7 +1,7 @@
 # 30-Second Demo Video — Shot List
 
-Covers the whole Spatial Sequencers project. Record from the **live site** on a
-real machine (sound matters — this is an audio project):
+Covers **all** of Spatial Sequencers' sub-projects, not just one. Record from
+the **live site** on a real machine (sound matters — this is an audio project):
 <https://dmuldrew.github.io/spatial_sequencers/>
 
 Total runtime must stay **at or under 30.0 seconds**.
@@ -9,11 +9,11 @@ Total runtime must stay **at or under 30.0 seconds**.
 | # | Time | On screen | What you hear | How |
 |---|------|-----------|---------------|-----|
 | 1 | 0–5s | **PyroSync** climate spiral turning, temperature winding outward | The sonified temperature line rising | Open PyroSync from the hub, start the spiral, let it play |
-| 2 | 5–10s | PyroSync **Iowa hex map** (or the orbital flyby) | Fire-weather tones over the map | Switch views; keep the cursor moving slowly |
-| 3 | 10–15s | **Space Jukebox** start screen → takeoff | The spoken briefing's first line, then "Taking off" | Open Space Jukebox, click through the briefing (or skip), start the flight |
-| 4 | 15–23s | The **Australia** pass: globe close, light bars tall, intensity meter pegged | The tone climbing to its loudest, pings stacking up | Let the tour reach Australia; don't touch anything — this is the money shot |
-| 5 | 23–27s | Press **G** — the globe flattens into the map; steer a few seconds | Narration calls out a region or an ocean crossing | Manual Pilot on the flat map |
-| 6 | 27–30s | End card (below) | The tone, fading | Hold the card for the full 3 seconds |
+| 2 | 5–9s | **Midwest Fire Timeline** — scrub the timeline and watch a fire season sweep the map | The timeline's fire tones | Open the Midwest app, drag the time scrubber across one season |
+| 3 | 9–14s | PyroSync **Iowa hex map**, then cut to the **combined orbital flyby** | Fire-weather tones under the orbit | Switch views in PyroSync; let the flyby carry the cut |
+| 4 | 14–22s | **Space Jukebox** — the Australia pass: light bars tall, intensity meter pegged | The briefing's tail, then the tone climbing to its loudest over Australia | Open Space Jukebox, start the flight, let the tour reach Australia — the one flight shot |
+| 5 | 22–26s | Back to the **hub page** — all four projects on one screen | Any of the apps' sound, low | Return to the hub and pan across the project cards |
+| 6 | 26–30s | End card (below) | Fade out | Hold the card for the full 4 seconds |
 
 **End card text** (a plain slide or a title in your editor):
 
@@ -35,4 +35,4 @@ Total runtime must stay **at or under 30.0 seconds**.
 ## If the sound misbehaves on the day
 
 Submit the slide deck (`slides.html`, 7 slides) instead — the rules allow
-either. The deck tells the same story with stills from the real flight.
+either. The deck tells the same whole-project story with stills and stats.

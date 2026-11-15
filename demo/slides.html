@@ -26,6 +26,11 @@
   .row > * { flex: 1; }
   img.shot { width: 100%; border-radius: 14px; border: 1px solid #22315e; box-shadow: 0 18px 50px rgba(0,0,0,.55); }
   img.icon { width: clamp(120px, 18vw, 230px); border-radius: 24px; }
+  .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 1vh; }
+  .card { background: var(--panel); border: 1px solid #22315e; border-radius: 14px; padding: 22px 26px; }
+  .card h3 { font-size: clamp(20px, 2.4vw, 32px); margin-bottom: 8px; }
+  .card p { font-size: clamp(15px, 1.7vw, 22px); color: var(--dim); line-height: 1.4; }
+  .card p b { color: var(--ink); }
   .chips { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 3vh; }
   .chip { background: var(--panel); border: 1px solid #22315e; border-radius: 12px; padding: 14px 20px; font-size: clamp(15px, 1.8vw, 23px); }
   .chip b { font-size: 1.35em; display: block; }
@@ -46,7 +51,7 @@
       <div class="kicker">NASA Space Apps Challenge 2026 · Seattle</div>
       <h1>Spatial<br>Sequencers</h1>
       <p style="margin-top:2.4vh" class="big-quote">Earth data you can <span class="accent">hear</span>.</p>
-      <p class="dim" style="margin-top:2vh">Challenge: <b style="color:var(--ink)">The Earth Information Jukebox</b></p>
+      <p class="dim" style="margin-top:2vh">A hub of sonification projects — one ensemble, four instruments.<br>Challenge: <b style="color:var(--ink)">The Earth Information Jukebox</b></p>
       <p class="dim">@dmuldrew · Lan Ly · Brian Pickrell · Monica</p>
     </div>
     <div style="flex:1; text-align:center">
@@ -68,27 +73,34 @@
   <div class="footer"><span>The problem</span><span>2 / 7</span></div>
 </section>
 
-<!-- 3 · WHAT -->
+<!-- 3 · WHAT — THE WHOLE ENSEMBLE -->
 <section class="slide">
-  <div class="kicker">What</div>
-  <h2>One hub. Three ways to listen.</h2>
-  <ul>
-    <li><b>PyroSync</b> — a fire-weather observatory: 26 years of NASA data, sonified.</li>
-    <li><b>Space Jukebox</b> — an audio-first 3D flight over this week's largest wildfires.</li>
-    <li><b>The combined flyby</b> — both datasets in a single orbital pass.</li>
-  </ul>
-  <div class="chips">
-    <div class="chip"><b>NASA POWER</b>meteorology</div>
-    <div class="chip"><b>EONET</b>wildfire events</div>
-    <div class="chip"><b>FIRMS</b>active-fire hotspots</div>
-    <div class="chip"><b>MODIS</b>land data</div>
+  <div class="kicker">What · The whole project</div>
+  <h2>One hub. Four instruments.</h2>
+  <div class="cards">
+    <div class="card">
+      <h3>PyroSync</h3>
+      <p>The team's main project — a <b>fire-weather observatory</b>: climate spiral, Iowa hex map, and orbital flyby over 26 years of NASA POWER data, EONET wildfires, and FIRMS hotspots.</p>
+    </div>
+    <div class="card">
+      <h3>Space Jukebox</h3>
+      <p>An <b>audio-first</b> experience of this week's global fires — spoken narration and sound first, built for blind and low-vision listeners.</p>
+    </div>
+    <div class="card">
+      <h3>Midwest Fire Timeline</h3>
+      <p><b>MODIS</b> fire history across the US Midwest — a map and timeline you can scrub, watching fire seasons come and go.</p>
+    </div>
+    <div class="card">
+      <h3>The Combined Flyby</h3>
+      <p>One orbital pass that <b>merges the ensemble</b> — fire weather and live hotspots together in a single spacecraft flight.</p>
+    </div>
   </div>
-  <div class="footer"><span>The project</span><span>3 / 7</span></div>
+  <div class="footer"><span>All four, one hub</span><span>3 / 7</span></div>
 </section>
 
 <!-- 4 · PYROSYNC -->
 <section class="slide">
-  <div class="kicker">PyroSync</div>
+  <div class="kicker">Sub-project · PyroSync</div>
   <h2>A fire-weather observatory<br>you can <span class="accent">hear</span> building.</h2>
   <ul>
     <li><b>Climate spiral</b> — temperature winding across 26 years of NASA POWER data.</li>
@@ -105,13 +117,13 @@
 
 <!-- 5 · SPACE JUKEBOX -->
 <section class="slide">
-  <div class="kicker">Space Jukebox</div>
+  <div class="kicker">Sub-project · Space Jukebox</div>
   <div class="row">
     <div>
-      <h2>Fly the fires.<br>Hear the planet burn.</h2>
+      <h2>The week's fires,<br>as an album you fly through.</h2>
       <ul>
-        <li>The <b>330 largest fires on Earth this week</b> — of <b>80,347</b> FIRMS detections.</li>
-        <li>Every hotspot is a <b>bar of light</b> and a voice in the tone: stronger fire, louder and higher.</li>
+        <li>The <b>330 largest fires on Earth this week</b> — of <b>80,347</b> FIRMS detections — each a bar of light with a voice in the tone.</li>
+        <li><b>Designed to be used eyes-closed:</b> a spoken briefing before takeoff, narration with totals and rankings throughout, keyboard or Xbox controller.</li>
         <li>Australia: <b>101,440 MW</b> — a roar. The Mediterranean: <b>1,779 MW</b> — nearly silent. <b>The contrast is the data.</b></li>
       </ul>
     </div>
@@ -120,21 +132,21 @@
   <div class="footer"><span>Space Jukebox — Lan Ly</span><span>5 / 7</span></div>
 </section>
 
-<!-- 6 · FLY IT YOURSELF -->
+<!-- 6 · MIDWEST + COMBINED FLYBY -->
 <section class="slide">
-  <div class="kicker">Accessible by design</div>
-  <div class="row">
-    <div>
-      <h2>Built to be flown<br>with your eyes closed.</h2>
-      <ul>
-        <li>A <b>spoken briefing</b> before takeoff explains everything on screen.</li>
-        <li><b>Narration</b> throughout: regions, fire totals, rankings, ocean crossings, compass headings.</li>
-        <li><b>Manual Pilot</b> flattens the globe into a map — keyboard or Xbox controller.</li>
-      </ul>
-    </div>
-    <div><img class="shot" src="img/flight-flat.png" alt="Manual Pilot: the flattened world map with light bars standing on the hotspots"></div>
+  <div class="kicker">Sub-projects · Midwest &amp; the Flyby</div>
+  <h2>Same fires, heard<br>from the ground — and from orbit.</h2>
+  <ul>
+    <li><b>Midwest Fire Timeline</b> — MODIS fire history on a map you can scrub through time: seasons ignite, spread, and fade, region by region. <span class="dim">(Brian Pickrell)</span></li>
+    <li><b>The Combined Flyby</b> — the ensemble in one pass: a spacecraft orbit carrying PyroSync's fire weather and the week's live FIRMS hotspots together.</li>
+    <li>Every instrument in the hub plays the <b>same NASA data</b> — the hub is the band, the data is the score.</li>
+  </ul>
+  <div class="chips">
+    <div class="chip"><b>MODIS</b>fire history</div>
+    <div class="chip"><b>1 orbit</b>all datasets merged</div>
+    <div class="chip"><b>4 instruments</b>1 hub</div>
   </div>
-  <div class="footer"><span>Fly it yourself</span><span>6 / 7</span></div>
+  <div class="footer"><span>Midwest · Combined Flyby</span><span>6 / 7</span></div>
 </section>
 
 <!-- 7 · POSSIBILITY / CLOSE -->
