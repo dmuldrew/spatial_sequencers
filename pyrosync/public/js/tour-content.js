@@ -74,7 +74,7 @@ export const TOUR_STOPS = [
 
 export const TOUR_INTRO = [
   'Welcome aboard PyroSat-1. We are touring the world\'s fire hotspots.',
-  'The hexagons show 25 years of satellite fire detections: yellow means the most fire, dark red the least. Orange towers are a recent week\'s most intense fires.',
+  'The hexagons show 25 years of satellite fire detections: bright yellow means the most fire, dark purple the least. Orange towers are a recent week\'s most intense fires.',
   'Listen: crackle and higher notes mean more fire, a tense chord means fire is rising, and a bell marks a new fire season.',
   'Press F at any time for the fire history below.'
 ];

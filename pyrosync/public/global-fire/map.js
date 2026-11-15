@@ -7,13 +7,17 @@ const DATA_DIR = '../data/global-fire/';
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August',
   'September', 'October', 'November', 'December'];
 // Same low-to-high ramp as the flyby's Fire History carpet.
-const DENSITY_STOPS = ['#4c0519', '#b91c1c', '#f97316', '#facc15', '#fef9c3'];
+// Least to most fire: dark purple -> crimson -> orange -> amber -> bright yellow. No pale
+// top end: pale colours turn grey when the hexagons are semi-transparent over land.
+const DENSITY_STOPS = ['#2a0f45', '#8b1a3e', '#e2481c', '#f59f0b', '#ffe94d'];
+// Density mode fades sparse hexagons and makes dense ones nearly solid.
+const DENSITY_OPACITY = [0.3, 0.9];
+const LAND_COLOR = '#2f435a';
 // Diverging: falling fire activity blue, rising red (trend_log2: -1 = halved, +1 = doubled).
 const TREND_STOPS = [[-1.5, '#2166ac'], [-0.5, '#67a9cf'], [0, '#ece7df'], [0.5, '#ef8a62'], [1.5, '#b2182b']];
 const monthColor = (m) => `hsl(${(m - 1) * 30}, 78%, 58%)`;
 // Hexagons with few detections have noisy trends and seasons: fade them.
 const CONFIDENCE_OPACITY = ['interpolate', ['linear'], ['log10', ['max', ['get', 'detections'], 1]], 0, 0.12, 2, 0.58];
-const HEX_OPACITY = 0.55; // semi-transparent, so coastlines and land stay visible
 const INITIAL_VIEW = { center: [20, 8], zoom: 2.2 };
 // PMTiles zoom bands for resolutions 0-4 (raster_h3 zoom bands), for the status line.
 const RES_FOR_ZOOM = [0, 0, 1, 1, 2, 3, 4, 4];
@@ -44,6 +48,25 @@ function currentResolution() {
 
 // Each hexagon is coloured on its own resolution's scale; the tile pyramid shows one
 // resolution per zoom, so the colours and the legend always match what is on screen.
+// Opacity rising with density, on the same per-resolution log scale as the colour.
+function densityOpacityByResolution() {
+  const ramp = (lo, hi) => ['interpolate', ['linear'], ['log10', ['max', ['get', 'density'], 1e-9]],
+    lo, DENSITY_OPACITY[0], hi, DENSITY_OPACITY[1]];
+  const byRes = manifest.colorRangeByResolution;
+  const { min: lo, max: hi } = manifest.colorRange;
+  if (!byRes || !Object.keys(byRes).length) return ramp(lo, hi);
+  const cases = Object.entries(byRes).flatMap(([res, r]) => [Number(res), ramp(r.min, r.max)]);
+  return ['match', ['get', 'resolution'], ...cases, ramp(lo, hi)];
+}
+
+// Legend swatches as they appear on the map: each stop blended over the land colour at
+// the opacity it is drawn with.
+function blendOverLand(hex, alpha) {
+  const rgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+  const [a, b] = [rgb(hex), rgb(LAND_COLOR)];
+  return `rgb(${a.map((v, i) => Math.round(v * alpha + b[i] * (1 - alpha))).join(',')})`;
+}
+
 function densityByResolution() {
   const byRes = manifest.colorRangeByResolution;
   const { min: lo, max: hi } = manifest.colorRange;
@@ -66,7 +89,7 @@ function paintFor(selected) {
       opacity: CONFIDENCE_OPACITY
     };
   }
-  return { color: densityByResolution(), opacity: HEX_OPACITY };
+  return { color: densityByResolution(), opacity: densityOpacityByResolution() };
 }
 
 // world-atlas cuts shapes at the 180th meridian, so a line can step from +180 to -180
@@ -118,7 +141,8 @@ function renderLegend() {
     const perRes = Boolean(manifest.colorRangeByResolution?.[String(res)]);
     const { min: lo, max: hi } = rangeFor(res);
     legend.innerHTML = `
-      <div class="gf-ramp" style="background:linear-gradient(90deg,${DENSITY_STOPS.join(',')})"></div>
+      <div class="gf-ramp" style="background:linear-gradient(90deg,${DENSITY_STOPS.map((c, i) => blendOverLand(c, DENSITY_OPACITY[0] + ((DENSITY_OPACITY[1] - DENSITY_OPACITY[0]) * i) / (DENSITY_STOPS.length - 1))).join(',')})"></div>
+      <div class="gf-ramp-labels"><span>less fire</span><span>more fire →</span></div>
       <div class="gf-ramp-labels"><span>≤ ${per1000(10 ** lo)}</span><span>${per1000(10 ** ((lo + hi) / 2))}</span><span>≥ ${per1000(10 ** hi)}</span></div>`;
     note.textContent = perRes
       ? `Fire detections per 1,000 km² per year (log scale), scaled for the resolution ${res} hexagons shown at this zoom. The scale changes as you zoom.`
@@ -208,7 +232,7 @@ async function main() {
       },
       layers: [
         { id: 'ocean', type: 'background', paint: { 'background-color': '#0b1a2e' } },
-        { id: 'land', type: 'fill', source: 'land', paint: { 'fill-color': '#2f435a' } },
+        { id: 'land', type: 'fill', source: 'land', paint: { 'fill-color': LAND_COLOR } },
         {
           id: 'fire-fill',
           type: 'fill',

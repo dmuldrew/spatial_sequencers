@@ -17,7 +17,9 @@ const RIGHT_X = new THREE.Vector3(1, 0, 0);
 const KM_PER_UNIT = 265;
 const FIRE_HISTORY_DIR = './data/global-fire/';
 // Low-to-high fire density ramp for the multi-year H3 fire history carpet.
-const FIRE_HISTORY_STOPS = ['#4c0519', '#b91c1c', '#f97316', '#facc15', '#fef9c3'];
+// Same ramp as the Global Fire Map: dark purple (least fire) to bright yellow (most); no
+// pale top end, which turned grey through the semi-transparent carpet.
+const FIRE_HISTORY_STOPS = ['#2a0f45', '#8b1a3e', '#e2481c', '#f59f0b', '#ffe94d'];
 
 // Tour flight: a great-circle transit that arcs up for a wider view, then a constant
 // circle around each hotspot. Scene units: 1 unit = 265 km.
