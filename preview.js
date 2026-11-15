@@ -6,14 +6,15 @@
 //                                                  is served from pyrosync/node_modules)
 //   /space-jukebox/  -> space-jukebox/           (Space Jukebox player + 3D flight)
 //
-// Usage:  node preview.js [port] [--no-open]     (default port 8080)
-// Needs:  Node.js. For PyroSync's vendor libraries, run `npm install`
-//         inside pyrosync/ once (preview.bat / preview.sh do it for you).
+// Usage:  npm run preview [-- <port>] [-- --no-open]   (default port 8080)
+//         or directly: node preview.js [port] [--no-open]
+// Needs:  Node.js + npm. On first run, PyroSync's dependencies are
+//         installed automatically (same on Windows, macOS, and Linux).
 
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
-const { exec } = require("child_process");
+const { exec, execSync } = require("child_process");
 
 const ROOT = __dirname;
 const args = process.argv.slice(2);
@@ -71,6 +72,22 @@ function serveFromDir(res, baseDir, rel) {
   });
 }
 
+/* First run: install PyroSync's dependencies so its vendor libraries
+   (d3, Tone.js, d3-audio, ...) can be served. Cross-platform: npm is
+   invoked through the shell, which resolves npm.cmd on Windows. */
+function ensureDeps() {
+  const pyroDir = path.join(ROOT, "pyrosync");
+  if (fs.existsSync(path.join(pyroDir, "node_modules", "d3"))) return;
+  console.log("First run: installing PyroSync dependencies (npm install)...");
+  try {
+    execSync("npm install --omit=dev --no-audit --no-fund", { cwd: pyroDir, stdio: "inherit", shell: true });
+  } catch (e) {
+    console.log("Automatic install failed — PyroSync's vendor libraries will 404.");
+    console.log("Fix manually:  cd pyrosync && npm install");
+  }
+}
+ensureDeps();
+
 const server = http.createServer((req, res) => {
   const urlPath = decodeURI((req.url || "/").split("?")[0]);
 
@@ -105,8 +122,8 @@ server.listen(PORT, () => {
   console.log(`  3D flight:     ${base}/space-jukebox/fly.html`);
   const d3 = path.join(ROOT, "pyrosync", "node_modules", "d3");
   if (!fs.existsSync(d3)) {
-    console.log("\n  NOTE: PyroSync vendor libraries not installed yet.");
-    console.log("  Run `npm install` inside the pyrosync/ folder once, then restart.");
+    console.log("\n  NOTE: PyroSync vendor libraries are missing (install did not complete).");
+    console.log("  PyroSync will not load fully; Space Jukebox is unaffected.");
   }
   console.log("\nPress Ctrl+C to stop.");
   if (!NO_OPEN) {
