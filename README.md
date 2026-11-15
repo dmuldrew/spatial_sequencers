@@ -8,7 +8,9 @@ An interactive **audio-visual NASA wildfire, meteorology, and Earth-data sonific
 
 ## TL;DR
 
-- **What:** Two sonification apps that turn NASA Earth data into sound, built for the **2026 NASA Space Apps Challenge** (Seattle). Submission challenge: **The Earth Information Jukebox**.
+- **Who:** Blind and low-vision audiences — and anyone who can't use a map — are shut out of NASA Earth data published as pictures and charts.
+- **What:** Two sonification apps that turn that data into sound, built for the **2026 NASA Space Apps Challenge** (Seattle). Submission challenge: **The Earth Information Jukebox**.
+- **Why:** A changing planet shouldn't require eyes to perceive. Earth data you can *hear*, not just see.
 - **PyroSync** — a fire-weather observatory: 26 years of NASA POWER meteorology, EONET wildfires, and FIRMS hotspots, sonified with `d3-audio` across a climate spiral, an Iowa H3 hex map, and an orbital flyby.
 - **Space Jukebox** — an audio-first 3D fire flight designed for blind and low-vision listeners: a ship tours the 330 largest NASA FIRMS hotspots on Earth this week while spoken narration, a bowed-string tone, and extruded light bars make the fires audible and visible.
 - **Live demo:** https://dmuldrew.github.io/spatial_sequencers/
