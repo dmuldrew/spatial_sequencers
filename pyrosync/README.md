@@ -233,6 +233,15 @@ python3 scripts/prepare_global_fire.py /path/to/firms/modis_*.parquet --vegetati
 
 **Guided fire hotspot tour.** The flyby's autopilot now defaults to **🔥 Fire Hotspot Tour**: it narrates what the visuals and sounds mean, then flies to eight hotspots (northern California, Brazil's Cerrado, Africa's northern savanna, Angola's miombo, Yakutia, northern Laos, Central Kalimantan, northern Australia) and explains why fire is common at each, in short lines drawn from published sources (cited in comments in `flyby.js`). The ship follows a great-circle route that climbs to about 1,600–2,900 km on long legs, then circles each hotspot at a constant ~715 km altitude. The fires, peak month and trend spoken at each stop are read from the hexagon at the centre of the circle, which blinks cyan (steady with reduced motion) with a light column above it so it is easy to spot on approach. Lines are spoken after **Enable Audio** and always shown as subtitles at the bottom of the viewport; **💬 Narration** toggles it, and taking manual control stops it. The chase camera keeps the ship in the upper third of the screen so more Earth shows below.
 
+**Tour narration audio.** Tour lines are pre-rendered MP3 clips (`public/data/tour/`, 61 clips, ~2 MB) played through Web Audio, so narration and fire sounds play together on every platform (iOS Safari cannot play `speechSynthesis` and Web Audio at once). The fire sounds dip slightly while a line plays. The text lives in `public/js/tour-content.js`; after changing it or the fire data, re-render with Piper's public-domain LJ Speech voice:
+
+```bash
+pip install piper-tts lameenc pyarrow h3
+python3 scripts/build_tour_narration.py --voice /path/to/en_US-ljspeech-high.onnx
+```
+
+Lines without a clip, the F readout and biome announcements still use the browser's speech, so on iOS they briefly pause the fire sounds.
+
 **Flyby sound.** After **Enable Audio**, the Fire History layer plays a Geiger-style crackle (rate follows density), a pluck on each newly entered cell (pitch follows density, C pentatonic), a short tension chord for the trend (rising fire activity tense/dissonant, steady or falling consonant, via d3-audio `scaleTension`), and a bell when the peak fire month changes from cell to cell (January = C5 … December = B5). **F** speaks the cell under the craft: fires, density, trend and peak month.
 
 Colour by `density`, not `detections`: counts grow about 7× per coarser resolution. With a raster_h3 build that has zoom bands for H3 tables, every zoom from 0 to 9 has tiles (res 0: z0–1, 1: z2–3, 2: z4, 3: z5, 4: z6–7, 5: z8–9). Older builds put each resolution at one zoom and leave z1, z3, z6 and z9 empty.

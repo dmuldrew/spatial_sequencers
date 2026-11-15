@@ -1,4 +1,8 @@
 import * as THREE from '../vendor/three.module.min.js';
+import {
+  TOUR_STOPS, TOUR_INTRO, TOUR_TIP, MONTH_NAMES, firstStopLine, nextStopLine, resumeLine,
+  arrivalLine, dataLine, trendPercentFromLog2
+} from './tour-content.js';
 
 const EARTH_R = 24;
 const MIN_RADIUS = EARTH_R + 1.15;
@@ -14,83 +18,6 @@ const KM_PER_UNIT = 265;
 const FIRE_HISTORY_DIR = './data/global-fire/';
 // Low-to-high fire density ramp for the multi-year H3 fire history carpet.
 const FIRE_HISTORY_STOPS = ['#4c0519', '#b91c1c', '#f97316', '#facc15', '#fef9c3'];
-
-// Guided fire hotspot tour. Each stop sits on the densest H3 resolution-3 hexagon of its
-// region in the 2001-2025 data; the spoken numbers are read from the data at arrival,
-// the context sentence explains why fire is common there.
-const TOUR_STOPS = [
-  {
-    id: 'california', name: "Northern California's Klamath Mountains", lat: 41.83, lon: -123.67,
-    // UC Berkeley / PNAS 2022: Indigenous burning shaped Klamath forests for a millennium.
-    context: [
-      'Karuk and Yurok cultural burning kept these forests open for at least a thousand years.',
-      'A century of fire suppression let them grow dense, and with a warming climate, fires here now burn larger.'
-    ]
-  },
-  {
-    id: 'brazil', name: "Maranhão, in Brazil's Cerrado", lat: -6.23, lon: -45.14,
-    // MATOPIBA studies: Maranhão and Tocantins lead Cerrado burned area; fires track fresh clearing.
-    context: [
-      'Maranhão sits on the Cerrado\'s soy and cattle frontier, where it and Tocantins burn the most of any states in the biome.',
-      'Most fires here follow freshly cleared land, set in the dry season from July to October.'
-    ]
-  },
-  {
-    id: 'northern-savanna', name: "Africa's northern savanna", lat: 5.57, lon: 28.29,
-    // Andela et al., Science 2017: savanna burned area fell as cropland and livestock fragmented grassland.
-    context: [
-      'Each dry season, from November to March, people burn these grasslands to clear fields and renew grazing.',
-      'Across Africa\'s northern savannas, burned area has fallen as farms and herds break up the grass that carries fire.'
-    ]
-  },
-  {
-    id: 'angola', name: "Angola's miombo woodlands", lat: -9.42, lon: 17.97,
-    // Catarino et al. 2022: ~30% of Angola burns each year (MODIS 2001-2019); Africa ~70% of global burned area.
-    context: [
-      'Africa holds about 70 percent of the world\'s burned area, and roughly 30 percent of Angola burns every year.',
-      'These are mostly small savanna and farm fires, not forest clearing.'
-    ]
-  },
-  {
-    id: 'yakutia', name: 'Yakutia, in eastern Siberia', lat: 62.32, lon: 127.33,
-    // NASA Earth Observatory: 2021 was Sakha's record burn year in the MODIS era (~9.4 million ha).
-    context: [
-      'Larch forests on carbon-rich permafrost start burning soon after the snow melts.',
-      'In 2021, Yakutia burned more than nine million hectares, its largest fire year in the satellite record.'
-    ]
-  },
-  {
-    id: 'laos', name: 'Northern Laos', lat: 19.72, lon: 102.31,
-    // Lao air-quality reporting: shifting-cultivation burning; March-April haze; Jan-Apr burn ban (2025-26).
-    context: [
-      'Farmers burn hillside plots for shifting cultivation, and smoke haze peaks in March and April.',
-      'Laos now bans outdoor burning from January to April to cut the haze.'
-    ]
-  },
-  {
-    id: 'kalimantan', name: 'Central Kalimantan, on Borneo', lat: -2.79, lon: 113.85,
-    // Mongabay / CIFOR: failed Mega Rice Project drained peat; 2015 El Nino fires; canal blocking by the peat agency.
-    context: [
-      'The failed Mega Rice Project of the 1990s drained a million hectares of peat swamp here.',
-      'In El Niño droughts like 2015 the dry peat smoulders for weeks; canals are now being blocked to rewet it.'
-    ]
-  },
-  {
-    id: 'north-australia', name: "Northern Australia's savannas", lat: -13.39, lon: 132.2,
-    // WALFA studies: early dry-season burning cut late-season fires and emissions by ~38%.
-    context: [
-      'Rangers, many of them Indigenous, burn early in the dry season, when fires are cool and patchy.',
-      'Projects like West Arnhem Land have cut late-season fires and emissions by more than a third.'
-    ]
-  }
-];
-
-const TOUR_INTRO = [
-  'Welcome aboard PyroSat-1. We are touring the world\'s fire hotspots.',
-  'The hexagons show 25 years of satellite fire detections: yellow means the most fire, dark red the least. Orange towers are a recent week\'s most intense fires.',
-  'Listen: crackle and higher notes mean more fire, a tense chord means fire is rising, and a bell marks a new fire season.',
-  'Press F at any time for the fire history below.'
-];
 
 // Tour flight: a great-circle transit that arcs up for a wider view, then a constant
 // circle around each hotspot. Scene units: 1 unit = 265 km.
@@ -919,8 +846,6 @@ export function createFlybyController(bridge) {
     return 'very high';
   }
 
-  const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July',
-    'August', 'September', 'October', 'November', 'December'];
 
   // Percent change in mean yearly detections, late window vs early window.
   function fireTrendPercent(trendLog2) {
@@ -1179,7 +1104,9 @@ export function createFlybyController(bridge) {
       audioBus.panner = new Tone.Panner(0);
       audioBus.filter = new Tone.Filter(1200, 'lowpass');
       audioBus.panner.connect(audioBus.filter);
-      audioBus.filter.toDestination();
+      // Fire sounds pass through a ducking gain that dips while narration clips play.
+      audioBus.duck = new Tone.Gain(1).toDestination();
+      audioBus.filter.connect(audioBus.duck);
 
       audioBus.drone = new Tone.PolySynth(Tone.Synth, {
         oscillator: { type: 'triangle' },
@@ -1211,7 +1138,7 @@ export function createFlybyController(bridge) {
       // density under the craft, and a pluck each time the craft enters a new H3 cell,
       // pitched by that cell's density. Their own chain, so the biome filter sweep
       // does not muffle them.
-      audioBus.historyOut = new Tone.Gain(0.9).toDestination();
+      audioBus.historyOut = new Tone.Gain(0.9).connect(audioBus.duck);
       audioBus.crackleFilter = new Tone.Filter({ frequency: 2600, type: 'bandpass', Q: 0.8 })
         .connect(audioBus.historyOut);
       audioBus.crackle = new Tone.NoiseSynth({
@@ -1373,6 +1300,80 @@ export function createFlybyController(bridge) {
     if (!narrator.busy) nextNarrationLine();
   }
 
+  // Pre-rendered narration clips (data/tour/narration.json maps line text -> MP3, built
+  // by scripts/build_tour_narration.py). Played through Web Audio, they mix with the
+  // fire sounds on every platform; iOS cannot play speechSynthesis and Web Audio at once.
+  const NARRATION_DIR = './data/tour/';
+  const narrationClips = { lines: null, loading: null, buffers: new Map() };
+
+  function loadNarrationManifest() {
+    if (!narrationClips.loading) {
+      narrationClips.loading = fetch(`${NARRATION_DIR}narration.json`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((m) => { narrationClips.lines = m?.lines || {}; })
+        .catch(() => { narrationClips.lines = {}; });
+    }
+    return narrationClips.loading;
+  }
+
+  function rawAudioContext() {
+    const Tone = bridge.Tone || window.Tone;
+    return Tone?.context?.rawContext || null;
+  }
+
+  const clipFor = (text) => (typeof text === 'string' ? narrationClips.lines?.[text] || null : null);
+
+  function fetchClip(file) {
+    if (!narrationClips.buffers.has(file)) {
+      const ctx = rawAudioContext();
+      const promise = fetch(`${NARRATION_DIR}${file}`)
+        .then((r) => {
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          return r.arrayBuffer();
+        })
+        // Callback form: older Safari has no promise-returning decodeAudioData.
+        .then((data) => new Promise((resolve, reject) => ctx.decodeAudioData(data, resolve, reject)));
+      promise.catch(() => narrationClips.buffers.delete(file));
+      narrationClips.buffers.set(file, promise);
+    }
+    return narrationClips.buffers.get(file);
+  }
+
+  function prefetchNarration(lines) {
+    if (!rawAudioContext() || !narrationClips.lines) return;
+    for (const line of lines) {
+      const file = clipFor(line);
+      if (file) fetchClip(file).catch(() => {});
+    }
+  }
+
+  // Lower the fire sounds a little while narration plays, so speech stays clear.
+  function duckFireSounds(on) {
+    const gain = audioBus.duck?.gain;
+    if (gain?.rampTo) gain.rampTo(on ? 0.45 : 1, on ? 0.15 : 0.5);
+  }
+
+  function playClip(buffer, onEnded) {
+    const Tone = bridge.Tone || window.Tone;
+    const ctx = rawAudioContext();
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    const gain = ctx.createGain();
+    src.connect(gain);
+    try {
+      // Through Tone's destination, so the page's Mute button silences narration too.
+      Tone.connect(gain, Tone.getDestination());
+    } catch (_) {
+      gain.connect(ctx.destination);
+    }
+    src.onended = () => {
+      try { gain.disconnect(); } catch (_) {}
+      onEnded();
+    };
+    src.start();
+    return src;
+  }
+
   function nextNarrationLine() {
     clearNarratorTimers();
     const item = narrator.queue.shift();
@@ -1400,6 +1401,25 @@ export function createFlybyController(bridge) {
     }, delay));
     const readingMs = 1600 + item.text.length * 55;
     const state = bridge.getState();
+    const clip = clipFor(item.text);
+    if (clip && state.audioReady && !state.isMuted && rawAudioContext()) {
+      initFlybyAudio();
+      window.PyroAudioUnlock?.resumeContext?.();
+      fetchClip(clip)
+        .then((buffer) => {
+          if (token !== narrator.token) return;
+          duckFireSounds(true);
+          narrator.source = playClip(buffer, () => {
+            narrator.source = null;
+            duckFireSounds(false);
+            if (token === narrator.token) advance(350);
+          });
+        })
+        .catch(() => { if (token === narrator.token) advance(readingMs); });
+      // Safety net in case playback never ends (e.g. the context stays suspended).
+      advance(readingMs * 2 + 8000);
+      return;
+    }
     if ('speechSynthesis' in window && state.audioReady && !state.isMuted) {
       try {
         const u = new SpeechSynthesisUtterance(item.text);
@@ -1424,6 +1444,11 @@ export function createFlybyController(bridge) {
     narrator.queue = [];
     narrator.busy = false;
     clearNarratorTimers();
+    if (narrator.source) {
+      try { narrator.source.stop(); } catch (_) {}
+      narrator.source = null;
+      duckFireSounds(false);
+    }
     if ('speechSynthesis' in window) {
       try { window.speechSynthesis.cancel(); } catch (_) {}
     }
@@ -1449,30 +1474,26 @@ export function createFlybyController(bridge) {
     if (!row) return [];
     const [detections, , , trend, peakMonth] = row;
     const startYear = (fireHistoryYears().match(/\d{4}/) || ['2001'])[0];
-    let line = `The hexagon at the centre of our circle logged ${Math.round(detections).toLocaleString()} fires since ${startYear}`;
-    if (peakMonth >= 1) line += `, peaking in ${MONTH_NAMES[peakMonth - 1]}`;
-    const pct = fireTrendPercent(trend);
-    if (pct !== null && fireTrendWindows()) {
-      if (Math.abs(pct) < 10) line += ', with a steady trend, so the chord is calm.';
-      else if (pct > 0) line += `, up ${pct} percent in the last decade, hence the tense chord.`;
-      else line += `, down ${Math.abs(pct)} percent in the last decade, so the chord stays calm.`;
-    } else {
-      line += '.';
-    }
-    return [line];
+    return [dataLine({
+      detections,
+      trendPercent: fireTrendWindows() ? trendPercentFromLog2(trend) : null,
+      peakMonth,
+      startYear
+    })];
   }
 
   function startTour({ intro = true, resume = false } = {}) {
     stopNarration();
     beginTourLeg(tourStop());
+    loadNarrationManifest().then(() => prefetchNarration([TOUR_TIP, ...TOUR_INTRO]));
     sim.tour.started = true;
     const lines = [];
     const state = bridge.getState();
-    if (!state.audioReady && intro) lines.push('Tip: click Enable Audio to hear this narration and the fire sounds.');
+    if (!state.audioReady && intro) lines.push(TOUR_TIP);
     if (intro) lines.push(...TOUR_INTRO);
     // Lazy: skip the announcement if the ship already reached the stop during the intro.
     lines.push(() => (sim.tour.phase === 'transit'
-      ? [`${resume ? 'Resuming the tour. ' : ''}${intro ? 'First stop' : 'Next stop'}: ${tourStop().name}.`]
+      ? [resume ? resumeLine(tourStop()) : (intro ? firstStopLine(tourStop()) : nextStopLine(tourStop()))]
       : []));
     narrate(lines);
   }
@@ -1500,6 +1521,10 @@ export function createFlybyController(bridge) {
   // Great-circle leg from the ship to the circle around `stop`, entering the circle on the
   // side facing the ship, with an altitude arc that peaks higher on longer legs.
   function beginTourLeg(stop) {
+    loadNarrationManifest().then(() => prefetchNarration([
+      firstStopLine(stop), nextStopLine(stop), resumeLine(stop), arrivalLine(stop),
+      ...stop.context, ...tourDataLines(stop)
+    ]));
     const from = sim.craftPos.clone().normalize();
     const c = latLonAltToVec3(stop.lat, stop.lon, 1, new THREE.Vector3()).normalize();
     const { east, north } = surfaceFrame(c);
@@ -1534,7 +1559,7 @@ export function createFlybyController(bridge) {
     sim.tour.phase = 'arrived';
     sim.tour.theta = sim.tour.leg?.theta || 0;
     sim.tour.arrivedAt = performance.now();
-    narrate([`Now over ${stop.name}.`, ...stop.context, () => tourDataLines(stop)], () => {
+    narrate([arrivalLine(stop), ...stop.context, () => tourDataLines(stop)], () => {
       sim.tour.phase = 'dwell';
       // Wall-clock: a short pause after the narration, and at least ~12 s of circling.
       sim.tour.dwellUntil = Math.max(performance.now() + 4000, sim.tour.arrivedAt + 12000);
@@ -1637,7 +1662,7 @@ export function createFlybyController(bridge) {
       if (sim.tour.phase === 'dwell' && performance.now() >= sim.tour.dwellUntil) {
         sim.tour.index = (sim.tour.index + 1) % TOUR_STOPS.length;
         beginTourLeg(tourStop());
-        narrate([`Next stop: ${tourStop().name}.`]);
+        narrate([nextStopLine(tourStop())]);
         return stepTourFlight(dt);
       }
       // Constant-altitude, constant-speed circle around the hotspot.

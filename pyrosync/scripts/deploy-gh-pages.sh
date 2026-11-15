@@ -92,6 +92,8 @@ REQUIRED_FILES=(
   "js/app.js"
   "js/hub-nav.js"
   "js/flyby.js"
+  "js/tour-content.js"
+  "data/tour/narration.json"
   "js/enable-audio.js"
   "data/fire_weather_data.json"
   "midwest/map.html"
