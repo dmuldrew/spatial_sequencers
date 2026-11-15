@@ -834,7 +834,7 @@ export function createFlybyController(bridge) {
   }
 
   function initFlybyAudio() {
-    const Tone = bridge.Tone;
+    const Tone = bridge.Tone || window.Tone;
     if (!Tone || audioBus.ready) return;
     try {
       audioBus.panner = new Tone.Panner(0);
