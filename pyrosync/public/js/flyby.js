@@ -1438,7 +1438,7 @@ export function createFlybyController(bridge) {
       if (scan.iowaCell && Number.isFinite(scan.iowaCell.A1)) {
         const ndviStr = Number.isFinite(scan.iowaCell.A2) ? scan.iowaCell.A2.toFixed(2) : '—';
         dom.hudHex.textContent = `H3 ${scan.iowaCell.id.slice(0, 7)}… ${scan.iowaCell.A1.toFixed(1)}°C · NDVI ${ndviStr}`;
-      } else if (scan.fireBin && scan.distToFire < 8.5) {
+      } else if (scan.fireBin && scan.distToFire < 8.5 && fireGroup?.visible !== false) {
         dom.hudHex.textContent = `${scan.fireBin.count} hotspots · ${Math.round(scan.fireBin.totalFrp)} MW FRP`;
       } else if (scan.historyCell) {
         const { res, detections, density } = scan.historyCell;
