@@ -197,6 +197,7 @@ const FLAT_UP = new THREE.Vector3(0, 0, 1);
 const DEG = Math.PI / 180;
 const _flatPos = new THREE.Vector3(), _flatAhead = new THREE.Vector3();
 let flatLonCont = null, flatPrevLon = 0; /* continuous (unwrapped) flat longitude */
+let flatX = 0, flatY = 0; /* manual flight state: the ship's position on the flat map itself */
 const _desired = new THREE.Vector3(), _look = new THREE.Vector3();
 const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.01, 100);
 camera.position.set(0, 1.4, 3.6);
@@ -248,7 +249,7 @@ function hotspotScale(){ return renderer.domElement.height * 0.5; }
 function hotspotMaterial(){
   const m = new THREE.ShaderMaterial({
     uniforms: { uPulse: { value: 1 }, uScale: { value: hotspotScale() },
-      uTime: { value: 0 }, uFlick: { value: REDUCED_MOTION ? 0 : 1 } },
+      uTime: { value: 0 }, uFlick: { value: REDUCED_MOTION ? 0 : 1 }, uBoost: { value: 0 } },
     vertexShader: `
       attribute float aSize;
       attribute float aMag;
@@ -256,15 +257,18 @@ function hotspotMaterial(){
       attribute vec3 aColor;
       varying vec3 vColor;
       varying float vFlick;
-      uniform float uPulse, uScale, uTime, uFlick;
+      uniform float uPulse, uScale, uTime, uFlick, uBoost;
       void main(){
         /* living fire: every hotspot flickers on its own phase, and the
-           bigger the fire (aMag), the faster and harder it flickers */
+           bigger the fire (aMag), the faster and harder it flickers.
+           uBoost is the fire intensity under the ship: as it climbs,
+           every fire on screen swells and brightens with it, so the
+           rendering intensifies exactly when the tone does           */
         float flick = sin(uTime * (2.0 + aMag * 3.5) + aPhase) * (0.08 + aMag * 0.30) * uFlick;
         vFlick = flick;
-        vColor = aColor;
+        vColor = aColor * (1.0 + uBoost * 0.55);
         vec4 mv = modelViewMatrix * vec4(position, 1.0);
-        gl_PointSize = aSize * uPulse * (1.0 + flick) * uScale / -mv.z;
+        gl_PointSize = aSize * uPulse * (1.0 + flick) * (1.0 + uBoost * 0.9) * uScale / -mv.z;
         gl_Position = projectionMatrix * mv;
       }`,
     fragmentShader: `
@@ -573,6 +577,8 @@ function setPilotMode(m){
   if (m === "manual"){
     freePos.copy(curve.getPointAt(u)).setLength(1.24);
     heading = bearingBetween(vecToLatLon(freePos), vecToLatLon(curve.getPointAt((u + 0.01) % 1)));
+    const ll0 = vecToLatLon(freePos);
+    flatX = ll0.lon * DEG; flatY = ll0.lat * DEG;
     announce("Manual pilot. You have the controls. Steer with the left stick or the arrow keys; push forward to speed up. The globe flattens into a map while you fly. The fires still sing below you.");
   } else {
     u = nearestU(freePos);
@@ -625,11 +631,18 @@ function updateFree(dt){
   bankTarget = -steer * 0.55;
   const spd = 0.09 * manualSpeed;
   if (spd <= 0.0001) return;
-  const ll = vecToLatLon(freePos);
-  const fr = localFrame(ll.lat, ll.lon);
-  const dir = fr.north.multiplyScalar(Math.cos(heading)).addScaledVector(fr.east, Math.sin(heading)).normalize();
-  const axis = new THREE.Vector3().crossVectors(freePos.clone().normalize(), dir).normalize();
-  freePos.applyAxisAngle(axis, spd * dt).setLength(1.24);
+  /* Manual flight is planar: the ship flies on the flat map itself.
+     Straight lines stay straight, flying east holds your latitude,
+     the world loops at the left and right edges, and the top and
+     bottom are simply the ends of the map. The sphere position is
+     re-derived from the map position every step, because the sound,
+     narration and HUD all read latitude/longitude from it.         */
+  flatX += Math.sin(heading) * spd * dt;
+  flatY += Math.cos(heading) * spd * dt;
+  const yMax = Math.PI / 2 - 0.03;
+  flatY = Math.max(-yMax, Math.min(yMax, flatY));
+  const lonDeg = ((flatX / DEG + 180) % 360 + 360) % 360 - 180;
+  freePos.copy(latLonToVec3(flatY / DEG, lonDeg, 1.24));
 }
 
 const clock = new THREE.Clock();
@@ -661,27 +674,16 @@ function animate(){
   let rPos = pos, rAhead = ahead;
   const rUp = manual ? FLAT_UP : _radial.copy(pos).normalize();
   if (manual){
-    /* Unwrapped longitude: the flat x accumulates across the ±180° seam
-       (and rebases by one map width, camera shifted along, when the ship
-       crosses it), so flight loops around the tiled map seamlessly
-       instead of the ship teleporting and the camera sweeping.        */
-    const mp = vecToLatLon(pos), la = vecToLatLon(ahead);
-    if (flatLonCont === null){ flatLonCont = mp.lon; flatPrevLon = mp.lon; }
-    let dl = mp.lon - flatPrevLon; if (dl > 180) dl -= 360; if (dl < -180) dl += 360;
-    /* rate-limit the flat longitude: near the poles the sphere longitude
-       swings ~180° in a step, and following it literally teleports the
-       ship across the map every frame (the polar stutter). Legit flight
-       never exceeds ~15°/s, so a 120°/s cap only binds at the poles.  */
-    const maxDl = 120 * dt + 0.5;
-    dl = Math.max(-maxDl, Math.min(maxDl, dl));
-    flatLonCont += dl; flatPrevLon = mp.lon;
-    if (flatLonCont > 180){ flatLonCont -= 360; camTargetPos.x -= Math.PI * 2; }
-    else if (flatLonCont < -180){ flatLonCont += 360; camTargetPos.x += Math.PI * 2; }
-    let dlA = la.lon - mp.lon; if (dlA > 180) dlA -= 360; if (dlA < -180) dlA += 360;
-    dlA = Math.max(-60, Math.min(60, dlA)); /* heading follows suit */
-    _flatPos.set(flatLonCont * DEG, mp.lat * DEG, 0.06);
-    _flatAhead.set((flatLonCont + dlA) * DEG, la.lat * DEG, 0.06);
+    /* The ship's flat position IS the flight state (flatX, flatY) —
+       no projection from the sphere. Rebasing by one map width when
+       it crosses an edge keeps it on the centre tile of the looped
+       world, camera shifted along so nothing jumps.                */
+    if (flatX > Math.PI){ flatX -= Math.PI * 2; camTargetPos.x -= Math.PI * 2; }
+    else if (flatX < -Math.PI){ flatX += Math.PI * 2; camTargetPos.x += Math.PI * 2; }
+    _flatPos.set(flatX, flatY, 0.06);
+    _flatAhead.set(flatX + Math.sin(heading) * 0.12, flatY + Math.cos(heading) * 0.12, 0.06);
     rPos = _flatPos; rAhead = _flatAhead;
+    flatLonCont = flatX / DEG; flatPrevLon = vecToLatLon(pos).lon; /* for the trail */
   }
   if (manual) ship.up.set(0, 0, 1); else ship.up.set(0, 1, 0);
   ship.position.copy(rPos);
@@ -708,7 +710,8 @@ function animate(){
   }
   trailGeo.attributes.position.needsUpdate = true;
   const pulse = REDUCED_MOTION ? 1.1 : 1 + Math.sin(t * 2.6) * 0.18;
-  for (const m of hotspotMats){ m.uniforms.uPulse.value = pulse; m.uniforms.uTime.value = t; }
+  const boost = Math.min(1, intensitySmooth / 2600);
+  for (const m of hotspotMats){ m.uniforms.uPulse.value = pulse; m.uniforms.uTime.value = t; m.uniforms.uBoost.value = boost; }
 
   /* camera: smoothing is now a function of dt, so the chase feels the same at
      30, 60 and 144 fps (the old fixed per-frame factor did not).           */
@@ -786,7 +789,7 @@ function animate(){
   }
   if (flying && inBiome && biome.id !== lastBiomeId){
     lastBiomeId = biome.id;
-    announce(`Now flying over ${biome.name}. ${biome.note} ${biome.count} major hotspots below, totalling about ${Math.round(biome.totalFrp)} megawatts of fire power. Strongest single fire, ${biome.maxFrp}. ${biome.rankLine}`);
+    announce(`Now flying over ${biome.name}. ${biome.note} ${biome.count} major hotspots below, totalling about ${Math.round(biome.totalFrp)} megawatts of fire power. Strongest single fire, ${biome.maxFrp} megawatts. ${biome.rankLine}`);
   }
   /* bonus detail at a region's core — only when the voice is free, so
      it never talks over the entry announcement                        */
@@ -830,7 +833,7 @@ $("startBtn").addEventListener("click", () => {
   /* u begins on the first region, so mark it announced: otherwise the region
      check fired on the very next frame and cancelled the intro mid-sentence. */
   lastBiomeId = tour[0].id;
-  announce(`Space Jukebox fire flight. Touring six fire regions of Earth, west to east. The ship follows 330 of the largest hotspots NASA satellites recorded this week, out of ${TOTAL_7D} detections in total. First stop, ${tour[0].name}. Press S at any time to hear where you are. The tone rises as the fires below grow hotter and denser.`);
+  announce(`Space Jukebox fire flight. Touring six fire regions of Earth, west to east. The ship follows 330 of the largest hotspots NASA satellites recorded this week, out of ${TOTAL_7D} detections in total. A hotspot is a fire the satellites spotted from orbit, and its fire power is measured in megawatts of heat. First stop, ${tour[0].name}. Press S at any time to hear where you are. The tone rises as the fires below grow hotter and denser.`);
   $("btnFly").focus();
 });
 $("btnFly").addEventListener("click", () => {
