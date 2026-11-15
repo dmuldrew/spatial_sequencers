@@ -227,7 +227,7 @@ python3 scripts/prepare_global_fire.py /path/to/firms/*.csv --vegetation-only
 # --skip-pmtiles stops after Parquet + LOD JSON; --snap-degrees 0 bins every detection exactly
 ```
 
-Colour by `density`, not `detections`: counts grow about 7× per coarser resolution. Known gap: raster_h3 places each resolution at a single zoom (res 0→z0, 1→z2, 2→z4, 3→z5, 4→z7, 5→z8), so zooms 1, 3 and 6 contain no tiles.
+Colour by `density`, not `detections`: counts grow about 7× per coarser resolution. With a raster_h3 build that has zoom bands for H3 tables, every zoom from 0 to 9 has tiles (res 0: z0–1, 1: z2–3, 2: z4, 3: z5, 4: z6–7, 5: z8–9). Older builds put each resolution at one zoom and leave z1, z3, z6 and z9 empty.
 
 ## Orbital Flyby (3D)
 

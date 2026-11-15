@@ -5,8 +5,10 @@ Outputs, from one pass over the input CSVs:
 1. ``global_fire_h3.parquet``: every requested H3 resolution (default 0-5) in one
    table, one row per cell, keyed by ``h3_index``.
 2. ``global_fire.pmtiles``: the same table as a PMTiles v3 vector pyramid, written by
-   raster_h3 (https://github.com/dmuldrew/raster_h3). Each resolution lands at its
-   matching Web Mercator zoom (res 0 -> z0, 1 -> z2, 2 -> z4, 3 -> z5, 4 -> z7, 5 -> z8).
+   raster_h3 (https://github.com/dmuldrew/raster_h3). Each resolution fills a band
+   of Web Mercator zooms (res 0: z0-1, 1: z2-3, 2: z4, 3: z5, 4: z6-7, 5: z8-9), so
+   no zoom is empty. raster_h3 builds without zoom bands put each resolution at a
+   single zoom and leave z1, z3, z6 and z9 empty.
 3. ``lod-r{N}.json`` + ``manifest.json``: small level-of-detail extracts (default
    res 2-4) for the Three.js orbital flyby, which swaps levels by altitude.
 
