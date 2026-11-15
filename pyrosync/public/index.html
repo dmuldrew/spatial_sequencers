@@ -392,6 +392,7 @@
               <button type="button" id="flyby-btn-cam" class="btn btn-mini">🎥 Cam: Chase</button>
               <button type="button" id="flyby-btn-horizon" class="btn btn-mini" aria-pressed="true">🧭 Horizon Lock</button>
               <button type="button" id="flyby-btn-reset" class="btn btn-mini">↺ Reset Orbit</button>
+              <button type="button" id="flyby-btn-narration" class="btn btn-mini" aria-pressed="true" title="Spoken tour narration with subtitles">💬 Narration: On</button>
             </div>
           </div>
 
@@ -422,6 +423,9 @@
               <span class="flyby-reticle-ring"></span>
               <span class="flyby-reticle-dot"></span>
             </div>
+
+            <!-- Tour narration subtitles (speech is read aloud separately, so not a live region) -->
+            <div id="flyby-subtitle" class="flyby-caption" hidden></div>
 
             <!-- Loading / WebGL status banner -->
             <div id="flyby-status-banner" class="flyby-status-banner">Initializing Three.js planetary core…</div>
