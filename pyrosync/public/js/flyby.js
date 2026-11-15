@@ -147,8 +147,10 @@ export function createFlybyController(bridge) {
     panner: null,
     filter: null,
     drone: null,
+    violin: null,
     scanner: null,
-    ember: null
+    ember: null,
+    lastSpokenBiomeId: null
   };
 
   // Scene references
@@ -832,7 +834,7 @@ export function createFlybyController(bridge) {
   }
 
   function initFlybyAudio() {
-    const Tone = bridge.Tone;
+    const Tone = bridge.Tone || window.Tone;
     if (!Tone || audioBus.ready) return;
     try {
       audioBus.panner = new Tone.Panner(0);
@@ -844,6 +846,13 @@ export function createFlybyController(bridge) {
         oscillator: { type: 'triangle' },
         volume: -17,
         envelope: { attack: 0.16, decay: 0.25, sustain: 0.55, release: 0.85 }
+      }).connect(audioBus.panner);
+
+      // 3D Fire Flight continuous thermal violin voice (sawtooth glide)
+      audioBus.violin = new Tone.Synth({
+        oscillator: { type: 'sawtooth' },
+        volume: -20,
+        envelope: { attack: 0.08, decay: 0.2, sustain: 0.7, release: 0.5 }
       }).connect(audioBus.panner);
 
       audioBus.scanner = new Tone.FMSynth({
@@ -892,13 +901,33 @@ export function createFlybyController(bridge) {
       audioBus.filter.frequency.rampTo(targetCutoff, 0.12);
     }
 
-    // Harmonic Pyro-Spiral Drone every ~680ms
+    // Harmonic Pyro-Spiral Drone + 3D Fire Flight Continuous Thermal Violin every ~680ms
     if (nowMs - sim.lastDroneMs >= 680 && audioBus.drone && rec) {
       sim.lastDroneMs = nowMs;
       try {
         audioBus.drone.set({ detune: tierInfo.detuneCents * proxBiome });
         audioBus.drone.triggerAttackRelease(tierInfo.chord, 0.62, undefined, 0.14 + proxBiome * 0.24);
+        if (audioBus.violin) {
+          const frpNorm = fireBin ? clamp(fireBin.totalFrp / 2400, 0, 1) : clamp(posZ / 3.0, 0, 1);
+          const violinFreq = 110 * Math.pow(2, frpNorm * 2.1);
+          audioBus.violin.triggerAttackRelease(violinFreq, 0.58, undefined, 0.12 + frpNorm * 0.22);
+        }
       } catch (_) {}
+    }
+
+    // Spoken biome arrival narration (from 3D Fire Flight + PyroSync telemetry)
+    if (biome && distToBiome < 7.5 && audioBus.lastSpokenBiomeId !== biome.id) {
+      audioBus.lastSpokenBiomeId = biome.id;
+      if ('speechSynthesis' in window && !state.isMuted) {
+        try {
+          window.speechSynthesis.cancel();
+          const u = new SpeechSynthesisUtterance(
+            `Flying over ${biome.name}. Climate departure ${(rec?.zScore || 0).toFixed(1)} sigma, ${tierInfo.label.split(' ')[0]}.`
+          );
+          u.rate = 1.05;
+          window.speechSynthesis.speak(u);
+        } catch (_) {}
+      }
     }
 
     // Spatial Hex/Fire Scanner Pulse

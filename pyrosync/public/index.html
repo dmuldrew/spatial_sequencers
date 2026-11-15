@@ -14,7 +14,39 @@
 <body>
   <a href="#main-heading" class="skip-link visually-hidden">Skip to main content</a>
 
+  <header class="hub-header is-wide">
+    <div class="hub-header-inner">
+      <a class="hub-brand" href="../">
+        <span aria-hidden="true">🪐</span>
+        <span>Spatial Sequencers Hub</span>
+      </a>
+
+      <nav class="site-nav" aria-label="Experiences">
+        <button
+          class="menu-button"
+          type="button"
+          popovertarget="site-menu"
+          popovertargetaction="toggle"
+          aria-controls="site-menu"
+        >
+          <span aria-hidden="true">☰</span>
+          <span>Experiences</span>
+        </button>
+
+        <ul id="site-menu" class="site-menu" role="list">
+          <li><a href="../" data-exp="hub">🪐 All Experiences</a></li>
+          <li><a href="#spiral" data-exp="spiral" aria-current="page">🌀 Wildfire Spiral</a></li>
+          <li><a href="#iowa-map" data-exp="iowa-map">⬡ Iowa Hex Map</a></li>
+          <li><a href="../spaceship-flyby/" data-exp="combined-flyby">🚀 Combined Flyby</a></li>
+          <li><a href="#flyby" data-exp="pyrosat-flyby">🛰️ PyroSat-1 3D</a></li>
+          <li><a href="../space-jukebox/fly.html" data-exp="fire-flight">🔥 3D Fire Flight</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
   <div class="container">
+
     <header class="site-header">
       <div>
         <p class="eyebrow">2026 NASA Space Apps · Fire-Weather Sonification Observatory</p>
@@ -203,7 +235,8 @@
       </div>
 
       <!-- Semantic Data Breakdown & Scientific Interpretation -->
-      <section class="reference-section" aria-labelledby="science-heading">
+      <details class="reference-section">
+        <summary>PyroSync methods and monthly records</summary>
         <h2 id="science-heading">Communicating Climate Departure with Harmonic Tension</h2>
         <p style="color: var(--muted); max-width: 78ch;">
           Rather than mapping raw seasonal temperature alone—where normal summers always sound intense—PyroSync measures
@@ -308,6 +341,22 @@
             </thead>
             <tbody id="monthly-table-body"></tbody>
           </table>
+        </div>
+      </details>
+      </section>
+
+      <section id="panel-iowa-view" role="tabpanel" aria-labelledby="tab-iowa" tabindex="0" hidden>
+        <div id="iowa-map" class="panel midwest-map-panel">
+          <div class="midwest-map-header">
+            <h2 id="midwest-heading">Central Iowa MODIS hexagon map</h2>
+            <a class="btn btn-mini" href="./midwest/map.html" target="_blank" rel="noopener noreferrer">Open standalone map ↗</a>
+          </div>
+          <iframe
+            id="midwest-map-frame"
+            class="midwest-map-frame"
+            data-src="./midwest/map.html"
+            title="Interactive H3 map of surface temperature and vegetation"
+          ></iframe>
         </div>
       </section>
 
@@ -420,6 +469,7 @@
   </div>
 
   <script src="./js/enable-audio.js"></script>
+  <script type="module" src="./js/hub-nav.js"></script>
   <script type="module" src="./js/app.js"></script>
 </body>
 </html>
