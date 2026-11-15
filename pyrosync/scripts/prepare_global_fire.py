@@ -19,8 +19,8 @@ Colour should use ``density`` (detections per km^2 per year), not raw counts: co
 grow about 7x per coarser resolution, density does not. ``manifest.json`` carries one
 shared colour range for all levels so the colours do not jump when levels swap.
 
-Input: FIRMS archive or NRT CSVs (MODIS C6.1 or VIIRS), e.g. the yearly
-``modis_<year>_<country>.csv`` files or an archive download request. Unzip them first.
+Input: FIRMS archive or NRT CSVs (MODIS C6.1 or VIIRS), or the yearly Parquet files
+written by ``fetch_firms_archive.py`` (pass one kind, not a mix).
 Required columns: latitude, longitude, acq_date, confidence, frp. ``type`` is used
 when present (archive files only) to keep presumed vegetation fires (type 0).
 
@@ -96,7 +96,12 @@ def load_bins(con, paths, min_confidence, vegetation_only, snap_degrees, high_co
     several km off-nadir). Use ``--snap-degrees 0`` for exact per-detection binning
     at the cost of indexing every detection.
     """
-    source = f"read_csv({[str(p) for p in paths]!r}, union_by_name = true, header = true)"
+    csvs = [str(p) for p in paths if p.suffix.lower() != '.parquet']
+    parquets = [str(p) for p in paths if p.suffix.lower() == '.parquet']
+    if csvs and parquets:
+        raise ValueError('Pass either CSV files or Parquet files, not a mix.')
+    source = (f"read_parquet({parquets!r}, union_by_name = true)" if parquets
+              else f"read_csv({csvs!r}, union_by_name = true, header = true)")
     con.execute(f'CREATE VIEW raw AS SELECT * FROM {source}')
     columns = {row[0].lower(): row[1] for row in con.execute('DESCRIBE raw').fetchall()}
     missing = {'latitude', 'longitude', 'acq_date', 'confidence', 'frp'} - columns.keys()
@@ -334,7 +339,8 @@ def main():
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument('csv', nargs='+', type=Path, help='FIRMS CSV files (MODIS or VIIRS)')
+    parser.add_argument('csv', nargs='+', type=Path,
+                        help='FIRMS CSV files (MODIS or VIIRS) or fetch_firms_archive.py Parquet files')
     parser.add_argument('--resolutions', type=parse_resolutions, default=parse_resolutions('0-5'),
                         help='H3 resolutions for Parquet/PMTiles (default 0-5)')
     parser.add_argument('--lod-resolutions', type=parse_resolutions,

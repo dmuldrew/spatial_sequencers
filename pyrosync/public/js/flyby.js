@@ -9,6 +9,12 @@ const UP_Y = new THREE.Vector3(0, 1, 0);
 const FWD_Z = new THREE.Vector3(0, 0, -1);
 const RIGHT_X = new THREE.Vector3(1, 0, 0);
 
+// Scene units per km: EARTH_R scene units span the Earth's 6,371 km radius (the HUD uses 265 km/unit).
+const KM_PER_UNIT = 265;
+const FIRE_HISTORY_DIR = './data/global-fire/';
+// Low-to-high fire density ramp for the multi-year H3 fire history carpet.
+const FIRE_HISTORY_STOPS = ['#4c0519', '#b91c1c', '#f97316', '#facc15', '#fef9c3'];
+
 const CAM_MODES = ['chase', 'cockpit', 'orbit'];
 const CAM_LABELS = {
   chase: '🎥 Cam: Chase',
@@ -102,6 +108,7 @@ export function createFlybyController(bridge) {
     layerHex: document.getElementById('flyby-layer-hex'),
     layerSpirals: document.getElementById('flyby-layer-spirals'),
     layerFires: document.getElementById('flyby-layer-fires'),
+    layerHistory: document.getElementById('flyby-layer-history'),
     metricSelect: document.getElementById('flyby-metric-select')
   };
 
@@ -161,6 +168,12 @@ export function createFlybyController(bridge) {
   let hexGroup = null;
   let spiralGroup = null;
   let fireGroup = null;
+  let historyGroup = null;
+  // Multi-resolution FIRMS fire history, one level per H3 resolution:
+  // [{ res, mesh, cells: Map(id -> [detections, density, frpMax]), altMinKm, altMaxKm }]
+  let historyLevels = [];
+  let historyMeta = null;
+  let activeHistoryLevel = null;
   let craftGroup = null;
   let plumeLeft = null;
   let plumeRight = null;
@@ -597,6 +610,109 @@ export function createFlybyController(bridge) {
     if (inst.instanceColor) inst.instanceColor.needsUpdate = true;
     fireGroup.add(inst);
     scene.add(fireGroup);
+  }
+
+  function fireHistoryColor(t, out) {
+    const scaled = clamp(t, 0, 1) * (FIRE_HISTORY_STOPS.length - 1);
+    const i = Math.min(FIRE_HISTORY_STOPS.length - 2, Math.floor(scaled));
+    out.set(FIRE_HISTORY_STOPS[i]).lerp(new THREE.Color(FIRE_HISTORY_STOPS[i + 1]), scaled - i);
+    return out;
+  }
+
+  function buildFireHistoryLevel(h3, level, payload, colorRange) {
+    const rows = Array.isArray(payload?.cells) ? payload.cells : [];
+    if (!rows.length) return null;
+    // A hexagon's circumradius equals its edge length.
+    const radius = (h3.getHexagonEdgeLengthAvg(level.resolution, 'km') / KM_PER_UNIT) * 0.94;
+    const lo = Number.isFinite(colorRange?.min) ? colorRange.min : -4;
+    const hi = Number.isFinite(colorRange?.max) ? colorRange.max : -1;
+
+    const geo = new THREE.CylinderGeometry(1, 1, 1, 6);
+    const mat = new THREE.MeshLambertMaterial({ color: '#ffffff' });
+    const mesh = new THREE.InstancedMesh(geo, mat, rows.length);
+    mesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
+    mesh.visible = false;
+
+    const cells = new Map();
+    const col = new THREE.Color();
+    const pos = new THREE.Vector3();
+    const scale = new THREE.Vector3();
+    const quat = new THREE.Quaternion();
+    rows.forEach(([id, detections, density, frpMax], idx) => {
+      cells.set(id, [detections, density, frpMax]);
+      const t = density > 0 ? (Math.log10(density) - lo) / (hi - lo || 1) : 0;
+      // Same absolute heights at every level, so swapping levels does not jump.
+      const height = 0.012 + clamp(t, 0, 1) * 0.11;
+      const [lat, lon] = h3.cellToLatLng(id);
+      latLonAltToVec3(lat, lon, EARTH_R, pos);
+      tmpUp.copy(pos).normalize();
+      quat.setFromUnitVectors(UP_Y, tmpUp);
+      pos.addScaledVector(tmpUp, height * 0.5 + 0.006);
+      scale.set(radius, height, radius);
+      tmpM4.compose(pos, quat, scale);
+      mesh.setMatrixAt(idx, tmpM4);
+      mesh.setColorAt(idx, fireHistoryColor(t, col));
+    });
+    mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    return {
+      res: level.resolution,
+      mesh,
+      cells,
+      altMinKm: Number.isFinite(level.altitudeKm?.min) ? level.altitudeKm.min : 0,
+      altMaxKm: Number.isFinite(level.altitudeKm?.max) ? level.altitudeKm.max : Infinity
+    };
+  }
+
+  // Loads after the scene is up; the layer is optional, so a missing manifest is not an error.
+  async function loadFireHistory(h3) {
+    const manifest = await fetch(`${FIRE_HISTORY_DIR}manifest.json`)
+      .then((r) => (r.ok ? r.json() : null))
+      .catch(() => null);
+    if (!manifest || !Array.isArray(manifest.levels) || !manifest.levels.length) return;
+    historyMeta = manifest;
+    historyGroup = new THREE.Group();
+    historyGroup.visible = dom.layerHistory?.getAttribute('aria-pressed') !== 'false';
+    scene.add(historyGroup);
+    // Coarsest first, so the high-orbit view appears soonest.
+    const levels = [...manifest.levels].sort((a, b) => a.resolution - b.resolution);
+    for (const level of levels) {
+      const payload = await fetch(`${FIRE_HISTORY_DIR}${level.file}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .catch(() => null);
+      const built = buildFireHistoryLevel(h3, level, payload, manifest.colorRange);
+      if (!built) continue;
+      historyGroup.add(built.mesh);
+      historyLevels.push(built);
+    }
+  }
+
+  // Show the finest level whose altitude band contains the craft.
+  function updateFireHistoryLod(altKm) {
+    if (!historyLevels.length) return;
+    let pick = null;
+    for (const level of historyLevels) {
+      if (altKm >= level.altMinKm && altKm < level.altMaxKm && (!pick || level.res > pick.res)) {
+        pick = level;
+      }
+    }
+    if (!pick) {
+      // Outside every band: nearest by altitude.
+      pick = historyLevels.reduce((best, level) => {
+        const gap = altKm < level.altMinKm ? level.altMinKm - altKm : altKm - level.altMaxKm;
+        const bestGap = altKm < best.altMinKm ? best.altMinKm - altKm : altKm - best.altMaxKm;
+        return gap < bestGap ? level : best;
+      });
+    }
+    if (pick === activeHistoryLevel) return;
+    for (const level of historyLevels) level.mesh.visible = level === pick;
+    activeHistoryLevel = pick;
+  }
+
+  function fireHistoryYears() {
+    const label = historyMeta?.periodLabel || '';
+    const years = label.match(/\d{4}/g);
+    return years && years.length >= 2 ? `${years[0]}–${years[years.length - 1]}` : 'History';
   }
 
   function computeRadialNorm(biome, rec, metric) {
@@ -1205,6 +1321,13 @@ export function createFlybyController(bridge) {
       currentH3Res3 = window.h3.latLngToCell(geo.lat, geo.lon, 3);
     }
 
+    let historyCell = null;
+    if (window.h3 && activeHistoryLevel && historyGroup?.visible) {
+      const id = window.h3.latLngToCell(geo.lat, geo.lon, activeHistoryLevel.res);
+      const row = activeHistoryLevel.cells.get(id);
+      if (row) historyCell = { res: activeHistoryLevel.res, detections: row[0], density: row[1] };
+    }
+
     const activeRec = nearestTower
       ? nearestTower.biome.records[clamp(sim.monthIndex, 0, nearestTower.biome.records.length - 1)]
       : null;
@@ -1225,6 +1348,7 @@ export function createFlybyController(bridge) {
       fireBin: nearestFire,
       distToFire: minFireDist,
       iowaCell,
+      historyCell,
       currentH3Res3,
       pan
     };
@@ -1258,6 +1382,10 @@ export function createFlybyController(bridge) {
         dom.hudHex.textContent = `H3 ${scan.iowaCell.id.slice(0, 7)}… ${scan.iowaCell.A1.toFixed(1)}°C · NDVI ${ndviStr}`;
       } else if (scan.fireBin && scan.distToFire < 8.5) {
         dom.hudHex.textContent = `${scan.fireBin.count} hotspots · ${Math.round(scan.fireBin.totalFrp)} MW FRP`;
+      } else if (scan.historyCell) {
+        const { res, detections, density } = scan.historyCell;
+        const per1000 = (density * 1000).toPrecision(2);
+        dom.hudHex.textContent = `${fireHistoryYears()} r${res}: ${detections.toLocaleString()} fires · ${per1000}/1000 km²/yr`;
       } else if (scan.currentH3Res3) {
         dom.hudHex.textContent = `H3 r3 ${scan.currentH3Res3}`;
       }
@@ -1285,6 +1413,7 @@ export function createFlybyController(bridge) {
     }
 
     stepFlightPhysics(dt);
+    updateFireHistoryLod((sim.craftPos.length() - EARTH_R) * KM_PER_UNIT);
     const scan = scanFootprint();
     updateHudReadout(nowMs, scan);
     updateSpatialAudio(nowMs, scan);
@@ -1385,6 +1514,12 @@ export function createFlybyController(bridge) {
       const next = e.currentTarget.getAttribute('aria-pressed') !== 'true';
       e.currentTarget.setAttribute('aria-pressed', String(next));
       if (fireGroup) fireGroup.visible = next;
+    });
+
+    dom.layerHistory?.addEventListener('click', (e) => {
+      const next = e.currentTarget.getAttribute('aria-pressed') !== 'true';
+      e.currentTarget.setAttribute('aria-pressed', String(next));
+      if (historyGroup) historyGroup.visible = next;
     });
 
     dom.metricSelect?.addEventListener('change', (e) => {
@@ -1516,6 +1651,7 @@ export function createFlybyController(bridge) {
 
       sim.initialized = true;
       setBanner('', true);
+      loadFireHistory(h3).catch((err) => console.warn('Fire history layer unavailable:', err));
     } catch (err) {
       console.error('Orbital flyby initialization failed:', err);
       setBanner(`Failed to initialize 3D view: ${err.message}`);
