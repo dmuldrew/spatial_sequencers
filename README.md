@@ -9,7 +9,7 @@ An interactive **audio-visual NASA wildfire, meteorology, and Earth-data sonific
 ## TL;DR
 
 - **Who:** Anyone trying to understand a changing planet — researchers, land and fire managers, students, and blind and low-vision audiences who are shut out of Earth data published only as maps and charts.
-- **What:** Spatial Sequencers — a hub of interactive sonifications of NASA Earth data (POWER meteorology, EONET wildfire events, FIRMS hotspots, MODIS land data): PyroSync's fire-weather observatory, the Space Jukebox fire flight, and a combined flyby. Built for the **2026 NASA Space Apps Challenge** (Seattle); submission challenge: **The Earth Information Jukebox**.
+- **What:** Spatial Sequencers — a hub of interactive sonifications of NASA Earth data (POWER meteorology, EONET wildfire events, FIRMS hotspots, MODIS land data): PyroSync's fire-weather observatory, the Space Jukebox fire flight. Built for the **2026 NASA Space Apps Challenge** (Seattle); submission challenge: **The Earth Information Jukebox**.
 - **Why:** Sound reveals what pictures hide — patterns, tension, and change over time — and it includes the people pictures leave out. A changing planet shouldn't require eyes to perceive.
 - **PyroSync** — a fire-weather observatory: 26 years of NASA POWER meteorology, EONET wildfires, and FIRMS hotspots, sonified with `d3-audio` across a climate spiral, an Iowa H3 hex map, and an orbital flyby.
 - **Space Jukebox** — an audio-first 3D fire flight designed for blind and low-vision listeners: a ship tours the 330 largest NASA FIRMS hotspots on Earth this week while spoken narration, a bowed-string tone, and extruded light bars make the fires audible and visible.
@@ -31,7 +31,6 @@ An interactive **audio-visual NASA wildfire, meteorology, and Earth-data sonific
 
 - **[PyroSync (`pyrosync/`)](pyrosync/README.md)** — Live Demo: `https://dmuldrew.github.io/spatial_sequencers/pyrosync/`
   - **26-Year Wildfire Spiral (`/#spiral`)**, **Central Iowa MODIS Hex Map (`/#iowa-map`)**, and **Orbital Flyby (3D) (`/#flyby`)**.
-- **[Combined Spaceship Flyby (`spaceship-flyby/`)](spaceship-flyby/README.md)** — Live Demo: `https://dmuldrew.github.io/spatial_sequencers/spaceship-flyby/`
   - Separate website choice uniting **3D Fire Flight** (continuous detuned sawtooth thermal violin, stereo hotspot proximity bells, and spoken region narration) with **PyroSync Observatory** (1991–2020 harmonic tension `σ` chords, Euclidean wind-ember pulses, 26-year 3D climate spirals, and Central Iowa MODIS H3 hex plucks).
 - **[Space Jukebox (`space-jukebox/`)](space-jukebox/README.md)** — Live Demo: `https://dmuldrew.github.io/spatial_sequencers/space-jukebox/fly.html`
   - **3D Fire Flight** (`fly.html`) — a spaceship tours NASA FIRMS fire regions on a 3D globe; Web Audio sonification + Speech Synthesis narration designed for blind and low-vision listeners.

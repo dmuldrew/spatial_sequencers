@@ -177,7 +177,7 @@ const server = http.createServer(async (req, res) => {
   const rawPath = decodeURI((req.url || '/').split('?')[0]);
 
   // Redirect directory roots without trailing slash so relative links resolve cleanly
-  if (['/pyrosync', '/spaceship-flyby', '/space-jukebox', '/hub'].includes(rawPath)) {
+  if (['/pyrosync', '/space-jukebox', '/hub'].includes(rawPath)) {
     res.writeHead(301, { Location: `${rawPath}/` });
     res.end();
     return;
@@ -189,7 +189,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   const reqPath = rawPath
-    .replace(/^\/hub\/(pyrosync|spaceship-flyby|space-jukebox)(?=\/|$)/, '/$1')
+    .replace(/^\/hub\/(pyrosync|space-jukebox)(?=\/|$)/, '/$1')
     .replace(/^\/pyrosync(?=\/|$)/, '') || '/';
 
   if (req.method === 'GET' && reqPath.startsWith('/api/midwest/')) {

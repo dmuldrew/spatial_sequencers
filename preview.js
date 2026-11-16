@@ -107,9 +107,6 @@ const server = http.createServer((req, res) => {
   if (urlPath === "/pyrosync" || urlPath.startsWith("/pyrosync/")) {
     return serveFromDir(res, path.join(ROOT, "pyrosync", "public"), urlPath.slice("/pyrosync".length) || "/");
   }
-  if (urlPath === "/spaceship-flyby" || urlPath.startsWith("/spaceship-flyby/")) {
-    return serveFromDir(res, path.join(ROOT, "spaceship-flyby"), urlPath.slice("/spaceship-flyby".length) || "/");
-  }
   if (urlPath === "/space-jukebox" || urlPath === "/space-jukebox/") {
     return sendFile(res, path.join(ROOT, "space-jukebox", "fly.html"));
   }
@@ -117,7 +114,7 @@ const server = http.createServer((req, res) => {
     return serveFromDir(res, path.join(ROOT, "space-jukebox"), urlPath.slice("/space-jukebox".length));
   }
   res.writeHead(404, { "Content-Type": "text/plain" });
-  res.end("404 Not Found\n\nThis preview serves:\n  /\n  /pyrosync/\n  /spaceship-flyby/\n  /space-jukebox/\n");
+  res.end("404 Not Found\n\nThis preview serves:\n  /\n  /pyrosync/\n  /space-jukebox/\n");
 });
 
 server.listen(PORT, () => {
@@ -125,7 +122,6 @@ server.listen(PORT, () => {
   console.log("Spatial Sequencers — local preview");
   console.log(`  Hub:             ${base}/`);
   console.log(`  PyroSync:        ${base}/pyrosync/`);
-  console.log(`  Spaceship Flyby: ${base}/spaceship-flyby/`);
   console.log(`  Space Jukebox:   ${base}/space-jukebox/  (3D flight)`);
   const d3 = path.join(ROOT, "pyrosync", "node_modules", "d3");
   if (!fs.existsSync(d3)) {

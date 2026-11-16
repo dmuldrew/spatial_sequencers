@@ -55,9 +55,7 @@ export function initHubNavbar() {
     const links = Array.from(menu.querySelectorAll('a[data-exp]'));
     let activeExp = 'hub';
 
-    if (curPath.includes('/spaceship-flyby')) {
-      activeExp = 'combined-flyby';
-    } else if (curPath.endsWith('/fly.html')) {
+    if (curPath.endsWith('/fly.html')) {
       activeExp = 'fire-flight';
     } else if (curPath.includes('/space-jukebox')) {
       activeExp = 'space-jukebox';

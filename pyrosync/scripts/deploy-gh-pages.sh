@@ -102,7 +102,6 @@ REQUIRED_FILES=(
   "global-fire/map.js"
   "data/global-fire/manifest.json"
   "data/global-fire/global_fire.pmtiles"
-  "spaceship-flyby/index.html"
   "hub/index.html"
   "vendor/d3.min.js"
   "vendor/Tone.js"
